@@ -1,2 +1,6 @@
 # CINet
-Zack Williams
+Bryan Zhao 
+Christopher Volkmar 
+Zackary Willians 
+Ian Piala 
+Marcie Nelsen 
