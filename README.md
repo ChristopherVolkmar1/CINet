@@ -1,6 +1,6 @@
 # CINet
-Bryan Zhao
-Christopher Volkmar
-Zackary Willians 
-Ian Piala
-Marcie Nelsen
+Bryan Zhao /n
+Christopher Volkmar /n
+Zackary Willians /n
+Ian Piala /n
+Marcie Nelsen /n
