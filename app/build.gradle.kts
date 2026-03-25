@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
 }
 
 android {
@@ -55,4 +56,10 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation(libs.maps.compose) // {x-release-please-version}
+    // Optionally, you can include the Compose utils library for Clustering,
+    // Street View metadata checks, etc.
+    //implementation(libs.maps.compose.utils) // {x-release-please-version}
+    // Optionally, you can include the widgets library for ScaleBar, etc.
+    //implementation(libs.maps.compose.widgets) // {x-release-please-version}
 }
