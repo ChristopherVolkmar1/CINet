@@ -37,13 +37,7 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true
     }
-}
-
-secrets {
-    propertiesFileName = "local.properties"
-    defaultPropertiesFileName = "local.properties"
 }
 
 dependencies {
@@ -55,7 +49,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.play.services.location)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -69,7 +62,4 @@ dependencies {
     //implementation(libs.maps.compose.utils) // {x-release-please-version}
     // Optionally, you can include the widgets library for ScaleBar, etc.
     //implementation(libs.maps.compose.widgets) // {x-release-please-version}
-    implementation(libs.accompanist.permissions)
-    implementation(libs.google.maps.services)
-    implementation(libs.slf4j.simple)
 }

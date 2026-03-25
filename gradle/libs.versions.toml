@@ -1,8 +1,6 @@
 [versions]
-accompanistPermissions = "0.37.3"
 agp = "9.0.1"
 coreKtx = "1.10.1"
-googleMapsServices = "2.2.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
@@ -13,14 +11,9 @@ composeBom = "2024.09.00"
 mapsCompose = "8.2.0"
 mapsComposeUtils = "8.2.0"
 mapsComposeWidgets = "8.2.0"
-playServicesLocation = "21.3.0"
-accompanist = "0.37.0"
-slf4j = "2.0.7"
 
 [libraries]
-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-google-maps-services = { module = "com.google.maps:google-maps-services", version.ref = "googleMapsServices" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -38,8 +31,6 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "mapsCompose" }
 maps-compose-utils = { module = "com.google.maps.android:maps-compose-utils", version.ref = "mapsComposeUtils" }
 maps-compose-widgets = { module = "com.google.maps.android:maps-compose-widgets", version.ref = "mapsComposeWidgets" }
-play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
-slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
