@@ -1,6 +1,10 @@
 package com.example.cinet
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -8,9 +12,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -45,7 +51,10 @@ data class CampusLocation(
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun CampusMapScreen(modifier: Modifier = Modifier) {
+fun CampusMapScreen(
+    modifier: Modifier = Modifier,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
 
     val csuciBounds = LatLngBounds(
@@ -153,45 +162,56 @@ fun CampusMapScreen(modifier: Modifier = Modifier) {
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
     }
 
-    GoogleMap(
-        modifier = modifier.fillMaxSize(),
-        properties = mapProperties,
-        cameraPositionState = cameraPositionState
-    ) {
-        if (polylinePoints.isNotEmpty()) {
-            Polyline(
-                points = polylinePoints,
-                color = Color(0xff0000ff),
-                width = 10f,
-                jointType = JointType.ROUND
-            )
-        }
+    Box(modifier = modifier.fillMaxSize()) {
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            properties = mapProperties,
+            cameraPositionState = cameraPositionState
+        ) {
+            if (polylinePoints.isNotEmpty()) {
+                Polyline(
+                    points = polylinePoints,
+                    color = Color(0xff0000ff),
+                    width = 10f,
+                    jointType = JointType.ROUND
+                )
+            }
 
-        val markersToDraw = campusRegistry.values.flatten()
-        markersToDraw.forEach { location ->
-            val markerState = rememberUpdatedMarkerState(position = location.coordinates)
+            val markersToDraw = campusRegistry.values.flatten()
+            markersToDraw.forEach { location ->
+                val markerState = rememberUpdatedMarkerState(position = location.coordinates)
 
-            Marker(
-                state = markerState,
-                title = location.name,
-                snippet = "Category: ${location.category.name.lowercase()}",
-                icon = BitmapDescriptorFactory.defaultMarker(
-                    when (location.category) {
-                        LocationCategory.ACADEMIC -> BitmapDescriptorFactory.HUE_RED
-                        LocationCategory.COMMUTER_PARKING -> BitmapDescriptorFactory.HUE_AZURE
-                        LocationCategory.DINING -> BitmapDescriptorFactory.HUE_ORANGE
-                        LocationCategory.HOUSING -> BitmapDescriptorFactory.HUE_VIOLET
-                    }
-                ),
-                onInfoWindowClick = {
-                    userLocation?.let { start ->
-                        coroutineScope.launch {
-                            val path = fetchDirections(start, location.coordinates, context)
-                            polylinePoints = path
+                Marker(
+                    state = markerState,
+                    title = location.name,
+                    snippet = "Category: ${location.category.name.lowercase()}",
+                    icon = BitmapDescriptorFactory.defaultMarker(
+                        when (location.category) {
+                            LocationCategory.ACADEMIC -> BitmapDescriptorFactory.HUE_RED
+                            LocationCategory.COMMUTER_PARKING -> BitmapDescriptorFactory.HUE_AZURE
+                            LocationCategory.DINING -> BitmapDescriptorFactory.HUE_ORANGE
+                            LocationCategory.HOUSING -> BitmapDescriptorFactory.HUE_VIOLET
+                        }
+                    ),
+                    onInfoWindowClick = {
+                        userLocation?.let { start ->
+                            coroutineScope.launch {
+                                val path = fetchDirections(start, location.coordinates, context)
+                                polylinePoints = path
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
+        }
+
+        Button(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            Text("Back")
         }
     }
 }
