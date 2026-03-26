@@ -6,8 +6,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,11 +54,13 @@ fun HomeScreen(modifier: Modifier = Modifier) {
     ) { padding ->
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.secondary)
-                .padding(padding)
+                .padding(padding),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(20.dp))
+
             Text(
                 text = "Welcome back to CINet!",
                 style = MaterialTheme.typography.headlineLarge
@@ -66,7 +68,16 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Button(onClick = { }) {
+            Button(
+                onClick = { },
+                modifier = Modifier
+                    .align(Alignment.Start)
+                    .padding(start = 24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.tertiary
+                )
+            ) {
                 Text("Maps")
             }
         }
