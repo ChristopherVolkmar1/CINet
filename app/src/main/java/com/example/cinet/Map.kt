@@ -1,63 +1,42 @@
 package com.example.cinet
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-
-@Composable //dummy screen for demo nav
-fun MapScreen(onBack: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Dummy Screen Content", style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onBack) {
-            Text("Back to Home")
-        }
-    }
-}
-import android.R.attr.end
-import android.graphics.Color.blue
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.GoogleMapComposable
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
-import com.google.maps.android.compose.rememberUpdatedMarkerState
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.Polyline
+import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
 import com.google.maps.model.TravelMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class LocationCategory {
@@ -71,28 +50,27 @@ data class CampusLocation(
 )
 
 @OptIn(ExperimentalPermissionsApi::class)
-@ExperimentalPermissionsApi
 @Composable
-@GoogleMapComposable
-fun Map(modifier: Modifier = Modifier) {
+fun CampusMapScreen(
+    modifier: Modifier = Modifier,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
-    val csuci = LatLng(34.1621, -119.0435)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(csuci, 10f)
-    }
-    //Bounds to prevent the user from leaving the campus
+
     val csuciBounds = LatLngBounds(
         LatLng(34.155, -119.055),
         LatLng(34.168, -119.035)
     )
-    val mapProperties by remember {
+
+    val permissionState = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
+
+    val mapProperties by remember(permissionState.status.isGranted) {
         mutableStateOf(
             MapProperties(
                 latLngBoundsForCameraTarget = csuciBounds,
-                //min prevents from zooming out too far
                 minZoomPreference = 14f,
                 maxZoomPreference = 20f,
-                isMyLocationEnabled = true
+                isMyLocationEnabled = permissionState.status.isGranted
             )
         )
     }
@@ -125,15 +103,17 @@ fun Map(modifier: Modifier = Modifier) {
         CampusLocation("Topanga Hall", LatLng(34.16009541167767, -119.04166559195076), LocationCategory.ACADEMIC),
         CampusLocation("Yuba Hall", LatLng(34.164022422925036, -119.04109646938987), LocationCategory.ACADEMIC)
     )
+
     val diningLocations = listOf(
         CampusLocation("American Pie Company", LatLng(34.16321171837447, -119.03931197917322), LocationCategory.DINING),
-        CampusLocation("Ekho's Café", LatLng(34.16309792014503, -119.03946822433113), LocationCategory.DINING),
+        CampusLocation("Ekho's Cafe", LatLng(34.16309792014503, -119.03946822433113), LocationCategory.DINING),
         CampusLocation("Freudian Sip", LatLng(34.162524752647805, -119.04086278682107), LocationCategory.DINING),
         CampusLocation("Islands Cafe", LatLng(34.160430282161435, -119.04160590722023), LocationCategory.DINING),
         CampusLocation("Mom Wong Kitchen", LatLng(34.16281772412409, -119.0392259681462), LocationCategory.DINING),
         CampusLocation("Sea Store Market", LatLng(34.16137041992328, -119.04409100603398), LocationCategory.DINING),
         CampusLocation("Tortillas Grill & Cantina", LatLng(34.16304343294648, -119.03946353999095), LocationCategory.DINING)
     )
+
     val commuterParking = listOf(
         CampusLocation("A1 Parking", LatLng(34.163600395901376, -119.04259463208324), LocationCategory.COMMUTER_PARKING),
         CampusLocation("A2 Parking", LatLng(34.16420505882201, -119.04162581055532), LocationCategory.COMMUTER_PARKING),
@@ -146,19 +126,19 @@ fun Map(modifier: Modifier = Modifier) {
         CampusLocation("A10 Parking", LatLng(34.15935028132672, -119.04041059647916), LocationCategory.COMMUTER_PARKING),
         CampusLocation("A11 Parking", LatLng(34.164527100140525, -119.04799474404118), LocationCategory.COMMUTER_PARKING),
     )
-    //Map of all campus markers
 
-    val campusRegistry: Map<LocationCategory, List<CampusLocation>> = mapOf(
+    val campusRegistry: kotlin.collections.Map<LocationCategory, List<CampusLocation>> = mapOf(
         LocationCategory.ACADEMIC to academicLocations,
         LocationCategory.DINING to diningLocations,
         LocationCategory.COMMUTER_PARKING to commuterParking
     )
+
     val coroutineScope = rememberCoroutineScope()
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
 
-    //Getting user location data and requesting permissions
     val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
+
     fun updateLocation() {
         try {
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
@@ -166,68 +146,76 @@ fun Map(modifier: Modifier = Modifier) {
                     userLocation = LatLng(location.latitude, location.longitude)
                 }
             }
-        } catch (e: SecurityException) {
-            // Handle case where user denied permission
+        } catch (_: SecurityException) {
         }
     }
-    val permissionState = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
+
     LaunchedEffect(Unit) {
         if (!permissionState.status.isGranted) {
             permissionState.launchPermissionRequest()
         } else {
-            updateLocation() // Get the location if we already have permission
+            updateLocation()
         }
     }
 
-    GoogleMap(
-        modifier = Modifier.fillMaxSize(),
-        properties = mapProperties,
-        cameraPositionState = rememberCameraPositionState {
-            position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
-        }
-    ) {
-        if (polylinePoints.isNotEmpty()) {
-            Polyline(
-                points = polylinePoints,
-                color = Color(0xff0000ff),
-                width = 10f,
-                jointType = JointType.ROUND
-            )
-        }
-        //Flatten all markers into a single list to easily draw them onto the map
-        val markersToDraw = campusRegistry.values.flatten()
-        markersToDraw.forEach { location ->
-            // Create a specific state for each marker so we can control it
-            val markerState = rememberUpdatedMarkerState(position = location.coordinates)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
+    }
 
-            Marker(
-                state = markerState,
-                title = location.name,
-                snippet = "Category: ${location.category.name.lowercase()}",
-                // Categorizing by color
-                icon = BitmapDescriptorFactory.defaultMarker(
-                    when (location.category) {
-                        LocationCategory.ACADEMIC -> BitmapDescriptorFactory.HUE_RED
-                        LocationCategory.COMMUTER_PARKING -> BitmapDescriptorFactory.HUE_AZURE
-                        LocationCategory.DINING -> BitmapDescriptorFactory.HUE_ORANGE
-                        LocationCategory.HOUSING -> BitmapDescriptorFactory.HUE_VIOLET
-                    }
-                ),
-                onInfoWindowClick = { _ ->
-                    //A null check before to make sure we have the users location to create the polyline
-                    userLocation?.let { start ->
-                        coroutineScope.launch {
-                            val path = fetchDirections(start, location.coordinates, context)
-                            polylinePoints = path
+    Box(modifier = modifier.fillMaxSize()) {
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            properties = mapProperties,
+            cameraPositionState = cameraPositionState
+        ) {
+            if (polylinePoints.isNotEmpty()) {
+                Polyline(
+                    points = polylinePoints,
+                    color = Color(0xff0000ff),
+                    width = 10f,
+                    jointType = JointType.ROUND
+                )
+            }
+
+            val markersToDraw = campusRegistry.values.flatten()
+            markersToDraw.forEach { location ->
+                val markerState = rememberUpdatedMarkerState(position = location.coordinates)
+
+                Marker(
+                    state = markerState,
+                    title = location.name,
+                    snippet = "Category: ${location.category.name.lowercase()}",
+                    icon = BitmapDescriptorFactory.defaultMarker(
+                        when (location.category) {
+                            LocationCategory.ACADEMIC -> BitmapDescriptorFactory.HUE_RED
+                            LocationCategory.COMMUTER_PARKING -> BitmapDescriptorFactory.HUE_AZURE
+                            LocationCategory.DINING -> BitmapDescriptorFactory.HUE_ORANGE
+                            LocationCategory.HOUSING -> BitmapDescriptorFactory.HUE_VIOLET
+                        }
+                    ),
+                    onInfoWindowClick = {
+                        userLocation?.let { start ->
+                            coroutineScope.launch {
+                                val path = fetchDirections(start, location.coordinates, context)
+                                polylinePoints = path
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
+        }
+
+        Button(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            Text("Back")
         }
     }
 }
 
-//Implements google directions api to create paths around buildings using the users location
 suspend fun fetchDirections(
     start: LatLng,
     end: LatLng,
@@ -235,23 +223,27 @@ suspend fun fetchDirections(
 ): List<LatLng> {
     return withContext(Dispatchers.IO) {
         try {
-            val ai = context.packageManager.getApplicationInfo(context.packageName, android.content.pm.PackageManager.GET_META_DATA)
+            val ai = context.packageManager.getApplicationInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_META_DATA
+            )
             val bundle = ai.metaData
             val apiKey = bundle.getString("com.google.android.geo.API_KEY")
 
             val geoContext = GeoApiContext.Builder()
                 .apiKey(apiKey)
                 .build()
+
             val result = DirectionsApi.newRequest(geoContext)
-                .mode(TravelMode.WALKING) // Makes sure routes are set to walkable
-                .origin(com.google.maps.model.LatLng(start.latitude, start.longitude)) // The users location
-                .destination(com.google.maps.model.LatLng(end.latitude, end.longitude)) // Where the user wants to go
+                .mode(TravelMode.WALKING)
+                .origin(com.google.maps.model.LatLng(start.latitude, start.longitude))
+                .destination(com.google.maps.model.LatLng(end.latitude, end.longitude))
                 .await()
 
             result.routes.getOrNull(0)?.overviewPolyline?.decodePath()?.map {
                 LatLng(it.lat, it.lng)
             } ?: listOf(start, end)
-        } catch (e: Exception) { // "e" Represents the error object containing details about what happened
+        } catch (e: Exception) {
             e.printStackTrace()
             listOf(start, end)
         }
