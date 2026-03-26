@@ -15,6 +15,7 @@ private val DarkColorScheme = darkColorScheme(
     primary = CINetPrimaryDark,
     secondary = CINetSecondaryDark,
     tertiary = CINetTertiaryDark,
+    onPrimary = CINetTertiaryDark
 
 )
 
@@ -22,6 +23,7 @@ private val LightColorScheme = lightColorScheme(
     primary = CINetPrimaryLight,
     secondary = CINetSecondaryLight,
     tertiary = CINetTertiaryLight,
+    onPrimary = CINetTertiaryLight
 
     /* Other default colors to override
     background = Color(0xFFFFFBFE),

@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onMapClick: () -> Unit,
-    onSettingsClick: () -> Unit // Added callback for settings
+    onSettingsClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -31,7 +31,7 @@ fun HomeScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.tertiary
                 ),
                 actions = {
-                    IconButton(onClick = { expanded = true }) {
+                    IconButton(onClick = { expanded = true }) { //creates dropdown menu for settings
                         Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                     }
 
@@ -47,7 +47,7 @@ fun HomeScreen(
                             text = { Text("Settings") },
                             onClick = {
                                 expanded = false
-                                onSettingsClick() // Call settings callback
+                                onSettingsClick() //goes to settings page
                             }
                         )
                         DropdownMenuItem(
@@ -79,11 +79,8 @@ fun HomeScreen(
                 onClick = onMapClick,
                 modifier = Modifier
                     .align(Alignment.Start)
-                    .padding(start = 24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.tertiary
-                )
+                    .padding(start = 24.dp), // adjustable formatting
+                colors = ButtonDefaults.buttonColors()
             ) {
                 Text("Maps")
             }

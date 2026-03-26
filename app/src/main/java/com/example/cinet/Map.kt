@@ -7,7 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-@Composable
+@Composable //dummy screen for demo nav
 fun MapScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
