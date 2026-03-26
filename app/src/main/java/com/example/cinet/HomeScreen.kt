@@ -12,7 +12,11 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    modifier: Modifier = Modifier,
+    onMapClick: () -> Unit,
+    onSettingsClick: () -> Unit // Added callback for settings
+) {
     var expanded by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -41,7 +45,10 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                         )
                         DropdownMenuItem(
                             text = { Text("Settings") },
-                            onClick = { expanded = false }
+                            onClick = {
+                                expanded = false
+                                onSettingsClick() // Call settings callback
+                            }
                         )
                         DropdownMenuItem(
                             text = { Text("Log Out") },
@@ -69,7 +76,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { },
+                onClick = onMapClick,
                 modifier = Modifier
                     .align(Alignment.Start)
                     .padding(start = 24.dp),
