@@ -1,10 +1,8 @@
 package com.example.cinet
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,14 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -49,7 +42,6 @@ data class CampusLocation(
     val category: LocationCategory
 )
 
-@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CampusMapScreen(
     modifier: Modifier = Modifier,
@@ -62,15 +54,17 @@ fun CampusMapScreen(
         LatLng(34.168, -119.035)
     )
 
-    val permissionState = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    var hasPermission by remember {
+        mutableStateOf(PermissionManager.hasAllPermissions(context))
+    }
 
-    val mapProperties by remember(permissionState.status.isGranted) {
+    val mapProperties by remember(hasPermission) {
         mutableStateOf(
             MapProperties(
                 latLngBoundsForCameraTarget = csuciBounds,
                 minZoomPreference = 14f,
                 maxZoomPreference = 20f,
-                isMyLocationEnabled = permissionState.status.isGranted
+                isMyLocationEnabled = hasPermission
             )
         )
     }
@@ -151,10 +145,23 @@ fun CampusMapScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (!permissionState.status.isGranted) {
-            permissionState.launchPermissionRequest()
-        } else {
-            updateLocation()
+        if (!hasPermission) {
+            // If missing permissions, request them
+            val activity = context as? Activity
+            activity?.let {
+                PermissionManager.requestAllPermissions(it)
+                hasPermission = PermissionManager.hasAllPermissions(context)
+            }
+        }
+        if (hasPermission) {
+            // Retrieve the users last location
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    location?.let { userLocation = LatLng(it.latitude, it.longitude) }
+                }
+            } catch (e: SecurityException) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -203,15 +210,6 @@ fun CampusMapScreen(
                     }
                 )
             }
-        }
-
-        Button(
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-        ) {
-            Text("Back")
         }
     }
 }
