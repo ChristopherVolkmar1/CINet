@@ -25,14 +25,14 @@ class MainActivity : ComponentActivity() {
         // Create a Notification Channel for this app which is required to make notifications appear
         NotificationHelper.createChannel(this)
         // Test notification on app launch to verify notifications but also set up pop up notifications
-        /*val testNotification = AppNotification(
+        val testNotification = AppNotification(
             title = "Test Event",
             message = "Study Session in 10 Minutes",
             type = NotificationType.EVENT,
             timestamp = System.currentTimeMillis()
         )
 
-        NotificationHelper.showNotification(this, testNotification) // commented out (used for testing notifs) */
+        NotificationHelper.showNotification(this, testNotification) // commented out (used for testing notifs)
 
         enableEdgeToEdge()
         setContent {
