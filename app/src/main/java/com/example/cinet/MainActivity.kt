@@ -53,9 +53,7 @@ class MainActivity : ComponentActivity() {
                                     onMapClick = { currentScreen = Screen.Map },
                                     onSettingsClick = { currentScreen = Screen.Settings }
                                 )
-                                Screen.Map -> MapScreen(
-                                    onBack = { currentScreen = Screen.Home }
-                                )
+                                Screen.Map -> CampusMapScreen()
                                 Screen.Settings -> SettingScreen(
                                     onBack = { currentScreen = Screen.Home }
                                 )
