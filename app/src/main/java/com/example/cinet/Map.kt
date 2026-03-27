@@ -1,6 +1,7 @@
 package com.example.cinet
 
 import android.app.Activity
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -31,16 +32,23 @@ import com.google.maps.model.TravelMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.google.firebase.firestore.GeoPoint
+import com.google.firebase.firestore.PropertyName
+import com.google.maps.android.compose.MarkerState
+import kotlinx.coroutines.tasks.await
 
 enum class LocationCategory {
     ACADEMIC, COMMUTER_PARKING, DINING, HOUSING
 }
 
 data class CampusLocation(
-    val name: String,
-    val coordinates: LatLng,
-    val category: LocationCategory
-)
+    val name: String = "",
+    val category: String = "",
+    val coordinates: GeoPoint = GeoPoint(0.0, 0.0)
+) {
+    val latLng: LatLng
+        get() = LatLng(coordinates.latitude, coordinates.longitude)
+}
 
 @Composable
 fun CampusMapScreen(
@@ -48,6 +56,7 @@ fun CampusMapScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
 
     val csuciBounds = LatLngBounds(
         LatLng(34.155, -119.055),
@@ -57,7 +66,6 @@ fun CampusMapScreen(
     var hasPermission by remember {
         mutableStateOf(PermissionManager.hasAllPermissions(context))
     }
-
     val mapProperties by remember(hasPermission) {
         mutableStateOf(
             MapProperties(
@@ -69,63 +77,9 @@ fun CampusMapScreen(
         )
     }
 
-    val academicLocations = listOf(
-        CampusLocation("Aliso Hall", LatLng(34.161033533317216, -119.04554291019717), LocationCategory.ACADEMIC),
-        CampusLocation("Arroyo Hall", LatLng(34.160362571139856, -119.0449651371382), LocationCategory.ACADEMIC),
-        CampusLocation("Bell Tower", LatLng(34.161033426860186, -119.04327405083124), LocationCategory.ACADEMIC),
-        CampusLocation("Bell Tower East", LatLng(34.1613627873466, -119.04193224072041), LocationCategory.ACADEMIC),
-        CampusLocation("Bell Tower West", LatLng(34.16077413754563, -119.04413838504449), LocationCategory.ACADEMIC),
-        CampusLocation("Broome Library", LatLng(34.16272379037882, -119.04085866409868), LocationCategory.ACADEMIC),
-        CampusLocation("Chaparral Hall", LatLng(34.1620975730738, -119.04571940179336), LocationCategory.ACADEMIC),
-        CampusLocation("Del Norte Hall", LatLng(34.16314332680665, -119.04409404414939), LocationCategory.ACADEMIC),
-        CampusLocation("El Dorado Hall", LatLng(34.16421806224397, -119.04713710663997), LocationCategory.ACADEMIC),
-        CampusLocation("Gateway Hall", LatLng(34.164917303238425, -119.04526653254618), LocationCategory.ACADEMIC),
-        CampusLocation("Ironwood Hall", LatLng(34.16278192070162, -119.04589286088351), LocationCategory.ACADEMIC),
-        CampusLocation("Lindero Hall", LatLng(34.15952716715866, -119.04147320447237), LocationCategory.ACADEMIC),
-        CampusLocation("Madera Hall", LatLng(34.16291249920953, -119.04407142302078), LocationCategory.ACADEMIC),
-        CampusLocation("Manzanita Hall", LatLng(34.162752145230215, -119.04505967422949), LocationCategory.ACADEMIC),
-        CampusLocation("Malibu Hall", LatLng(34.16127971034514, -119.04036363349768), LocationCategory.ACADEMIC),
-        CampusLocation("Marin Hall", LatLng(34.16449348416405, -119.04518033627755), LocationCategory.ACADEMIC),
-        CampusLocation("Modoc Hall", LatLng(34.164118027818034, -119.0483579800719), LocationCategory.ACADEMIC),
-        CampusLocation("Napa Hall", LatLng(34.163790888257665, -119.04540396658717), LocationCategory.ACADEMIC),
-        CampusLocation("Ojai Hall", LatLng(34.16165367514373, -119.04266024098733), LocationCategory.ACADEMIC),
-        CampusLocation("Placer Hall", LatLng(34.163271303102604, -119.04319384405241), LocationCategory.ACADEMIC),
-        CampusLocation("Sage Hall", LatLng(34.164091848406024, -119.04219128128422), LocationCategory.ACADEMIC),
-        CampusLocation("Sierra Hall", LatLng(34.16234093150404, -119.04430321122032), LocationCategory.ACADEMIC),
-        CampusLocation("Shasta Hall", LatLng(34.16457201602076, -119.04463593717513), LocationCategory.ACADEMIC),
-        CampusLocation("Solano Hall", LatLng(34.16334765267999, -119.04519807735882), LocationCategory.ACADEMIC),
-        CampusLocation("Topanga Hall", LatLng(34.16009541167767, -119.04166559195076), LocationCategory.ACADEMIC),
-        CampusLocation("Yuba Hall", LatLng(34.164022422925036, -119.04109646938987), LocationCategory.ACADEMIC)
-    )
-
-    val diningLocations = listOf(
-        CampusLocation("American Pie Company", LatLng(34.16321171837447, -119.03931197917322), LocationCategory.DINING),
-        CampusLocation("Ekho's Cafe", LatLng(34.16309792014503, -119.03946822433113), LocationCategory.DINING),
-        CampusLocation("Freudian Sip", LatLng(34.162524752647805, -119.04086278682107), LocationCategory.DINING),
-        CampusLocation("Islands Cafe", LatLng(34.160430282161435, -119.04160590722023), LocationCategory.DINING),
-        CampusLocation("Mom Wong Kitchen", LatLng(34.16281772412409, -119.0392259681462), LocationCategory.DINING),
-        CampusLocation("Sea Store Market", LatLng(34.16137041992328, -119.04409100603398), LocationCategory.DINING),
-        CampusLocation("Tortillas Grill & Cantina", LatLng(34.16304343294648, -119.03946353999095), LocationCategory.DINING)
-    )
-
-    val commuterParking = listOf(
-        CampusLocation("A1 Parking", LatLng(34.163600395901376, -119.04259463208324), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A2 Parking", LatLng(34.16420505882201, -119.04162581055532), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A3 Parking", LatLng(34.16662463372068, -119.04684159985), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A4 Parking", LatLng(34.16422642302123, -119.0466532417237), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A5 Parking", LatLng(34.160303180725336, -119.04458319659938), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A6 Parking", LatLng(34.16325112229069, -119.0421188239597), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A7 Parking", LatLng(34.16064329832965, -119.04108600595718), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A8 Parking", LatLng(34.16305514764397, -119.04031656504462), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A10 Parking", LatLng(34.15935028132672, -119.04041059647916), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A11 Parking", LatLng(34.164527100140525, -119.04799474404118), LocationCategory.COMMUTER_PARKING),
-    )
-
-    val campusRegistry: kotlin.collections.Map<LocationCategory, List<CampusLocation>> = mapOf(
-        LocationCategory.ACADEMIC to academicLocations,
-        LocationCategory.DINING to diningLocations,
-        LocationCategory.COMMUTER_PARKING to commuterParking
-    )
+    var campusRegistry by remember {
+        mutableStateOf<Map<String, List<CampusLocation>>>(emptyMap())
+    }
 
     val coroutineScope = rememberCoroutineScope()
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
@@ -144,6 +98,7 @@ fun CampusMapScreen(
         }
     }
 
+    // This is where permissions are verified and the map gets the location data
     LaunchedEffect(Unit) {
         if (!hasPermission) {
             // If missing permissions, request them
@@ -162,6 +117,22 @@ fun CampusMapScreen(
             } catch (e: SecurityException) {
                 e.printStackTrace()
             }
+        }
+
+        // Get the location data from Firestore
+        try {
+            val collections = listOf("academic", "dining", "commuter_parking")
+            val finalRegistry = mutableMapOf<String, List<CampusLocation>>()
+            collections.forEach { collectionName ->
+                val snapshot = db.collection(collectionName).get().await()
+                val list = snapshot.toObjects(CampusLocation::class.java)
+                finalRegistry[collectionName] = list
+                Log.d("Firestore", "Fetched ${list.size} items from $collectionName")
+            }
+            // Update the state once at the end with all data
+            campusRegistry = finalRegistry.toMap()
+        } catch (e: Exception) {
+            Log.e("Firestore", "Error fetching data: ${e.message}")
         }
     }
 
@@ -186,24 +157,26 @@ fun CampusMapScreen(
 
             val markersToDraw = campusRegistry.values.flatten()
             markersToDraw.forEach { location ->
-                val markerState = rememberUpdatedMarkerState(position = location.coordinates)
+                val markerState = remember(location.name) {
+                    MarkerState(position = location.latLng)
+                }
 
                 Marker(
                     state = markerState,
                     title = location.name,
-                    snippet = "Category: ${location.category.name.lowercase()}",
+                    snippet = "Category: ${location.category.lowercase()}",
                     icon = BitmapDescriptorFactory.defaultMarker(
                         when (location.category) {
-                            LocationCategory.ACADEMIC -> BitmapDescriptorFactory.HUE_RED
-                            LocationCategory.COMMUTER_PARKING -> BitmapDescriptorFactory.HUE_AZURE
-                            LocationCategory.DINING -> BitmapDescriptorFactory.HUE_ORANGE
-                            LocationCategory.HOUSING -> BitmapDescriptorFactory.HUE_VIOLET
+                            "ACADEMIC" -> BitmapDescriptorFactory.HUE_RED
+                            "COMMUTER_PARKING" -> BitmapDescriptorFactory.HUE_AZURE
+                            "DINING" -> BitmapDescriptorFactory.HUE_ORANGE
+                            else -> BitmapDescriptorFactory.HUE_VIOLET
                         }
                     ),
                     onInfoWindowClick = {
                         userLocation?.let { start ->
                             coroutineScope.launch {
-                                val path = fetchDirections(start, location.coordinates, context)
+                                val path = fetchDirections(start, location.latLng, context)
                                 polylinePoints = path
                             }
                         }
