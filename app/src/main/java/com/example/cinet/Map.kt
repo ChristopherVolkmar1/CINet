@@ -1,6 +1,5 @@
 package com.example.cinet
 
-import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Restaurant
@@ -47,6 +48,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +84,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.google.firebase.firestore.GeoPoint
+import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerState
 import kotlinx.coroutines.tasks.await
@@ -111,13 +114,14 @@ fun CampusMapScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var hasPermission by remember { mutableStateOf(PermissionManager.hasAllPermissions(context)) }
+    val mapStyle = remember {
+        MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
+    }
     val mapProperties by remember(hasPermission) {
         mutableStateOf(
             MapProperties(
-                minZoomPreference = 14f,
-                maxZoomPreference = 20f,
                 isMyLocationEnabled = hasPermission,
-                mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
+                mapStyleOptions = mapStyle
             )
         )
     }
@@ -129,49 +133,6 @@ fun CampusMapScreen(
     var selectedLocation by remember { mutableStateOf<CampusLocation?>(null) }
     var activeFilter by remember { mutableStateOf<String?>(null) }
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
-
-    val requestRoute = { mode: TravelMode ->
-        val destination = selectedLocation?.latLng
-        if (destination != null && hasPermission) {
-            try {
-                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                    location?.let {
-                        coroutineScope.launch {
-                            val path = fetchDirections(LatLng(it.latitude, it.longitude), destination, context, mode)
-                            polylinePoints = path
-                        }
-                    }
-                }
-            } catch (e: SecurityException) { Log.e("Route", "No Permission") }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        textFieldState.edit { replace(0, length, "") }
-        polylinePoints = emptyList()
-        selectedLocation = null
-        if (!hasPermission) {
-            val activity = context as? Activity
-            activity?.let {
-                PermissionManager.requestAllPermissions(it)
-                hasPermission = PermissionManager.hasAllPermissions(context)
-            }
-        }
-
-        try {
-            val collections = listOf("academic", "dining", "commuter_parking")
-            val finalRegistry = mutableMapOf<String, List<CampusLocation>>()
-            collections.forEach { collectionName ->
-                val snapshot = db.collection(collectionName).get().await()
-                val list = snapshot.toObjects(CampusLocation::class.java)
-                finalRegistry[collectionName] = list
-                Log.d("Firestore", "Fetched ${list.size} items from $collectionName")
-            }
-            campusRegistry = finalRegistry.toMap()
-        } catch (e: Exception) {
-            Log.e("Firestore", "Error fetching data: ${e.message}")
-        }
-    }
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
@@ -193,7 +154,112 @@ fun CampusMapScreen(
     }
 
     val focusManager = LocalFocusManager.current
+    var userLatLng by remember { mutableStateOf<LatLng?>(null) }
+    val requestRoute = { mode: TravelMode ->
+        val destination = selectedLocation?.latLng
+        if (destination != null && hasPermission) {
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    location?.let {
+                        userLatLng = LatLng(it.latitude, it.longitude)
+                        coroutineScope.launch {
+                            val path = fetchDirections(LatLng(it.latitude, it.longitude), destination, context, mode)
+                            polylinePoints = path
+                            cameraPositionState.animate(
+                                update = CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 18f),
+                                durationMs = 1000
+                            )
+                        }
+                    }
+                }
+            } catch (e: SecurityException) { Log.e("Route", "No Permission") }
+        }
+    }
+    val searchState = SearchState(
+        textFieldState = textFieldState,
+        results = filteredNames,
+        onSearch = { query ->
+            val target = campusRegistry.values.flatten().find {
+                it.name.equals(query, ignoreCase = true)
+            }
+            target?.let { location ->
+                selectedLocation = location
+                coroutineScope.launch {
+                    cameraPositionState.animate(
+                        update = CameraUpdateFactory.newLatLngZoom(location.latLng, 18f),
+                        durationMs = 1000
+                    )
+                }
+            }
+            textFieldState.edit { replace(0, length, "") }
+        }
+    )
 
+    LaunchedEffect(Unit) {
+        textFieldState.edit { replace(0, length, "") }
+        polylinePoints = emptyList()
+        selectedLocation = null
+
+        if (hasPermission) {
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    userLatLng = if (location != null) {
+                        LatLng(location.latitude, location.longitude)
+                    } else {
+                        LatLng(34.162, -119.043)
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e("Location", "Permission missing")
+            }
+        } else {
+            userLatLng = LatLng(34.162, -119.043)
+        }
+
+        try {
+            val collections = listOf("academic", "dining", "commuter_parking")
+            val finalRegistry = mutableMapOf<String, List<CampusLocation>>()
+            collections.forEach { collectionName ->
+                val snapshot = db.collection(collectionName).get().await()
+                val list = snapshot.toObjects(CampusLocation::class.java)
+                finalRegistry[collectionName] = list
+                Log.d("Firestore", "Fetched ${list.size} items from $collectionName")
+            }
+            campusRegistry = finalRegistry.toMap()
+        } catch (e: Exception) {
+            Log.e("Firestore", "Error fetching data: ${e.message}")
+        }
+    }
+    DisposableEffect(hasPermission) {
+        if (!hasPermission) return@DisposableEffect onDispose {}
+
+        val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
+            com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+            2000L // update every 2 seconds
+        ).build()
+
+        val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                result.lastLocation?.let {
+                    userLatLng = LatLng(it.latitude, it.longitude)
+                }
+            }
+        }
+
+        try {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                android.os.Looper.getMainLooper()
+            )
+        } catch (e: SecurityException) {
+            Log.e("Location", "Permission missing")
+        }
+
+        onDispose {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+    }
     Box {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
@@ -223,6 +289,12 @@ fun CampusMapScreen(
                     ),
                     onClick = {
                         selectedLocation = location
+                        coroutineScope.launch {
+                            cameraPositionState.animate(
+                                update = CameraUpdateFactory.newLatLngZoom(location.latLng, 18f),
+                                durationMs = 1000
+                            )
+                        }
                         true
                     }
                 )
@@ -236,29 +308,7 @@ fun CampusMapScreen(
                 )
             }
         }
-    }
 
-    val searchState = SearchState(
-        textFieldState = textFieldState,
-        results = filteredNames,
-        onSearch = { query ->
-            val target = campusRegistry.values.flatten().find {
-                it.name.equals(query, ignoreCase = true)
-            }
-            target?.let { location ->
-                selectedLocation = location
-                coroutineScope.launch {
-                    cameraPositionState.animate(
-                        update = CameraUpdateFactory.newLatLngZoom(location.latLng, 18f),
-                        durationMs = 1000
-                    )
-                }
-            }
-            textFieldState.edit { replace(0, length, "") }
-        }
-    )
-
-    Box {
         MapControls(
             campusRegistry = campusRegistry,
             searchState = searchState,
@@ -267,6 +317,47 @@ fun CampusMapScreen(
             onDismissPopup = { selectedLocation = null },
             onModeSelected = requestRoute
         )
+
+        userLatLng?.let { user ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 11.dp, bottom = 86.dp)
+            ) {
+                CenterSelf(
+                    user = user,
+                    cameraPositionState = cameraPositionState
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CenterSelf(
+    user: LatLng,
+    cameraPositionState: CameraPositionState
+) {
+    val coroutineScope = rememberCoroutineScope()
+    Box {
+        Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = Color(0xFFEEEEEE).copy(alpha = 0.8f),
+            shadowElevation = 0.dp,
+            modifier = Modifier.size(40.dp)
+        ) {
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        cameraPositionState.animate(
+                            update = CameraUpdateFactory.newLatLngZoom(user, 18f),
+                            durationMs = 1000
+                        )
+                    }
+                }
+            ) { Icon(Icons.Default.FilterCenterFocus, contentDescription = "Center Self", tint = Color.Gray) }
+        }
     }
 }
 
@@ -290,7 +381,7 @@ fun FilterMenu(
         ) {
             IconButton(
                 onClick = { filterExpanded = true }
-            ) { Icon(Icons.Default.FilterList, contentDescription = "Filter") }
+            ) { Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = Color.Gray) }
         }
         DropdownMenu(
             expanded = filterExpanded,
