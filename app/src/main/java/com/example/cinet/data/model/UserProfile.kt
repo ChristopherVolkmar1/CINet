@@ -5,8 +5,9 @@ import java.util.Date
 
 data class UserProfile(
     val uid: String = "",
-    val displayName: String = "",
     val email: String = "",
+    val nickname: String = "",
+    val major: String = "",
     val photoUrl: String = "",
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val lastLoginAt: Date? = null,

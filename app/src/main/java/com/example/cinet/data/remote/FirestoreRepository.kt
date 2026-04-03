@@ -21,7 +21,6 @@ class FirestoreRepository(
 
             val loginUpdate = mapOf(
                 "uid"         to user.uid,
-                "displayName" to (user.displayName ?: "Unknown User"),
                 "email"       to (user.email ?: ""),
                 "photoUrl"    to (user.photoUrl?.toString() ?: ""),
                 "lastLoginAt" to FieldValue.serverTimestamp(),
