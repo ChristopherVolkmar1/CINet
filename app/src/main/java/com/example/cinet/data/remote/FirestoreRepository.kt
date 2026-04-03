@@ -5,28 +5,42 @@ import com.example.cinet.data.model.CampusEvent
 import com.example.cinet.data.model.UserProfile
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 
 class FirestoreRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
-    suspend fun saveCurrentUserProfile() {
-        val user = auth.currentUser ?: error("No signed-in user.")
+    suspend fun createOrLoadUserProfile(): Result<UserProfile> {
+        return try {
+            val user = auth.currentUser ?: error("No signed-in user.")
+            val docRef = db.collection(FirestoreCollections.USERS).document(user.uid)
 
-        val profile = UserProfile(
-            uid = user.uid,
-            displayName = user.displayName ?: "Unknown User",
-            email = user.email ?: "",
-            photoUrl = user.photoUrl?.toString(),
-            createdAt = Timestamp.now(),
-        )
+            val loginUpdate = mapOf(
+                "uid"         to user.uid,
+                "displayName" to (user.displayName ?: "Unknown User"),
+                "email"       to (user.email ?: ""),
+                "photoUrl"    to (user.photoUrl?.toString() ?: ""),
+                "lastLoginAt" to FieldValue.serverTimestamp(),
+            )
 
-        db.collection(FirestoreCollections.USERS)
-            .document(user.uid)
-            .set(profile)
-            .await()
+            docRef.set(loginUpdate, SetOptions.merge()).await()
+
+            val snapshot = docRef.get().await()
+            if (snapshot.getTimestamp("createdAt") == null) {
+                docRef.update("createdAt", FieldValue.serverTimestamp()).await()
+            }
+
+            val profile = snapshot.toObject(UserProfile::class.java)
+                ?: return Result.failure(Exception("Failed to parse UserProfile"))
+
+            Result.success(profile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     suspend fun loadCurrentUserProfile(): UserProfile? {
@@ -64,8 +78,6 @@ class FirestoreRepository(
             .get()
             .await()
 
-        return snapshot.documents.mapNotNull { document ->
-            document.toObject(CampusEvent::class.java)
-        }
+        return snapshot.documents.mapNotNull { it.toObject(CampusEvent::class.java) }
     }
 }
