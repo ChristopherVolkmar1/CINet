@@ -10,14 +10,15 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
-val CINetPrimaryLight = Color(0xFFFF0000)   // light background
+// CINet Custom Colors from Design
+val CINetBlue = Color(0xFF536E86)
+val CINetMaroon = Color(0xFF4A1414)
+val CINetBackground = Color(0xFFE0E0E0)
 
-val CINetSecondaryLight = Color(0xFFFFFFFF)// red accent
+val CINetPrimaryLight = CINetBlue
+val CINetSecondaryLight = Color.White
+val CINetTertiaryLight = CINetMaroon
 
-val CINetTertiaryLight = Color.Black
-
-val CINetPrimaryDark = Color(0xFF57090B)   // dark background
-
-val CINetSecondaryDark = Color(0xFF121212)// red accent
-
+val CINetPrimaryDark = Color(0xFF004160)
+val CINetSecondaryDark = Color(0xFF006140)
 val CINetTertiaryDark = Color.White
