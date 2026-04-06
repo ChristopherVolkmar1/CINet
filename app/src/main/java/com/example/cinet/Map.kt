@@ -2,6 +2,7 @@ package com.example.cinet
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.text.TextUtils.replace
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -117,8 +118,12 @@ fun CampusMapScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var hasPermission by remember { mutableStateOf(PermissionManager.hasAllPermissions(context)) }
-    val mapStyle = remember {
-        MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
+    val mapStyle: MapStyleOptions? = remember(AppSettings.isDarkMap) {
+        if (AppSettings.isDarkMap) {
+            MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark) as MapStyleOptions?
+        } else {
+            null
+        }
     }
     val mapProperties by remember(hasPermission) {
         mutableStateOf(
