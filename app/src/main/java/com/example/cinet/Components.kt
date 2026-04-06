@@ -3,6 +3,7 @@ package com.example.cinet
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.NorthWest
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
@@ -15,14 +16,37 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun DateInputBox(label: String, modifier: Modifier = Modifier) {
+fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condition: String = "Partly Cloudy") {
     Surface(
-        modifier = modifier.height(40.dp),
-        color = Color.White,
+        modifier = modifier.height(60.dp),
+        color = Color.White.copy(alpha = 0.2f),
         shape = RoundedCornerShape(8.dp)
     ) {
-        Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 12.dp)) {
-            Text(text = label, color = Color.Gray)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Icon(
+                imageVector = Icons.Default.Cloud,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = temp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = condition,
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp
+                )
+            }
         }
     }
 }
@@ -30,8 +54,7 @@ fun DateInputBox(label: String, modifier: Modifier = Modifier) {
 @Composable
 fun InfoSection(
     title: String,
-    items: List<Pair<String, String>>,
-    titleColor: Color = MaterialTheme.colorScheme.tertiary
+    items: List<Pair<String, String>>
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -43,14 +66,22 @@ fun InfoSection(
             Text(
                 text = title,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = titleColor
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSecondary
             )
             Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(thickness = 1.dp, color = Color.LightGray)
+            HorizontalDivider(
+                thickness = 1.dp, 
+                color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.3f)
+            )
             
             items.forEach { (label, desc) ->
-                ListItem(label = label, description = desc, tintColor = titleColor)
+                ListItem(
+                    label = label, 
+                    description = desc, 
+                    onStarClick = { /* Action for favorite */ },
+                    onArrowClick = { /* Action for navigation */ }
+                )
             }
         }
     }
@@ -60,42 +91,66 @@ fun InfoSection(
 fun ListItem(
     label: String,
     description: String,
-    tintColor: Color = MaterialTheme.colorScheme.tertiary
+    onStarClick: () -> Unit = {},
+    onArrowClick: () -> Unit = {}
 ) {
+    val contentColor = MaterialTheme.colorScheme.onSecondary
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.StarBorder,
-            contentDescription = null,
-            modifier = Modifier.size(28.dp),
-            tint = Color.Black
-        )
-        Spacer(modifier = Modifier.width(16.dp))
+        // Star Icon Button
+        IconButton(
+            onClick = onStarClick,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.StarBorder,
+                contentDescription = "Favorite",
+                modifier = Modifier.size(28.dp),
+                tint = Color.Black // Dark contrast as shown in the image
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        // Text Content
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
-                color = tintColor
-            )
-            Text(text = description, color = Color.Gray, fontSize = 14.sp)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.NorthWest,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = tintColor
+                color = contentColor
             )
             Text(
-                text = "A",
-                fontWeight = FontWeight.Bold,
-                color = tintColor
+                text = description,
+                color = contentColor.copy(alpha = 0.6f),
+                fontSize = 14.sp
             )
+        }
+        
+        // Arrow and Info Button
+        IconButton(
+            onClick = onArrowClick,
+            modifier = Modifier.width(48.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.NorthWest,
+                    contentDescription = "Navigate",
+                    modifier = Modifier.size(16.dp),
+                    tint = contentColor
+                )
+                Text(
+                    text = "",
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor,
+                    fontSize = 16.sp
+                )
+            }
         }
     }
 }

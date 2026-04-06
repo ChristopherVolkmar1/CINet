@@ -43,7 +43,7 @@ fun HomeScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp),
+                .height(130.dp),
             color = MaterialTheme.colorScheme.primary,
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -51,38 +51,36 @@ fun HomeScreen(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    text = "Welcome back to CINet, [user]",
-
+                    text = "Welcome back to CINet, [user]", //hardcoded until usernames are implemented
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(
+                
+                // Weather replaces the Date Input Boxes
+                WeatherDisplay(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    DateInputBox("DD", modifier = Modifier.weight(1f))
-                    DateInputBox("MM", modifier = Modifier.weight(1f))
-                    DateInputBox("YYYY", modifier = Modifier.weight(1f))
-                }
+                    temp = "72°F",
+                    condition = "Sunny - Camarillo, CA"
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Today's Schedule Section
+        // Today's Schedule Section hardcoded till calendar works
         InfoSection(title = "Today's Schedule", items = listOf(
-            "Menu Label" to "Menu description.",
-            "Menu Label" to "Menu description.",
-            "Menu Label" to "Menu description."
+            "CS 450: Software Engineering" to "10:00 AM - Bell Tower 1302",
+            "Lunch with Study Group" to "12:30 PM - Student Union",
+            "Math 300: Discrete Structures" to "2:00 PM - Sierra Hall 110"
         ))
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // Upcoming Events Section
         InfoSection(title = "Upcoming Events", items = listOf(
-            "Menu Label" to "Menu description.",
-            "Menu Label" to "Menu description."
+            "Career Fair" to "Tomorrow - Petit Salon",
+            "Pizza Night" to "Friday - Central Mall"
         ))
     }
 }
