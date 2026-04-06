@@ -71,13 +71,8 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
-<<<<<<< settings-page
-import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.model.MapStyleOptions
-=======
 import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.firebase.firestore.FirebaseFirestore
->>>>>>> develop
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.android.compose.GoogleMap
@@ -114,14 +109,6 @@ data class SearchState(
 )
 @Composable
 fun CampusMapScreen(
-<<<<<<< settings-page
-    /* Settings stuff -Zack 
-     * gets if night mode is on or off
-     */
-    isNightMode: Boolean = false,
-    modifier: Modifier = Modifier,
-=======
->>>>>>> develop
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -130,30 +117,6 @@ fun CampusMapScreen(
     val coroutineScope = rememberCoroutineScope()
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-<<<<<<< settings-page
-    val csuciBounds = LatLngBounds(
-        LatLng(34.155, -119.055),
-        LatLng(34.168, -119.035)
-    )
-
-    val permissionState = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
-
-    val mapProperties by remember(permissionState.status.isGranted, isNightMode) {
-        mutableStateOf(
-            MapProperties(
-                latLngBoundsForCameraTarget = csuciBounds,
-                minZoomPreference = 14f,
-                maxZoomPreference = 20f,
-                isMyLocationEnabled = permissionState.status.isGranted,
-                /* Settings stuff -Zack
-                 * makes the map dark if u picked night mode
-                 */
-                mapStyleOptions = if (isNightMode) {
-                    MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
-                } else {
-                    null
-                }
-=======
     var hasPermission by remember { mutableStateOf(PermissionManager.hasAllPermissions(context)) }
     val mapStyle: MapStyleOptions? = remember(AppSettings.isDarkMap) {
         if (AppSettings.isDarkMap) {
@@ -167,7 +130,6 @@ fun CampusMapScreen(
             MapProperties(
                 isMyLocationEnabled = hasPermission,
                 mapStyleOptions = mapStyle
->>>>>>> develop
             )
         )
     }
@@ -627,8 +589,6 @@ suspend fun fetchDirections(
         }
     }
 }
-<<<<<<< settings-page
-=======
 
 
 @Composable
@@ -709,4 +669,3 @@ fun DirectionsPopup(
         }
     }
 }
->>>>>>> develop
