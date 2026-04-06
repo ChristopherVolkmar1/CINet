@@ -2,6 +2,7 @@ package com.example.cinet
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.text.TextUtils.replace
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -87,6 +88,9 @@ import com.google.firebase.firestore.GeoPoint
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerState
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
 
 data class CampusLocation(
@@ -114,8 +118,12 @@ fun CampusMapScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var hasPermission by remember { mutableStateOf(PermissionManager.hasAllPermissions(context)) }
-    val mapStyle = remember {
-        MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark)
+    val mapStyle: MapStyleOptions? = remember(AppSettings.isDarkMap) {
+        if (AppSettings.isDarkMap) {
+            MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark) as MapStyleOptions?
+        } else {
+            null
+        }
     }
     val mapProperties by remember(hasPermission) {
         mutableStateOf(
@@ -218,14 +226,17 @@ fun CampusMapScreen(
 
         try {
             val collections = listOf("academic", "dining", "commuter_parking")
-            val finalRegistry = mutableMapOf<String, List<CampusLocation>>()
-            collections.forEach { collectionName ->
-                val snapshot = db.collection(collectionName).get().await()
-                val list = snapshot.toObjects(CampusLocation::class.java)
-                finalRegistry[collectionName] = list
-                Log.d("Firestore", "Fetched ${list.size} items from $collectionName")
+            val results = coroutineScope {
+                collections.map { collectionName ->
+                    async(Dispatchers.IO) {
+                        val snapshot = db.collection(collectionName).get().await()
+                        val list = snapshot.toObjects(CampusLocation::class.java)
+                        Log.d("Firestore", "Fetched ${list.size} items from $collectionName")
+                        collectionName to list
+                    }
+                }.awaitAll()
             }
-            campusRegistry = finalRegistry.toMap()
+            campusRegistry = results.toMap()
         } catch (e: Exception) {
             Log.e("Firestore", "Error fetching data: ${e.message}")
         }
@@ -616,7 +627,6 @@ fun DirectionsPopup(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Add your "Drive / Walk" info here to match the Google UI
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = Color(0xFFD0BCFF))
                     Spacer(Modifier.width(8.dp))
