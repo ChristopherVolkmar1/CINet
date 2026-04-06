@@ -26,6 +26,7 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.android.compose.GoogleMap
@@ -52,6 +53,10 @@ data class CampusLocation(
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CampusMapScreen(
+    /* Settings stuff -Zack 
+     * gets if night mode is on or off
+     */
+    isNightMode: Boolean = false,
     modifier: Modifier = Modifier,
     onBack: () -> Unit
 ) {
@@ -64,13 +69,21 @@ fun CampusMapScreen(
 
     val permissionState = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
-    val mapProperties by remember(permissionState.status.isGranted) {
+    val mapProperties by remember(permissionState.status.isGranted, isNightMode) {
         mutableStateOf(
             MapProperties(
                 latLngBoundsForCameraTarget = csuciBounds,
                 minZoomPreference = 14f,
                 maxZoomPreference = 20f,
-                isMyLocationEnabled = permissionState.status.isGranted
+                isMyLocationEnabled = permissionState.status.isGranted,
+                /* Settings stuff -Zack
+                 * makes the map dark if u picked night mode
+                 */
+                mapStyleOptions = if (isNightMode) {
+                    MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
+                } else {
+                    null
+                }
             )
         )
     }

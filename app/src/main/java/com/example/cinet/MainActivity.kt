@@ -11,32 +11,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.cinet.ui.theme.CINetTheme
 
-
 // Simple enum to handle screen state
 enum class Screen { Home, Map, Settings }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        val prefs = AppPreferences(this)
+        
         // Requests Notification Permission, required for android 13+
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         // Create a Notification Channel for this app which is required to make notifications appear
         NotificationHelper.createChannel(this)
-        // Test notification on app launch to verify notifications but also set up pop up notifications
-        val testNotification = AppNotification(
-            title = "Test Event",
-            message = "Study Session in 10 Minutes",
-            type = NotificationType.EVENT,
-            timestamp = System.currentTimeMillis()
-        )
-
-        NotificationHelper.showNotification(this, testNotification) // commented out (used for testing notifs)
 
         enableEdgeToEdge()
         setContent {
-            CINetTheme {
+            var isNightMode by remember { mutableStateOf(prefs.isNightMode) }
+            var notificationsEnabled by remember { mutableStateOf(prefs.notificationsEnabled) }
+            
+            CINetTheme(darkTheme = isNightMode) {
                 // State to keep track of the current screen
                 var currentScreen by remember { mutableStateOf(Screen.Home) }
 
@@ -57,7 +53,10 @@ class MainActivity : ComponentActivity() {
                                     onBack = { currentScreen = Screen.Home }
                                 )
                                 Screen.Settings -> SettingScreen(
-                                    onBack = { currentScreen = Screen.Home }
+                                    prefs = prefs,
+                                    onBack = { currentScreen = Screen.Home },
+                                    onThemeChange = { isNightMode = it },
+                                    onNotificationChange = { notificationsEnabled = it }
                                 )
                             }
                         }
@@ -138,12 +137,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
 }
