@@ -10,8 +10,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
-@Composable //dummy screen for demo nav (slightly diff from maps to differentiate)
-fun SettingScreen(onBack: () -> Unit) {
+@Composable
+fun SettingScreen(
+    onBack: () -> Unit,
+    onSignOut: () -> Unit
+) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -22,13 +25,9 @@ fun SettingScreen(onBack: () -> Unit) {
         Button(onClick = onBack) {
             Text("Back to Home")
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = onSignOut) {
+            Text("Sign out")
+        }
     }
-}
-
-/* True will change the map to use dark mode
- * False will change the map to use light mode
- * Just need to change the value in the ui on button click
- */
-object AppSettings {
-    var isDarkMap: Boolean by mutableStateOf(true)
 }
