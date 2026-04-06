@@ -4,19 +4,30 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.ui.theme.CINetTheme
+import com.example.cinet.viewmodels.AuthViewModel
+import com.example.cinet.viewmodels.AuthViewModelFactory
 
+<<<<<<< settings-page
 // Simple enum to handle screen state
 enum class Screen { Home, Map, Settings }
-
+=======
 class MainActivity : ComponentActivity() {
+
+    private val repository by lazy { FirestoreRepository() }
+
+    private val authViewModel: AuthViewModel by viewModels {
+        AuthViewModelFactory(repository)
+    }
+>>>>>>> develop
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+<<<<<<< settings-page
         
         val prefs = AppPreferences(this)
         
@@ -138,3 +149,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+=======
+        NotificationHelper.createChannel(this)
+        if (!PermissionManager.hasAllPermissions(this)) {
+            PermissionManager.requestAllPermissions(this)
+        }
+        enableEdgeToEdge()
+        setContent {
+            CINetTheme {
+                val authState by authViewModel.authState.collectAsState()
+                NavigationHandler(
+                    authState = authState,
+                    onSignOut = { authViewModel.signOut() },
+                    onRetry = { authViewModel.retryProfileLoad() }
+                )
+            }
+        }
+    }
+}
+>>>>>>> develop
