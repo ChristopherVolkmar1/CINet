@@ -15,7 +15,6 @@ import com.example.cinet.AppNotification
 object NotificationHelper {
     // Unique ID For app's notification channel
     private const val CHANNEL_ID = "cinet_channel"
-
     // Creates Notification Channel as required for Android 8+
     fun createChannel(context: Context) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -29,26 +28,13 @@ object NotificationHelper {
             manager.createNotificationChannel(channel)
         }
     }
-
     // Builds and displays a notification based on AppNotification Data
     fun showNotification(context: Context, notification: AppNotification) {
-<<<<<<< settings-page
-        /* Settings stuff -Zack
-         * stops the notification if u turned it off in settings
-         */
-        val prefs = AppPreferences(context)
-        if (!prefs.notificationsEnabled) {
-            Log.d("NotificationTest", "Notifications are disabled in settings. Skipping: ${notification.title}")
-            return
-        }
-
-=======
         // Safely verify whether permissions have been granted through the PermissionManager
         if (!PermissionManager.hasAllPermissions(context)) {
             Log.e("NotificationHelper", "Cannot show notification: Permission Denied")
             return
         }
->>>>>>> develop
         // Configure Notification Appearance and Behavior
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_dialog_info)    // Default System Icon
@@ -62,15 +48,7 @@ object NotificationHelper {
                     NotificationType.EVENT -> NotificationCompat.PRIORITY_LOW
                 }
             )
-
         // Send Notification to system
-<<<<<<< settings-page
-        val manager = NotificationManagerCompat.from(context)
-        manager.notify(notification.timestamp.toInt(), builder.build())
-
-        // Debug Log to confirm Notification Trigger
-        Log.d("NotificationTest", "Showing notification: ${notification.title}")
-=======
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
             == PackageManager.PERMISSION_GRANTED) {
 
@@ -81,6 +59,5 @@ object NotificationHelper {
             // Debug Log to confirm Notification Trigger
             Log.d("NotificationTest", "Showing notification: ${notification.title}")
         }
->>>>>>> develop
     }
 }
