@@ -1,5 +1,6 @@
 package com.example.cinet.data.remote
 
+import android.util.Log
 import com.example.cinet.data.FirestoreCollections
 import com.example.cinet.data.model.CampusEvent
 import com.example.cinet.data.model.UserProfile
@@ -78,5 +79,18 @@ class FirestoreRepository(
             .await()
 
         return snapshot.documents.mapNotNull { it.toObject(CampusEvent::class.java) }
+    }
+
+    fun updateFcmToken(userId: String, token: String) {
+        Log.d("FCM_DEBUG", "Saving token for userId=$userId")
+        db.collection(FirestoreCollections.USERS)
+            .document(userId)
+            .set(mapOf("fcmToken" to token), SetOptions.merge())
+            .addOnSuccessListener {
+                Log.d("FCM_DEBUG", "Token saved successfully!")
+            }
+            .addOnFailureListener { e ->
+                Log.e("FCM_DEBUG", "Failed to save token", e)
+            }
     }
 }

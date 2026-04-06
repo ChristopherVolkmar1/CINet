@@ -2,6 +2,7 @@
 accompanistPermissions = "0.37.3"
 agp = "9.0.1"
 coreKtx = "1.10.1"
+firebaseMessaging = "25.0.1"
 googleMapsServices = "2.2.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
@@ -26,6 +27,7 @@ material3 = "1.4.0"
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging", version.ref = "firebaseMessaging" }
 google-maps-services = { module = "com.google.maps:google-maps-services", version.ref = "googleMapsServices" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
