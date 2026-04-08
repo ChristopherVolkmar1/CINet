@@ -82,32 +82,7 @@ private fun MainScaffold(onSignOut: () -> Unit) {
             }
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            when (currentScreen) {
-                Screen.Home -> HomeScreen(
-                    onMapClick = { currentScreen = Screen.Map },
-                    onSettingsClick = { currentScreen = Screen.Settings }
-                )
-                Screen.Notifications -> NotificationScreen(
-                    onBack = { currentScreen = Screen.Home }
-                )
-                Screen.Map -> CampusMapScreen(
-                    onBack = { currentScreen = Screen.Home }
-                )
-                Screen.Calendar -> CalendarScreen(
-                    onBack = { currentScreen = Screen.Home }
-                )
-                Screen.Settings -> SettingScreen(
-                    onBack = { currentScreen = Screen.Home },
-                    onSignOut = onSignOut
-                )
-            }
-        }
-            // Main content area that swaps between screens
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -128,7 +103,8 @@ private fun MainScaffold(onSignOut: () -> Unit) {
                         onBack = { currentScreen = Screen.Home }
                     )
                     Screen.Settings -> SettingScreen(
-                        onBack = { currentScreen = Screen.Home }
+                        onBack = { currentScreen = Screen.Home },
+                        onSignOut = onSignOut
                     )
                 }
             }
