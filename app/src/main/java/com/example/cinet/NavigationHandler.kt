@@ -4,10 +4,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 // Page types
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
-    Notifications("Notifications", Icons.Default.Notifications),
+    Social("Social", Icons.AutoMirrored.Filled.Chat),
     Map("Map", Icons.Default.LocationOn),
     Calendar("Calendar", Icons.Default.CalendarMonth),
     Settings("Settings", Icons.Default.Settings)
@@ -73,7 +73,7 @@ fun NavigationHandler() {
                         onMapClick = { currentScreen = Screen.Map },
                         onSettingsClick = { currentScreen = Screen.Settings }
                     )
-                    Screen.Notifications -> NotificationScreen(
+                    Screen.Social -> NotificationScreen(
                         onBack = { currentScreen = Screen.Home }
                     )
                     Screen.Map -> CampusMapScreen(

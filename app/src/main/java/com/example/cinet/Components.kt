@@ -3,9 +3,7 @@ package com.example.cinet
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.NorthWest
-import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -14,9 +12,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Calendar
 
 @Composable
 fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condition: String = "Partly Cloudy") {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val isNight = hour < 6 || hour >= 18 // Simple rule: 6 PM to 6 AM is night
+
+    // Adjust condition text if it's night and sunny
+    val displayCondition = if (isNight && (condition.contains("Sunny", ignoreCase = true) || condition.contains("Clear", ignoreCase = true))) {
+        "Clear Sky"
+    } else {
+        condition
+    }
+
+    val weatherIcon = when {
+        displayCondition.contains("Clear Sky", ignoreCase = true) -> Icons.Default.NightsStay
+        displayCondition.contains("Sunny", ignoreCase = true) || displayCondition.contains("Clear", ignoreCase = true) -> Icons.Default.WbSunny
+        displayCondition.contains("Partly Cloudy", ignoreCase = true) -> Icons.Default.WbCloudy
+        displayCondition.contains("Cloudy", ignoreCase = true) || displayCondition.contains("Cloud", ignoreCase = true) -> Icons.Default.Cloud
+        displayCondition.contains("Rain", ignoreCase = true) || displayCondition.contains("Shower", ignoreCase = true) -> Icons.Default.Umbrella
+        displayCondition.contains("Thunder", ignoreCase = true) -> Icons.Default.Thunderstorm
+        else -> if (isNight) Icons.Default.NightsStay else Icons.Default.Cloud
+    }
+
     Surface(
         modifier = modifier.height(60.dp),
         color = Color.White.copy(alpha = 0.2f),
@@ -28,8 +47,8 @@ fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condit
             horizontalArrangement = Arrangement.Start
         ) {
             Icon(
-                imageVector = Icons.Default.Cloud,
-                contentDescription = null,
+                imageVector = weatherIcon,
+                contentDescription = displayCondition,
                 tint = Color.White,
                 modifier = Modifier.size(32.dp)
             )
@@ -42,7 +61,7 @@ fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condit
                     fontSize = 18.sp
                 )
                 Text(
-                    text = condition,
+                    text = displayCondition,
                     color = Color.White.copy(alpha = 0.8f),
                     fontSize = 12.sp
                 )
@@ -54,7 +73,8 @@ fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condit
 @Composable
 fun InfoSection(
     title: String,
-    items: List<Pair<String, String>>
+    items: List<Pair<String, String>>,
+    onAddClick: (() -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -63,12 +83,27 @@ fun InfoSection(
         shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onSecondary
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSecondary
+                )
+                if (onAddClick != null) {
+                    IconButton(onClick = onAddClick) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Item",
+                            tint = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(
                 thickness = 1.dp, 
