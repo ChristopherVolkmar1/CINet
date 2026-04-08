@@ -7,7 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -22,11 +22,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.cinet.data.model.Conversation
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.ui.AuthState
 
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
-    Notifications("Notifications", Icons.Default.Notifications),
+    Social("Social", Icons.Default.People),
     Map("Map", Icons.Default.LocationOn),
     Calendar("Calendar", Icons.Default.CalendarMonth),
     Settings("Settings", Icons.Default.Settings)
@@ -50,14 +52,22 @@ fun NavigationHandler(
             onRetry = onRetry
         )
         is AuthState.Authenticated -> MainScaffold(
+            userProfile = authState.userProfile,
             onSignOut = onSignOut
         )
     }
 }
 
 @Composable
-private fun MainScaffold(onSignOut: () -> Unit) {
+private fun MainScaffold(
+    userProfile: UserProfile,
+    onSignOut: () -> Unit
+) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+
+    // Sub-navigation state for Social tab
+    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -66,7 +76,14 @@ private fun MainScaffold(onSignOut: () -> Unit) {
                 Screen.entries.forEach { screen ->
                     NavigationBarItem(
                         selected = currentScreen == screen,
-                        onClick = { currentScreen = screen },
+                        onClick = {
+                            currentScreen = screen
+                            // Reset social sub-navigation when leaving the tab
+                            if (screen != Screen.Social) {
+                                selectedProfile = null
+                                activeConversation = null
+                            }
+                        },
                         label = {
                             Text(
                                 text = screen.label,
@@ -96,9 +113,21 @@ private fun MainScaffold(onSignOut: () -> Unit) {
                     onMapClick = { currentScreen = Screen.Map },
                     onSettingsClick = { currentScreen = Screen.Settings }
                 )
-                Screen.Notifications -> NotificationScreen(
-                    onBack = { currentScreen = Screen.Home }
-                )
+                Screen.Social -> when {
+                    activeConversation != null -> ConversationScreen(
+                        conversation = activeConversation!!,
+                        onBack = { activeConversation = null }
+                    )
+                    selectedProfile != null -> ProfileScreen(
+                        user = selectedProfile!!,
+                        currentUserProfile = userProfile,
+                        onOpenConversation = { activeConversation = it },
+                        onBack = { selectedProfile = null }
+                    )
+                    else -> SocialScreen(
+                        onOpenProfile = { selectedProfile = it }
+                    )
+                }
                 Screen.Map -> CampusMapScreen(
                     onBack = { currentScreen = Screen.Home }
                 )
