@@ -10,6 +10,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
+/* just need to change from false to
+true with a button click
+ */
+object AppSettings {
+    var isDarkMap: Boolean
+    by mutableStateOf(true)
+}
 @Composable
 fun SettingScreen(
     onBack: () -> Unit,

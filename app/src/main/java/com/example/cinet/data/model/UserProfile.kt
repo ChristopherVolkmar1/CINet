@@ -8,6 +8,7 @@ data class UserProfile(
     val email: String = "",
     val nickname: String = "",
     val major: String = "",
+    val pronouns: String = "",
     val photoUrl: String = "",
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val lastLoginAt: Date? = null,
