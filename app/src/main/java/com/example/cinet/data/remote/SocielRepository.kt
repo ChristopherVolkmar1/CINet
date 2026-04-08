@@ -205,4 +205,16 @@ class SocialRepository(
             Result.failure(e)
         }
     }
+    suspend fun getSentRequests(): Result<List<FriendRequest>> {
+        return try {
+            val snapshot = db.collection("friendRequests")
+                .whereEqualTo("senderId", currentUid)
+                .whereEqualTo("status", "pending")
+                .get()
+                .await()
+            Result.success(snapshot.toObjects(FriendRequest::class.java))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

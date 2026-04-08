@@ -44,15 +44,16 @@ fun SocialScreen(
 
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var pendingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
+    var sentRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Load friends and pending requests on first composition
     LaunchedEffect(Unit) {
         repository.getFriends().onSuccess { friends = it }
         repository.getPendingRequests().onSuccess { pendingRequests = it }
+        repository.getSentRequests().onSuccess { sentRequests = it }
         isLoading = false
     }
 
@@ -78,7 +79,6 @@ fun SocialScreen(
                     Text("Social", style = MaterialTheme.typography.headlineMedium)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Search bar
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -103,7 +103,6 @@ fun SocialScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // Search results
                 if (searchResults.isNotEmpty()) {
                     item {
                         Text("Search Results", style = MaterialTheme.typography.titleMedium)
@@ -118,6 +117,8 @@ fun SocialScreen(
                                     scope.launch {
                                         repository.sendFriendRequest(user)
                                         searchResults = searchResults - user
+                                        repository.getSentRequests()
+                                            .onSuccess { sentRequests = it }
                                     }
                                 }) {
                                     Text("Add")
@@ -129,7 +130,6 @@ fun SocialScreen(
                     item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
 
-                // Pending friend requests
                 if (pendingRequests.isNotEmpty()) {
                     item {
                         Text("Friend Requests", style = MaterialTheme.typography.titleMedium)
@@ -171,7 +171,6 @@ fun SocialScreen(
                     item { Spacer(modifier = Modifier.height(16.dp)) }
                 }
 
-                // Friends list
                 item {
                     Text("Friends", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(8.dp))
@@ -193,12 +192,41 @@ fun SocialScreen(
                         HorizontalDivider()
                     }
                 }
+
+                if (sentRequests.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Pending Sent Requests", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    items(sentRequests) { request ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = request.receiverId,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = "Request pending",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        HorizontalDivider()
+                    }
+                }
             }
         }
     }
 }
 
-// Simple reusable row for displaying a user — frontend can restyle this
+// Frontend team: restyle this row however you want
 @Composable
 fun UserRow(
     user: UserProfile,
