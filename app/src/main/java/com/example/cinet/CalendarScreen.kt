@@ -63,7 +63,7 @@ fun CalendarScreen(onBack: () -> Unit) {
     var assignmentName by remember { mutableStateOf("") }
     var dueTime by remember { mutableStateOf("") }
 
-    var selectedClassId by remember { mutableStateOf<Long?>(null) }
+    var selectedClassId by remember { mutableStateOf<String?>(null) }
     var classDropdownExpanded by remember { mutableStateOf(false) }
 
     var className by remember { mutableStateOf("") }

@@ -6,7 +6,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import java.time.LocalDate
 import java.time.YearMonth
-
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 class CalendarViewModel : ViewModel() {
 
     var currentMonth by mutableStateOf(YearMonth.now())
@@ -42,17 +43,23 @@ class CalendarViewModel : ViewModel() {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
 
-        val newClass = ClassItem(
-            name = name,
-            meetingDays = sortedMeetingDays,
-            startTime = startTime,
-            endTime = endTime
-        )
-        classItems = sortClassesByTime(classItems + newClass)
+        viewModelScope.launch {
+            try {
+                repository.addClass(
+                    name = name,
+                    meetingDays = sortedMeetingDays,
+                    startTime = startTime,
+                    endTime = endTime
+                )
+                refreshClasses()
+            } catch (e: Exception) {
+                android.util.Log.e("FirestoreDebug", "addClass failed", e)
+            }
+        }
     }
 
     fun updateClass(
-        classId: Long,
+        classId: String,
         name: String,
         meetingDays: List<String>,
         startTime: String,
@@ -61,29 +68,40 @@ class CalendarViewModel : ViewModel() {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
 
-        classItems = sortClassesByTime(
-            classItems.map { item ->
-                if (item.id == classId) {
-                    item.copy(
-                        name = name,
-                        meetingDays = sortedMeetingDays,
-                        startTime = startTime,
-                        endTime = endTime
-                    )
-                } else item
-            }
-        )
+        viewModelScope.launch {
+            try {
+                repository.updateClass(
+                    classId = classId,
+                    name = name,
+                    meetingDays = sortedMeetingDays,
+                    startTime = startTime,
+                    endTime = endTime
+                )
 
-        scheduleItems = scheduleItems.map { item ->
-            if (item.classId == classId) {
-                item.copy(className = name)
-            } else item
+                scheduleItems = scheduleItems.map { item ->
+                    if (item.classId == classId) {
+                        item.copy(className = name)
+                    } else item
+                }
+
+                refreshClasses()
+            } catch (e: Exception) {
+                android.util.Log.e("FirestoreDebug", "updateClass failed", e)
+            }
         }
     }
+    fun deleteClass(classId: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteClass(classId)
 
-    fun deleteClass(classId: Long) {
-        classItems = classItems.filterNot { it.id == classId }
-        scheduleItems = scheduleItems.filterNot { it.classId == classId }
+                scheduleItems = scheduleItems.filterNot { it.classId == classId }
+
+                refreshClasses()
+            } catch (e: Exception) {
+                android.util.Log.e("FirestoreDebug", "updateClass failed", e)
+            }
+        }
     }
 
     fun addScheduleItem(
@@ -92,38 +110,58 @@ class CalendarViewModel : ViewModel() {
         dueTime: String
     ) {
         val date = selectedDate ?: return
+        val formattedDate = formatDate(date)
 
-        val newItem = ScheduleItem(
-            date = formatDate(date),
-            classId = classItem.id,
-            className = classItem.name,
-            assignmentName = assignmentName,
-            dueTime = dueTime
-        )
-
-        scheduleItems = scheduleItems + newItem
-    }
-
-    fun updateScheduleItem(
-        itemId: Long,
-        classItem: ClassItem,
-        assignmentName: String,
-        dueTime: String
-    ) {
-        scheduleItems = scheduleItems.map { item ->
-            if (item.id == itemId) {
-                item.copy(
+        viewModelScope.launch {
+            try {
+                repository.addAssignment(
+                    date = formattedDate,
                     classId = classItem.id,
                     className = classItem.name,
                     assignmentName = assignmentName,
                     dueTime = dueTime
                 )
-            } else item
+                refreshAssignments()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    fun updateScheduleItem(
+        itemId: String,
+        classItem: ClassItem,
+        assignmentName: String,
+        dueTime: String
+    ) {
+        val date = selectedDate ?: return
+        val formattedDate = formatDate(date)
+
+        viewModelScope.launch {
+            try {
+                repository.updateAssignment(
+                    assignmentId = itemId,
+                    date = formattedDate,
+                    classId = classItem.id,
+                    className = classItem.name,
+                    assignmentName = assignmentName,
+                    dueTime = dueTime
+                )
+                refreshAssignments()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    fun deleteScheduleItem(itemId: Long) {
-        scheduleItems = scheduleItems.filterNot { it.id == itemId }
+    fun deleteScheduleItem(itemId: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteAssignment(itemId)
+                refreshAssignments()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun getItemsForSelectedDate(): List<ScheduleItem> {
@@ -185,5 +223,35 @@ class CalendarViewModel : ViewModel() {
 
     private fun sortClassesByTime(classes: List<ClassItem>): List<ClassItem> {
         return classes.sortedBy { parseTimeToSortableValue(it.startTime) }
+    }
+    private val repository = CalendarFirestoreRepository()
+    init {
+        refreshClasses()
+        refreshAssignments()
+    }
+    fun refreshClasses() {
+        viewModelScope.launch {
+            try {
+                classItems = sortClassesByTime(repository.loadClasses())
+                android.util.Log.d("FirestoreDebug", "Loaded classItems count: ${classItems.size}")
+                classItems.forEach {
+                    android.util.Log.d(
+                        "FirestoreDebug",
+                        "Class in ViewModel: ${it.name}, days=${it.meetingDays}, start=${it.startTime}, end=${it.endTime}"
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FirestoreDebug", "refreshClasses failed", e)
+            }
+        }
+    }
+    fun refreshAssignments() {
+        viewModelScope.launch {
+            try {
+                scheduleItems = repository.loadAssignments()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
