@@ -33,7 +33,10 @@ class MainActivity : ComponentActivity() {
                 NavigationHandler(
                     authState = authState,
                     onSignOut = { authViewModel.signOut() },
-                    onRetry = { authViewModel.retryProfileLoad() }
+                    onRetry = { authViewModel.retryProfileLoad() },
+                    onSaveProfile = { nickname, major, pronouns ->
+                        authViewModel.saveProfile(nickname, major, pronouns)
+                    }
                 )
             }
         }
