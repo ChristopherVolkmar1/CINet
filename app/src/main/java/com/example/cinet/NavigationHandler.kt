@@ -22,8 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.cinet.ui.AuthState
 
-// Page types
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Social("Social", Icons.AutoMirrored.Filled.Chat),
@@ -33,7 +33,26 @@ enum class Screen(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun NavigationHandler() {
+fun NavigationHandler(
+    authState: AuthState,
+    onSignOut: () -> Unit,
+    onRetry: () -> Unit
+) {
+    when (authState) {
+        is AuthState.Loading -> LoadingScreen()
+        is AuthState.Unauthenticated -> LoginScreen()
+        is AuthState.Error -> ErrorScreen(
+            message = authState.message,
+            onRetry = onRetry
+        )
+        is AuthState.Authenticated -> MainScaffold(
+            onSignOut = onSignOut
+        )
+    }
+}
+
+@Composable
+private fun MainScaffold(onSignOut: () -> Unit) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
 
     Scaffold(
@@ -50,7 +69,8 @@ fun NavigationHandler() {
                                 maxLines = 1,
                                 softWrap = false,
                                 style = MaterialTheme.typography.labelSmall
-                                ) },
+                            )
+                        },
                         icon = {
                             Icon(
                                 imageVector = screen.icon,
@@ -62,6 +82,31 @@ fun NavigationHandler() {
             }
         }
     ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when (currentScreen) {
+                Screen.Home -> HomeScreen(
+                    onMapClick = { currentScreen = Screen.Map },
+                    onSettingsClick = { currentScreen = Screen.Settings }
+                )
+                Screen.Notifications -> NotificationScreen(
+                    onBack = { currentScreen = Screen.Home }
+                )
+                Screen.Map -> CampusMapScreen(
+                    onBack = { currentScreen = Screen.Home }
+                )
+                Screen.Calendar -> CalendarScreen(
+                    onBack = { currentScreen = Screen.Home }
+                )
+                Screen.Settings -> SettingScreen(
+                    onBack = { currentScreen = Screen.Home },
+                    onSignOut = onSignOut
+                )
+            }
+        }
             // Main content area that swaps between screens
             Box(
                 modifier = Modifier
