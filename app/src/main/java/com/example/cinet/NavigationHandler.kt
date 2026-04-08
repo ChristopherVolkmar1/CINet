@@ -36,11 +36,15 @@ enum class Screen(val label: String, val icon: ImageVector) {
 fun NavigationHandler(
     authState: AuthState,
     onSignOut: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onSaveProfile: (String, String, String) -> Unit
 ) {
     when (authState) {
         is AuthState.Loading -> LoadingScreen()
         is AuthState.Unauthenticated -> LoginScreen()
+        is AuthState.ProfileSetup -> ProfileSetupScreen(
+            onSaveProfile = onSaveProfile
+        )
         is AuthState.Error -> ErrorScreen(
             message = authState.message,
             onRetry = onRetry

@@ -1,13 +1,12 @@
 package com.example.cinet.viewmodels
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.ui.AuthState
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,26 +36,28 @@ class AuthViewModel(
     }
 
     fun retryProfileLoad() {
-        val user = auth.currentUser ?: return
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             repository.createOrLoadUserProfile()
+                .onSuccess { resolveState(it) }
+                .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
+        }
+    }
+
+    fun saveProfile(nickname: String, major: String, pronouns: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            repository.saveProfileDetails(nickname, major, pronouns)
                 .onSuccess { _authState.value = AuthState.Authenticated(it) }
                 .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
         }
     }
 
-    fun fetchAndStoreToken() {
-        val userId = auth.currentUser?.uid
-        Log.d("FCM_DEBUG", "fetchAndStoreToken called, userId=$userId")
-        if (userId == null) return
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                Log.d("FCM_DEBUG", "Got token: ${task.result}")
-                repository.updateFcmToken(userId, task.result)
-            } else {
-                Log.e("FCM_DEBUG", "Token fetch failed: ${task.exception?.message}")
-            }
+    private fun resolveState(profile: UserProfile) {
+        _authState.value = if (profile.nickname.isBlank()) {
+            AuthState.ProfileSetup(profile)
+        } else {
+            AuthState.Authenticated(profile)
         }
     }
 
@@ -69,11 +70,7 @@ class AuthViewModel(
                 viewModelScope.launch {
                     _authState.value = AuthState.Loading
                     repository.createOrLoadUserProfile()
-                        .onSuccess {
-                            Log.d("FCM_DEBUG", "Profile loaded, calling fetchAndStoreToken")
-                            _authState.value = AuthState.Authenticated(it)
-                            fetchAndStoreToken()
-                        }
+                        .onSuccess { resolveState(it) }
                         .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
                 }
             }
