@@ -118,14 +118,15 @@ fun CampusMapScreen(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     var hasPermission by remember { mutableStateOf(PermissionManager.hasAllPermissions(context)) }
-    val mapStyle: MapStyleOptions? = remember(AppSettings.isDarkMap) {
-        if (AppSettings.isDarkMap) {
+    // Map style now follows the global isDarkMode setting
+    val mapStyle: MapStyleOptions? = remember(AppSettings.isDarkMode) {
+        if (AppSettings.isDarkMode) {
             MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark) as MapStyleOptions?
         } else {
             null
         }
     }
-    val mapProperties by remember(hasPermission) {
+    val mapProperties by remember(hasPermission, mapStyle) {
         mutableStateOf(
             MapProperties(
                 isMyLocationEnabled = hasPermission,
