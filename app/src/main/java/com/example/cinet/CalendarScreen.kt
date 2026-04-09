@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,7 +24,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
-import androidx.compose.runtime.LaunchedEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +43,7 @@ fun CalendarScreen(
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
     val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
     val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
+
     LaunchedEffect(Unit) {
         viewModel.refreshStudySessions()
         viewModel.refreshEvents()
@@ -77,16 +78,38 @@ fun CalendarScreen(
     var eventLocation by remember { mutableStateOf("") }
 
     fun resetAssignmentForm() {
-        editingAssignment = null; assignmentName = ""; dueTime = ""; selectedClassId = null; classDropdownExpanded = false
+        editingAssignment = null
+        assignmentName = ""
+        dueTime = ""
+        selectedClassId = null
+        classDropdownExpanded = false
     }
+
     fun resetClassForm() {
-        editingClass = null; className = ""; classStartTime = ""; classEndTime = ""; selectedMeetingDays = emptySet()
+        editingClass = null
+        className = ""
+        classStartTime = ""
+        classEndTime = ""
+        selectedMeetingDays = emptySet()
     }
+
     fun resetStudySessionForm() {
-        editingSession = null; sessionClassName = ""; sessionTopic = ""; sessionStartTime = ""; sessionLocation = ""
+        editingSession = null
+        sessionClassName = ""
+        sessionTopic = ""
+        sessionStartTime = ""
+        sessionLocation = ""
     }
+
     fun resetEventForm() {
-        editingEvent = null; eventName = ""; eventTime = ""; eventLocation = ""
+        editingEvent = null
+        eventName = ""
+        eventTime = ""
+        eventLocation = ""
+    }
+
+    fun formatDate(date: LocalDate): String {
+        return "%04d-%02d-%02d".format(date.year, date.monthValue, date.dayOfMonth)
     }
 
     Column(
@@ -101,6 +124,7 @@ fun CalendarScreen(
             onPreviousMonth = { viewModel.previousMonth() },
             onNextMonth = { viewModel.nextMonth() }
         )
+
         Spacer(modifier = Modifier.height(12.dp))
 
         Row(
@@ -126,16 +150,22 @@ fun CalendarScreen(
             today = today,
             scheduleItems = viewModel.scheduleItems,
             onDateSelected = { day -> viewModel.selectDate(day) },
-            onSameDateClicked = { resetAssignmentForm(); showAssignmentDialog = true }
+            onSameDateClicked = {
+                resetAssignmentForm()
+                showAssignmentDialog = true
+            }
         )
 
         ScheduleSection(
             selectedDate = selectedDate,
             itemsForSelectedDate = itemsForSelectedDate,
             onItemClick = { item ->
-                editingAssignment = item; assignmentName = item.assignmentName
-                dueTime = item.dueTime; selectedClassId = item.classId
-                classDropdownExpanded = false; showAssignmentDialog = true
+                editingAssignment = item
+                assignmentName = item.assignmentName
+                dueTime = item.dueTime
+                selectedClassId = item.classId
+                classDropdownExpanded = false
+                showAssignmentDialog = true
             }
         )
 
@@ -143,9 +173,12 @@ fun CalendarScreen(
             selectedDate = selectedDate,
             classesForSelectedDate = classesForSelectedDate,
             onClassClick = { classItem ->
-                editingClass = classItem; className = classItem.name
-                classStartTime = classItem.startTime; classEndTime = classItem.endTime
-                selectedMeetingDays = classItem.meetingDays.toSet(); showClassDialog = true
+                editingClass = classItem
+                className = classItem.name
+                classStartTime = classItem.startTime
+                classEndTime = classItem.endTime
+                selectedMeetingDays = classItem.meetingDays.toSet()
+                showClassDialog = true
             }
         )
 
@@ -153,9 +186,12 @@ fun CalendarScreen(
             selectedDate = selectedDate,
             studySessionsForSelectedDate = studySessionsForSelectedDate,
             onSessionClick = { session ->
-                editingSession = session; sessionClassName = session.className
-                sessionTopic = session.topic; sessionStartTime = session.startTime
-                sessionLocation = session.location; showStudySessionDialog = true
+                editingSession = session
+                sessionClassName = session.className
+                sessionTopic = session.topic
+                sessionStartTime = session.startTime
+                sessionLocation = session.location
+                showStudySessionDialog = true
             }
         )
 
@@ -163,8 +199,10 @@ fun CalendarScreen(
             selectedDate = selectedDate,
             eventsForSelectedDate = eventsForSelectedDate,
             onEventClick = { event ->
-                editingEvent = event; eventName = event.name
-                eventTime = event.time; eventLocation = event.location
+                editingEvent = event
+                eventName = event.name
+                eventTime = event.time
+                eventLocation = event.location
                 showEventDialog = true
             }
         )
@@ -182,19 +220,74 @@ fun CalendarScreen(
             onSelectedClassIdChange = { selectedClassId = it },
             classDropdownExpanded = classDropdownExpanded,
             onClassDropdownExpandedChange = { classDropdownExpanded = it },
-            onDismiss = { showAssignmentDialog = false; resetAssignmentForm() },
-            onPickTime = { openTimePicker(context) { picked -> dueTime = picked } },
+            onDismiss = {
+                showAssignmentDialog = false
+                resetAssignmentForm()
+            },
+            onPickTime = {
+                openTimePicker(context) { picked -> dueTime = picked }
+            },
             onConfirm = {
                 val selectedClass = classItems.firstOrNull { it.id == selectedClassId }
+
                 if (selectedClass != null && assignmentName.isNotBlank() && dueTime.isNotBlank()) {
                     val item = editingAssignment
-                    if (item == null) viewModel.addScheduleItem(selectedClass, assignmentName, dueTime)
-                    else viewModel.updateScheduleItem(item.id, selectedClass, assignmentName, dueTime)
-                    showAssignmentDialog = false; resetAssignmentForm()
+                    val dateStr = formatDate(selectedDate)
+
+                    if (item == null) {
+                        viewModel.addScheduleItem(selectedClass, assignmentName, dueTime)
+
+                        AssignmentReminderScheduler.scheduleReminder(
+                            context = context,
+                            date = dateStr,
+                            classId = selectedClass.id,
+                            className = selectedClass.name,
+                            assignmentName = assignmentName,
+                            dueTime = dueTime,
+                            minutesBefore = AppSettings.assignmentReminderMinutesBefore
+                        )
+                    } else {
+                        AssignmentReminderScheduler.cancelReminder(
+                            context = context,
+                            date = item.date,
+                            classId = item.classId,
+                            assignmentName = item.assignmentName,
+                            dueTime = item.dueTime
+                        )
+
+                        viewModel.updateScheduleItem(item.id, selectedClass, assignmentName, dueTime)
+
+                        AssignmentReminderScheduler.scheduleReminder(
+                            context = context,
+                            date = dateStr,
+                            classId = selectedClass.id,
+                            className = selectedClass.name,
+                            assignmentName = assignmentName,
+                            dueTime = dueTime,
+                            minutesBefore = AppSettings.assignmentReminderMinutesBefore
+                        )
+                    }
+
+                    showAssignmentDialog = false
+                    resetAssignmentForm()
                 }
             },
             onDelete = if (editingAssignment != null) {
-                { viewModel.deleteScheduleItem(editingAssignment!!.id); showAssignmentDialog = false; resetAssignmentForm() }
+                {
+                    val item = editingAssignment!!
+
+                    AssignmentReminderScheduler.cancelReminder(
+                        context = context,
+                        date = item.date,
+                        classId = item.classId,
+                        assignmentName = item.assignmentName,
+                        dueTime = item.dueTime
+                    )
+
+                    viewModel.deleteScheduleItem(item.id)
+                    showAssignmentDialog = false
+                    resetAssignmentForm()
+                }
             } else null
         )
     }
@@ -209,19 +302,74 @@ fun CalendarScreen(
             selectedMeetingDays = selectedMeetingDays,
             onMeetingDaysChange = { selectedMeetingDays = it },
             weekdayOptions = weekdayOptions,
-            onPickStartTime = { openTimePicker(context) { picked -> classStartTime = picked } },
-            onPickEndTime = { openTimePicker(context) { picked -> classEndTime = picked } },
-            onDismiss = { showClassDialog = false; resetClassForm() },
+            onPickStartTime = {
+                openTimePicker(context) { picked -> classStartTime = picked }
+            },
+            onPickEndTime = {
+                openTimePicker(context) { picked -> classEndTime = picked }
+            },
+            onDismiss = {
+                showClassDialog = false
+                resetClassForm()
+            },
             onConfirm = {
-                if (className.isNotBlank() && selectedMeetingDays.isNotEmpty() && classStartTime.isNotBlank() && classEndTime.isNotBlank()) {
+                if (
+                    className.isNotBlank() &&
+                    selectedMeetingDays.isNotEmpty() &&
+                    classStartTime.isNotBlank() &&
+                    classEndTime.isNotBlank()
+                ) {
                     val c = editingClass
-                    if (c == null) viewModel.addClass(className, selectedMeetingDays.toList(), classStartTime, classEndTime)
-                    else viewModel.updateClass(c.id, className, selectedMeetingDays.toList(), classStartTime, classEndTime)
-                    showClassDialog = false; resetClassForm()
+                    val meetingDaysList = selectedMeetingDays.toList()
+
+                    if (c == null) {
+                        viewModel.addClass(className, meetingDaysList, classStartTime, classEndTime)
+
+                        val newClass = ClassItem(
+                            id = "${className}_${classStartTime}_${meetingDaysList.joinToString("_")}",
+                            name = className,
+                            meetingDays = meetingDaysList,
+                            startTime = classStartTime,
+                            endTime = classEndTime
+                        )
+
+                        ClassReminderScheduler.scheduleNextReminder(
+                            context = context,
+                            classItem = newClass,
+                            minutesBefore = AppSettings.classReminderMinutesBefore
+                        )
+                    } else {
+                        ClassReminderScheduler.cancelReminder(context, c)
+
+                        viewModel.updateClass(c.id, className, meetingDaysList, classStartTime, classEndTime)
+
+                        val updatedClass = ClassItem(
+                            id = c.id,
+                            name = className,
+                            meetingDays = meetingDaysList,
+                            startTime = classStartTime,
+                            endTime = classEndTime
+                        )
+
+                        ClassReminderScheduler.scheduleNextReminder(
+                            context = context,
+                            classItem = updatedClass,
+                            minutesBefore = AppSettings.classReminderMinutesBefore
+                        )
+                    }
+
+                    showClassDialog = false
+                    resetClassForm()
                 }
             },
             onDelete = if (editingClass != null) {
-                { viewModel.deleteClass(editingClass!!.id); showClassDialog = false; resetClassForm() }
+                {
+                    val c = editingClass!!
+                    ClassReminderScheduler.cancelReminder(context, c)
+                    viewModel.deleteClass(c.id)
+                    showClassDialog = false
+                    resetClassForm()
+                }
             } else null
         )
     }
@@ -245,11 +393,16 @@ fun CalendarScreen(
                     val s = editingSession
                     if (s == null) viewModel.addStudySession(dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation)
                     else viewModel.updateStudySession(s.id, dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation)
-                    showStudySessionDialog = false; resetStudySessionForm()
+                    showStudySessionDialog = false
+                    resetStudySessionForm()
                 }
             },
             onDelete = if (editingSession != null) {
-                { viewModel.deleteStudySession(editingSession!!.id); showStudySessionDialog = false; resetStudySessionForm() }
+                {
+                    viewModel.deleteStudySession(editingSession!!.id)
+                    showStudySessionDialog = false
+                    resetStudySessionForm()
+                }
             } else null
         )
     }
@@ -271,11 +424,16 @@ fun CalendarScreen(
                     val e = editingEvent
                     if (e == null) viewModel.addEvent(dateStr, eventName, eventTime, eventLocation)
                     else viewModel.updateEvent(e.id, dateStr, eventName, eventTime, eventLocation)
-                    showEventDialog = false; resetEventForm()
+                    showEventDialog = false
+                    resetEventForm()
                 }
             },
             onDelete = if (editingEvent != null) {
-                { viewModel.deleteEvent(editingEvent!!.id); showEventDialog = false; resetEventForm() }
+                {
+                    viewModel.deleteEvent(editingEvent!!.id)
+                    showEventDialog = false
+                    resetEventForm()
+                }
             } else null
         )
     }
