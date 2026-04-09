@@ -11,8 +11,6 @@ class CalendarFirestoreRepository(
 ) {
 
     private fun getUid(): String {
-        // All data is stored under users/{uid}/..., so every operation depends
-        // on having a currently authenticated Firebase user.
         val uid = auth.currentUser?.uid
             ?: throw IllegalStateException("No signed-in user found.")
 
@@ -23,18 +21,17 @@ class CalendarFirestoreRepository(
     suspend fun loadClasses(): List<ClassItem> {
         val uid = getUid()
 
-        android.util.Log.d("FirestoreDebug", "Loading classes from users/$uid/classes")
+        Log.d("FirestoreDebug", "Loading classes from users/$uid/classes")
 
         val snapshot = db.collection("users")
             .document(uid)
             .collection("classes")
             .get()
-            .await() // Converts Firebase Task → coroutine suspend call
+            .await()
 
-        android.util.Log.d("FirestoreDebug", "Class documents found: ${snapshot.documents.size}")
+        Log.d("FirestoreDebug", "Class documents found: ${snapshot.documents.size}")
 
         return snapshot.documents.mapNotNull { doc ->
-            // If any required field is missing, that document is skipped entirely.
             val name = doc.getString("name") ?: return@mapNotNull null
             val meetingDays = doc.get("meetingDays") as? List<String> ?: emptyList()
             val startTime = doc.getString("startTime") ?: return@mapNotNull null
@@ -46,7 +43,7 @@ class CalendarFirestoreRepository(
             )
 
             ClassItem(
-                id = doc.id, // Firestore document ID becomes the app's class ID
+                id = doc.id,
                 name = name,
                 meetingDays = meetingDays,
                 startTime = startTime,
@@ -66,7 +63,6 @@ class CalendarFirestoreRepository(
             .await()
 
         return snapshot.documents.mapNotNull { doc ->
-            // Same pattern: skip any malformed or incomplete documents.
             val date = doc.getString("date") ?: return@mapNotNull null
             val classId = doc.getString("classId") ?: return@mapNotNull null
             val className = doc.getString("className") ?: return@mapNotNull null
@@ -75,7 +71,7 @@ class CalendarFirestoreRepository(
 
             ScheduleItem(
                 id = doc.id,
-                date = date, // Must match the format used elsewhere (e.g., CalendarGrid)
+                date = date,
                 classId = classId,
                 className = className,
                 assignmentName = assignmentName,
@@ -94,7 +90,6 @@ class CalendarFirestoreRepository(
         val uid = getUid()
 
         val assignmentData = mapOf(
-            // Field names must match what loadAssignments() expects.
             "date" to date,
             "classId" to classId,
             "className" to className,
@@ -105,7 +100,6 @@ class CalendarFirestoreRepository(
         db.collection("users")
             .document(uid)
             .collection("assignments")
-            // .add() generates a new document ID automatically.
             .add(assignmentData)
             .await()
     }
@@ -132,7 +126,6 @@ class CalendarFirestoreRepository(
             .document(uid)
             .collection("assignments")
             .document(assignmentId)
-            // .set() overwrites the entire document (not partial update).
             .set(assignmentData)
             .await()
     }
@@ -158,7 +151,6 @@ class CalendarFirestoreRepository(
         val uid = getUid()
 
         val classData = mapOf(
-            // Must match loadClasses() field expectations.
             "name" to name,
             "meetingDays" to meetingDays,
             "startTime" to startTime,
@@ -166,14 +158,23 @@ class CalendarFirestoreRepository(
             "location" to location
         )
 
-        db.collection("users")
+        val docRef = db.collection("users")
             .document(uid)
             .collection("classes")
             .add(classData)
             .await()
 
-        android.util.Log.d("FirestoreDebug", "Added class successfully: $name")
-        Log.d("FirestoreDebug", "Added class: $name")
+        val newClass = ClassItem(
+            id = docRef.id,
+            name = name,
+            meetingDays = meetingDays,
+            startTime = startTime,
+            endTime = endTime
+        )
+
+        Log.d("FirestoreDebug", "Added class successfully: ${newClass.name}, id=${newClass.id}")
+
+        return newClass
     }
 
     suspend fun updateClass(
@@ -198,9 +199,10 @@ class CalendarFirestoreRepository(
             .document(uid)
             .collection("classes")
             .document(classId)
-            // Overwrites entire class document.
             .set(classData)
             .await()
+
+        Log.d("FirestoreDebug", "Updated class successfully: $name, id=$classId")
     }
 
     suspend fun deleteClass(classId: String) {
@@ -212,5 +214,7 @@ class CalendarFirestoreRepository(
             .document(classId)
             .delete()
             .await()
+
+        Log.d("FirestoreDebug", "Deleted class successfully: id=$classId")
     }
 }

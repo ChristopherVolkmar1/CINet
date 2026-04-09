@@ -44,26 +44,29 @@ class CalendarViewModel : ViewModel() {
         location: String
     ) {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-
-        // Ensures consistent ordering regardless of user selection order.
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
 
         viewModelScope.launch {
             try {
-                repository.addClass(
+                val newClass = repository.addClass(
                     name = name,
                     meetingDays = sortedMeetingDays,
                     startTime = startTime,
                     endTime = endTime,
                     location = location
                 )
+
                 refreshClasses()
+
+                android.util.Log.d(
+                    "FirestoreDebug",
+                    "New class created: ${newClass.name}, id=${newClass.id}"
+                )
             } catch (e: Exception) {
                 android.util.Log.e("FirestoreDebug", "addClass failed", e)
             }
         }
     }
-
     fun updateClass(
         classId: String,
         name: String,
