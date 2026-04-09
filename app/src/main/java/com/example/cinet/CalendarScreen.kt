@@ -26,14 +26,10 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen(onBack: () -> Unit,
-                   initialShowClassDialog: Boolean = false
-) {
 fun CalendarScreen(
     onBack: () -> Unit,
     initialShowClassDialog: Boolean = false
 ) {
-    // Provided by Compose; automatically scopes this ViewModel to the current UI lifecycle.
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
@@ -47,19 +43,14 @@ fun CalendarScreen(
     val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
     val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
 
-    // Assignment dialog state
     var showAssignmentDialog by remember { mutableStateOf(false) }
     var showClassDialog by remember { mutableStateOf(initialShowClassDialog) }
-
-    // Null = create mode, non-null = edit mode (used throughout dialogs).
     var editingAssignment by remember { mutableStateOf<ScheduleItem?>(null) }
     var assignmentName by remember { mutableStateOf("") }
     var dueTime by remember { mutableStateOf("") }
     var selectedClassId by remember { mutableStateOf<String?>(null) }
     var classDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Class dialog state
-    var showClassDialog by remember { mutableStateOf(false) }
     var editingClass by remember { mutableStateOf<ClassItem?>(null) }
     var className by remember { mutableStateOf("") }
     var classStartTime by remember { mutableStateOf("") }
@@ -67,7 +58,6 @@ fun CalendarScreen(
     var selectedMeetingDays by remember { mutableStateOf(setOf<String>()) }
     val weekdayOptions = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-    // Study session dialog state
     var showStudySessionDialog by remember { mutableStateOf(false) }
     var editingSession by remember { mutableStateOf<StudySession?>(null) }
     var sessionClassName by remember { mutableStateOf("") }
@@ -75,7 +65,6 @@ fun CalendarScreen(
     var sessionStartTime by remember { mutableStateOf("") }
     var sessionLocation by remember { mutableStateOf("") }
 
-    // Event dialog state
     var showEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<EventItem?>(null) }
     var eventName by remember { mutableStateOf("") }
@@ -109,7 +98,6 @@ fun CalendarScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Management buttons row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -177,7 +165,6 @@ fun CalendarScreen(
         )
     }
 
-    // Assignment dialog
     if (showAssignmentDialog && selectedDate != null) {
         AssignmentDialog(
             selectedDate = selectedDate,
@@ -207,7 +194,6 @@ fun CalendarScreen(
         )
     }
 
-    // Class dialog
     if (showClassDialog) {
         ClassDialog(
             editingClass = editingClass,
@@ -235,7 +221,6 @@ fun CalendarScreen(
         )
     }
 
-    // Study session dialog
     if (showStudySessionDialog && selectedDate != null) {
         val dateStr = "%04d-%02d-%02d".format(selectedDate.year, selectedDate.monthValue, selectedDate.dayOfMonth)
         StudySessionDialog(
@@ -264,7 +249,6 @@ fun CalendarScreen(
         )
     }
 
-    // Event dialog
     if (showEventDialog && selectedDate != null) {
         val dateStr = "%04d-%02d-%02d".format(selectedDate.year, selectedDate.monthValue, selectedDate.dayOfMonth)
         EventItemDialog(

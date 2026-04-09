@@ -69,17 +69,8 @@ private fun MainScaffold(
     userProfile: UserProfile,
     onSignOut: () -> Unit
 ) {
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
-    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
-    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
-
-    BackHandler(enabled = currentScreen == Screen.Social &&
-            (selectedProfile != null || activeConversation != null)) {
-        when {
-            activeConversation != null -> activeConversation = null
-            selectedProfile != null -> selectedProfile = null
     val calendarViewModel: CalendarViewModel = viewModel()
-    
+
     val calendarScheduleItems = remember(calendarViewModel.classItems, calendarViewModel.scheduleItems) {
         val cal = Calendar.getInstance()
         val dayName = cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.US) ?: ""
@@ -88,13 +79,10 @@ private fun MainScaffold(
             cal.get(Calendar.MONTH) + 1,
             cal.get(Calendar.DAY_OF_MONTH)
         )
-
         val list = mutableListOf<Pair<String, String>>()
-        // Add classes for today
         calendarViewModel.classItems
             .filter { it.meetingDays.contains(dayName) }
             .forEach { list.add(it.name to "${it.startTime} - ${it.endTime}") }
-        // Add assignments/tasks for today
         calendarViewModel.scheduleItems
             .filter { it.date == dateStr }
             .forEach { list.add(it.assignmentName to "Due: ${it.dueTime} (${it.className})") }
@@ -103,11 +91,12 @@ private fun MainScaffold(
 
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
+    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
 
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
 
-    // Helper to load from SharedPreferences (Used only for Events now)
     fun loadItems(key: String): List<Pair<String, String>> {
         val saved = sharedPrefs.getString(key, null) ?: return emptyList()
         return saved.split("||").filter { it.contains("|") }.map {
@@ -116,27 +105,18 @@ private fun MainScaffold(
         }
     }
 
-    // Helper to save to SharedPreferences
     fun saveItems(key: String, items: List<Pair<String, String>>) {
         val stringified = items.joinToString("||") { "${it.first}|${it.second}" }
         sharedPrefs.edit().putString(key, stringified).apply()
     }
 
-    // State for the upcoming events items
     var upcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
-    // Sub-navigation state for Social tab
-    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
-    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
-
-    // Handle system back button
     BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null) {
-        if (activeConversation != null) {
-            activeConversation = null
-        } else if (selectedProfile != null) {
-            selectedProfile = null
-        } else {
-            currentScreen = Screen.Home
+        when {
+            activeConversation != null -> activeConversation = null
+            selectedProfile != null -> selectedProfile = null
+            else -> currentScreen = Screen.Home
         }
     }
 
@@ -153,7 +133,6 @@ private fun MainScaffold(
                                 selectedProfile = null
                                 activeConversation = null
                             }
-                            // Reset calendar sub-state when navigating normally
                             if (screen != Screen.Calendar) {
                                 showAddClassOnCalendar = false
                             }
@@ -191,7 +170,7 @@ private fun MainScaffold(
                     nickname = userProfile.nickname,
                     scheduleItems = calendarScheduleItems,
                     upcomingEventsItems = upcomingEventsItems,
-                    onUpdateSchedule = { /* Read-only from calendar */ },
+                    onUpdateSchedule = { },
                     onUpdateEvents = {
                         upcomingEventsItems = it
                         saveItems("event_items", it)
@@ -223,7 +202,7 @@ private fun MainScaffold(
                     onBack = { currentScreen = Screen.Home }
                 )
                 Screen.Calendar -> CalendarScreen(
-                    onBack = { 
+                    onBack = {
                         currentScreen = Screen.Home
                         showAddClassOnCalendar = false
                     },
