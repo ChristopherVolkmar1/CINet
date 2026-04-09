@@ -26,7 +26,9 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen(onBack: () -> Unit) {
+fun CalendarScreen(onBack: () -> Unit,
+                   initialShowClassDialog: Boolean = false
+) {
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
