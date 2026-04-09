@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,9 +24,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.ui.AuthState
+import java.util.Calendar
+import java.util.Locale
 
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
@@ -73,6 +78,65 @@ private fun MainScaffold(
         when {
             activeConversation != null -> activeConversation = null
             selectedProfile != null -> selectedProfile = null
+    val calendarViewModel: CalendarViewModel = viewModel()
+    
+    val calendarScheduleItems = remember(calendarViewModel.classItems, calendarViewModel.scheduleItems) {
+        val cal = Calendar.getInstance()
+        val dayName = cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.US) ?: ""
+        val dateStr = "%04d-%02d-%02d".format(
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.DAY_OF_MONTH)
+        )
+
+        val list = mutableListOf<Pair<String, String>>()
+        // Add classes for today
+        calendarViewModel.classItems
+            .filter { it.meetingDays.contains(dayName) }
+            .forEach { list.add(it.name to "${it.startTime} - ${it.endTime}") }
+        // Add assignments/tasks for today
+        calendarViewModel.scheduleItems
+            .filter { it.date == dateStr }
+            .forEach { list.add(it.assignmentName to "Due: ${it.dueTime} (${it.className})") }
+        list
+    }
+
+    var currentScreen by remember { mutableStateOf(Screen.Home) }
+    var showAddClassOnCalendar by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
+
+    // Helper to load from SharedPreferences (Used only for Events now)
+    fun loadItems(key: String): List<Pair<String, String>> {
+        val saved = sharedPrefs.getString(key, null) ?: return emptyList()
+        return saved.split("||").filter { it.contains("|") }.map {
+            val parts = it.split("|")
+            parts[0] to parts[1]
+        }
+    }
+
+    // Helper to save to SharedPreferences
+    fun saveItems(key: String, items: List<Pair<String, String>>) {
+        val stringified = items.joinToString("||") { "${it.first}|${it.second}" }
+        sharedPrefs.edit().putString(key, stringified).apply()
+    }
+
+    // State for the upcoming events items
+    var upcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
+
+    // Sub-navigation state for Social tab
+    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
+
+    // Handle system back button
+    BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null) {
+        if (activeConversation != null) {
+            activeConversation = null
+        } else if (selectedProfile != null) {
+            selectedProfile = null
+        } else {
+            currentScreen = Screen.Home
         }
     }
 
@@ -89,6 +153,10 @@ private fun MainScaffold(
                                 selectedProfile = null
                                 activeConversation = null
                             }
+                            // Reset calendar sub-state when navigating normally
+                            if (screen != Screen.Calendar) {
+                                showAddClassOnCalendar = false
+                            }
                         },
                         label = {
                             Text(
@@ -103,7 +171,11 @@ private fun MainScaffold(
                                 imageVector = screen.icon,
                                 contentDescription = screen.label
                             )
-                        }
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
@@ -116,8 +188,21 @@ private fun MainScaffold(
         ) {
             when (currentScreen) {
                 Screen.Home -> HomeScreen(
+                    nickname = userProfile.nickname,
+                    scheduleItems = calendarScheduleItems,
+                    upcomingEventsItems = upcomingEventsItems,
+                    onUpdateSchedule = { /* Read-only from calendar */ },
+                    onUpdateEvents = {
+                        upcomingEventsItems = it
+                        saveItems("event_items", it)
+                    },
                     onMapClick = { currentScreen = Screen.Map },
-                    onSettingsClick = { currentScreen = Screen.Settings }
+                    onSettingsClick = { currentScreen = Screen.Settings },
+                    onCalendarClick = { currentScreen = Screen.Calendar },
+                    onAddClassClick = {
+                        showAddClassOnCalendar = true
+                        currentScreen = Screen.Calendar
+                    }
                 )
                 Screen.Social -> when {
                     activeConversation != null -> ConversationScreen(
@@ -138,7 +223,11 @@ private fun MainScaffold(
                     onBack = { currentScreen = Screen.Home }
                 )
                 Screen.Calendar -> CalendarScreen(
-                    onBack = { currentScreen = Screen.Home }
+                    onBack = { 
+                        currentScreen = Screen.Home
+                        showAddClassOnCalendar = false
+                    },
+                    initialShowClassDialog = showAddClassOnCalendar
                 )
                 Screen.Settings -> SettingScreen(
                     onBack = { currentScreen = Screen.Home },

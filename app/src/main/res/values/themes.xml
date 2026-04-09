@@ -2,4 +2,32 @@
 <resources>
 
     <style name="Theme.CINet" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Light Time Picker Theme -->
+    <style name="Theme.CINet.TimePicker.Light" parent="android:Theme.Material.Light.Dialog">
+        <item name="android:colorAccent">@color/cinet_blue</item>
+        <item name="android:colorControlActivated">@color/cinet_blue</item>
+        <item name="android:headerBackground">@color/cinet_blue</item>
+        <item name="android:numbersTextColor">@color/black</item>
+    </style>
+
+    <!-- Dark Time Picker Theme -->
+    <style name="Theme.CINet.TimePicker.Dark" parent="android:Theme.Material.Dialog">
+        <item name="android:colorAccent">@color/cinet_blue</item>
+        <item name="android:colorControlActivated">@color/cinet_blue</item>
+        <item name="android:headerBackground">@color/cinet_blue_dark</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">#BDBDBD</item>
+        <!-- TimePicker specific colors -->
+        <item name="android:numbersTextColor">@color/white</item>
+        <item name="android:numbersInnerTextColor">#BDBDBD</item>
+        <item name="android:numbersSelectorColor">@color/cinet_blue</item>
+        <item name="android:numbersBackgroundColor">#2C2C2C</item>
+        <item name="android:amPmTextColor">@color/white</item>
+    </style>
+
+    <!-- Default TimePicker style that maps to either Light or Dark based on system -->
+    <style name="Theme.CINet.TimePicker" parent="Theme.CINet.TimePicker.Light" />
+
 </resources>

@@ -29,6 +29,11 @@ import java.time.LocalDate
 fun CalendarScreen(onBack: () -> Unit,
                    initialShowClassDialog: Boolean = false
 ) {
+fun CalendarScreen(
+    onBack: () -> Unit,
+    initialShowClassDialog: Boolean = false
+) {
+    // Provided by Compose; automatically scopes this ViewModel to the current UI lifecycle.
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
@@ -44,6 +49,9 @@ fun CalendarScreen(onBack: () -> Unit,
 
     // Assignment dialog state
     var showAssignmentDialog by remember { mutableStateOf(false) }
+    var showClassDialog by remember { mutableStateOf(initialShowClassDialog) }
+
+    // Null = create mode, non-null = edit mode (used throughout dialogs).
     var editingAssignment by remember { mutableStateOf<ScheduleItem?>(null) }
     var assignmentName by remember { mutableStateOf("") }
     var dueTime by remember { mutableStateOf("") }
