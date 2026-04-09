@@ -74,6 +74,8 @@ fun CalendarScreen(
 
     val weekdayOptions = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
+    var locationField by remember { mutableStateOf<CampusLocation?>(null) }
+
     fun resetAssignmentForm() {
         editingAssignment = null
         assignmentName = ""
@@ -88,6 +90,7 @@ fun CalendarScreen(
         classStartTime = ""
         classEndTime = ""
         selectedMeetingDays = emptySet()
+        locationField = null
     }
 
     Column(
@@ -256,7 +259,7 @@ fun CalendarScreen(
                 showClassDialog = false
                 resetClassForm()
             },
-            onConfirm = {
+            onConfirm = { location ->
                 if (
                     className.isNotBlank() &&
                     selectedMeetingDays.isNotEmpty() &&
@@ -269,7 +272,8 @@ fun CalendarScreen(
                             name = className,
                             meetingDays = selectedMeetingDays.toList(),
                             startTime = classStartTime,
-                            endTime = classEndTime
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
                         )
                     } else {
                         viewModel.updateClass(
@@ -277,7 +281,8 @@ fun CalendarScreen(
                             name = className,
                             meetingDays = selectedMeetingDays.toList(),
                             startTime = classStartTime,
-                            endTime = classEndTime
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
                         )
                     }
 

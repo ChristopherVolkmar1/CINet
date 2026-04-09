@@ -39,7 +39,7 @@ class CalendarFirestoreRepository(
             val meetingDays = doc.get("meetingDays") as? List<String> ?: emptyList()
             val startTime = doc.getString("startTime") ?: return@mapNotNull null
             val endTime = doc.getString("endTime") ?: return@mapNotNull null
-
+            val location = doc.getString("location") ?: ""
             android.util.Log.d(
                 "FirestoreDebug",
                 "Loaded class -> id=${doc.id}, name=$name, meetingDays=$meetingDays, start=$startTime, end=$endTime"
@@ -50,7 +50,8 @@ class CalendarFirestoreRepository(
                 name = name,
                 meetingDays = meetingDays,
                 startTime = startTime,
-                endTime = endTime
+                endTime = endTime,
+                location = location
             )
         }
     }
@@ -151,7 +152,8 @@ class CalendarFirestoreRepository(
         name: String,
         meetingDays: List<String>,
         startTime: String,
-        endTime: String
+        endTime: String,
+        location: String
     ) {
         val uid = getUid()
 
@@ -160,7 +162,8 @@ class CalendarFirestoreRepository(
             "name" to name,
             "meetingDays" to meetingDays,
             "startTime" to startTime,
-            "endTime" to endTime
+            "endTime" to endTime,
+            "location" to location
         )
 
         db.collection("users")
@@ -178,7 +181,8 @@ class CalendarFirestoreRepository(
         name: String,
         meetingDays: List<String>,
         startTime: String,
-        endTime: String
+        endTime: String,
+        location: String
     ) {
         val uid = getUid()
 
@@ -186,7 +190,8 @@ class CalendarFirestoreRepository(
             "name" to name,
             "meetingDays" to meetingDays,
             "startTime" to startTime,
-            "endTime" to endTime
+            "endTime" to endTime,
+            "location" to location
         )
 
         db.collection("users")

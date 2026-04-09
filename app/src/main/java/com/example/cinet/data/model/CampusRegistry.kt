@@ -11,13 +11,14 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class CampusRegistry : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
     val campusRegistry = MutableStateFlow<Map<String, List<CampusLocation>>>(emptyMap())
-
+    val academic = campusRegistry.map { it["academic"] ?: emptyList() }
     init {
         fetchCampusData()
     }

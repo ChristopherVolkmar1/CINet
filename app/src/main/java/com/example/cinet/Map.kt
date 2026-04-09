@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -106,7 +107,9 @@ data class SearchState(
 @Composable
 fun CampusMapScreen(
     onBack: () -> Unit,
-    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel()
+    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
+    preSelectedLocation: CampusLocation? = null,
+    onFinishedLoading: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val textFieldState = rememberTextFieldState()
@@ -220,8 +223,14 @@ fun CampusMapScreen(
         } else {
             userLatLng = LatLng(34.162, -119.043)
         }
-
-
+    }
+    LaunchedEffect(preSelectedLocation) {
+        if (preSelectedLocation == null ||  preSelectedLocation.coordinates.latitude == 0.0) return@LaunchedEffect
+        selectedLocation = preSelectedLocation
+        cameraPositionState.move(
+            update = CameraUpdateFactory.newLatLngZoom(preSelectedLocation.latLng, 18f)
+        )
+        onFinishedLoading()
     }
     DisposableEffect(hasPermission) {
         if (!hasPermission) return@DisposableEffect onDispose {}
@@ -336,7 +345,7 @@ fun CenterSelf(
     Box {
         Surface(
             shape = RoundedCornerShape(4.dp),
-            color = Color(0xFFEEEEEE).copy(alpha = 0.8f),
+            color = Color(0xFFEEEEEE).copy(alpha = 0.9f),
             shadowElevation = 0.dp,
             modifier = Modifier.size(40.dp)
         ) {
@@ -368,18 +377,19 @@ fun FilterMenu(
     Box {
         Surface(
             shape = CircleShape,
-            color = Color(0xFF1C1B1F),
+            color = MaterialTheme.colorScheme.surface,
             shadowElevation = 4.dp,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(56.dp)
         ) {
             IconButton(
                 onClick = { filterExpanded = true }
-            ) { Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = Color.Gray) }
+            ) { Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = MaterialTheme.colorScheme.onSurface) }
         }
         DropdownMenu(
             expanded = filterExpanded,
             onDismissRequest = { filterExpanded = false},
-            offset = DpOffset(x = 0.dp, y = 12.dp)
+            offset = DpOffset(x = 0.dp, y = 12.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             DropdownMenuItem(
                 text = { Text("All Locations") },
@@ -430,9 +440,12 @@ fun SearchLocationBar(
 
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = Color(0xFF1C1B1F),
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .imePadding()
+            .padding(bottom = 8.dp)
     ) {
         Column {
             TextField(
@@ -443,12 +456,14 @@ fun SearchLocationBar(
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = Color.White,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -466,12 +481,12 @@ fun SearchLocationBar(
             )
 
             if (showDropdown) {
-                HorizontalDivider(color = Color.DarkGray)
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 uniqueResults.take(5).forEach { result ->
                     ListItem(
-                        headlineContent = { Text(result, color = Color.White) },
+                        headlineContent = { Text(result, color = MaterialTheme.colorScheme.onSurface) },
                         colors = ListItemDefaults.colors(
-                            containerColor = Color(0xFF1C1B1F)
+                            containerColor = MaterialTheme.colorScheme.surface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
