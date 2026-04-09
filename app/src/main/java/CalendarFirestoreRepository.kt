@@ -218,4 +218,67 @@ class CalendarFirestoreRepository(
 
         Log.d("FirestoreDebug", "Deleted class successfully: id=$classId")
     }
+
+    suspend fun loadStudySessions(): List<StudySession> {
+        val uid = getUid()
+        val snapshot = db.collection("users").document(uid).collection("studySessions").get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            val date = doc.getString("date") ?: return@mapNotNull null
+            val className = doc.getString("className") ?: return@mapNotNull null
+            val topic = doc.getString("topic") ?: return@mapNotNull null
+            val startTime = doc.getString("startTime") ?: return@mapNotNull null
+            val location = doc.getString("location") ?: ""
+            StudySession(id = doc.id, date = date, className = className, topic = topic, startTime = startTime, location = location)
+        }
+    }
+
+    suspend fun loadEvents(): List<EventItem> {
+        val uid = getUid()
+        val snapshot = db.collection("users").document(uid).collection("events").get().await()
+        return snapshot.documents.mapNotNull { doc ->
+            val date = doc.getString("date") ?: return@mapNotNull null
+            val name = doc.getString("name") ?: return@mapNotNull null
+            val time = doc.getString("time") ?: return@mapNotNull null
+            val location = doc.getString("location") ?: ""
+            EventItem(id = doc.id, date = date, name = name, time = time, location = location)
+        }
+    }
+
+    suspend fun addStudySession(date: String, className: String, topic: String, startTime: String, location: String) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("studySessions")
+            .add(mapOf("date" to date, "className" to className, "topic" to topic, "startTime" to startTime, "location" to location))
+            .await()
+    }
+
+    suspend fun updateStudySession(sessionId: String, date: String, className: String, topic: String, startTime: String, location: String) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("studySessions").document(sessionId)
+            .set(mapOf("date" to date, "className" to className, "topic" to topic, "startTime" to startTime, "location" to location))
+            .await()
+    }
+
+    suspend fun deleteStudySession(sessionId: String) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("studySessions").document(sessionId).delete().await()
+    }
+
+    suspend fun addEvent(date: String, name: String, time: String, location: String) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("events")
+            .add(mapOf("date" to date, "name" to name, "time" to time, "location" to location))
+            .await()
+    }
+
+    suspend fun updateEvent(eventId: String, date: String, name: String, time: String, location: String) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("events").document(eventId)
+            .set(mapOf("date" to date, "name" to name, "time" to time, "location" to location))
+            .await()
+    }
+
+    suspend fun deleteEvent(eventId: String) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("events").document(eventId).delete().await()
+    }
 }

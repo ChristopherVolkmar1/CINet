@@ -12,4 +12,5 @@ data class Conversation(
     val isGroup: Boolean = false,
     val groupName: String = "",
     @ServerTimestamp val lastUpdated: Date? = null,
+
 )

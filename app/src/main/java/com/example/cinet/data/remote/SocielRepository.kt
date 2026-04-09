@@ -4,19 +4,20 @@ import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.FriendRequest
 import com.example.cinet.data.model.Message
 import com.example.cinet.data.model.UserProfile
+import com.example.cinet.ScheduleItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
+import com.example.cinet.StudySession
+import com.example.cinet.EventItem
 
 class SocialRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
 ) {
     private val currentUid get() = auth.currentUser?.uid ?: error("No signed-in user.")
-
-    // --- Friend search ---
 
     suspend fun searchUsersByNickname(query: String): Result<List<UserProfile>> {
         return try {
@@ -32,8 +33,6 @@ class SocialRepository(
             Result.failure(e)
         }
     }
-
-    // --- Friend requests ---
 
     suspend fun sendFriendRequest(receiver: UserProfile): Result<Unit> {
         return try {
@@ -71,13 +70,25 @@ class SocialRepository(
         }
     }
 
+    suspend fun getSentRequests(): Result<List<FriendRequest>> {
+        return try {
+            val snapshot = db.collection("friendRequests")
+                .whereEqualTo("senderId", currentUid)
+                .whereEqualTo("status", "pending")
+                .get()
+                .await()
+            Result.success(snapshot.toObjects(FriendRequest::class.java))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun acceptFriendRequest(request: FriendRequest): Result<Unit> {
         return try {
             db.collection("friendRequests").document(request.id)
                 .update("status", "accepted")
                 .await()
 
-            // Add each user to the other's friends subcollection
             db.collection("users").document(currentUid)
                 .collection("friends").document(request.senderId)
                 .set(mapOf("uid" to request.senderId)).await()
@@ -119,8 +130,6 @@ class SocialRepository(
         }
     }
 
-    // --- Conversations ---
-
     suspend fun getOrCreateConversation(
         participantIds: List<String>,
         participantNicknames: Map<String, String>,
@@ -128,7 +137,8 @@ class SocialRepository(
         groupName: String = "",
     ): Result<Conversation> {
         return try {
-            // For 1-on-1, check if conversation already exists
+            android.util.Log.d("SocialRepository", "getOrCreateConversation called with participantIds: $participantIds")
+
             if (!isGroup) {
                 val existing = db.collection("conversations")
                     .whereArrayContains("participantIds", currentUid)
@@ -136,7 +146,10 @@ class SocialRepository(
                     .toObjects(Conversation::class.java)
                     .firstOrNull { it.participantIds.containsAll(participantIds) }
 
-                if (existing != null) return Result.success(existing)
+                if (existing != null) {
+                    android.util.Log.d("SocialRepository", "Found existing conversation: ${existing.id}")
+                    return Result.success(existing)
+                }
             }
 
             val docRef = db.collection("conversations").document()
@@ -169,7 +182,12 @@ class SocialRepository(
         }
     }
 
-    suspend fun sendMessage(conversationId: String, content: String, type: String = "text"): Result<Unit> {
+    suspend fun sendMessage(
+        conversationId: String,
+        content: String,
+        type: String = "text",
+        metadata: Map<String, String> = emptyMap(),
+    ): Result<Unit> {
         return try {
             val currentUser = db.collection("users").document(currentUid).get().await()
                 .toObject(UserProfile::class.java) ?: error("Current user not found.")
@@ -185,16 +203,17 @@ class SocialRepository(
                 senderNickname = currentUser.nickname,
                 content = content,
                 type = type,
+                metadata = metadata,
             )
             docRef.set(message).await()
 
-            // Update lastMessage on the conversation
             db.collection("conversations").document(conversationId)
                 .set(mapOf("lastMessage" to content), SetOptions.merge())
                 .await()
 
             Result.success(Unit)
         } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "sendMessage failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -208,18 +227,97 @@ class SocialRepository(
                 .get().await()
             Result.success(snapshot.toObjects(Message::class.java))
         } catch (e: Exception) {
-            android.util.Log.e("SocialRepository", "sendMessage failed: ${e.message}")
             Result.failure(e)
         }
     }
-    suspend fun getSentRequests(): Result<List<FriendRequest>> {
+
+    suspend fun getUserNickname(uid: String): String {
         return try {
-            val snapshot = db.collection("friendRequests")
-                .whereEqualTo("senderId", currentUid)
-                .whereEqualTo("status", "pending")
+            val snapshot = db.collection("users").document(uid).get().await()
+            snapshot.getString("nickname") ?: uid
+        } catch (e: Exception) {
+            uid
+        }
+    }
+
+    // Loads the current user's schedule items to pick from for study invites
+    suspend fun getMyScheduleItems(): Result<List<ScheduleItem>> {
+        return try {
+            val snapshot = db.collection("users")
+                .document(currentUid)
+                .collection("assignments")
                 .get()
                 .await()
-            Result.success(snapshot.toObjects(FriendRequest::class.java))
+            val items = snapshot.documents.mapNotNull { doc ->
+                val date = doc.getString("date") ?: return@mapNotNull null
+                val classId = doc.getString("classId") ?: return@mapNotNull null
+                val className = doc.getString("className") ?: return@mapNotNull null
+                val assignmentName = doc.getString("assignmentName") ?: return@mapNotNull null
+                val dueTime = doc.getString("dueTime") ?: return@mapNotNull null
+                ScheduleItem(
+                    id = doc.id,
+                    date = date,
+                    classId = classId,
+                    className = className,
+                    assignmentName = assignmentName,
+                    dueTime = dueTime
+                )
+            }
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    suspend fun respondToInvite(conversationId: String, messageId: String, response: String): Result<Unit> {
+        return try {
+            db.collection("conversations")
+                .document(conversationId)
+                .collection("messages")
+                .document(messageId)
+                .update("metadata.response", response)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMyStudySessions(): Result<List<StudySession>> {
+        return try {
+            val snapshot = db.collection("users")
+                .document(currentUid)
+                .collection("studySessions")
+                .get()
+                .await()
+            val items = snapshot.documents.mapNotNull { doc ->
+                val date = doc.getString("date") ?: return@mapNotNull null
+                val className = doc.getString("className") ?: return@mapNotNull null
+                val topic = doc.getString("topic") ?: return@mapNotNull null
+                val startTime = doc.getString("startTime") ?: return@mapNotNull null
+                val location = doc.getString("location") ?: ""
+                StudySession(id = doc.id, date = date, className = className, topic = topic, startTime = startTime, location = location)
+            }
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMyEvents(): Result<List<EventItem>> {
+        return try {
+            val snapshot = db.collection("users")
+                .document(currentUid)
+                .collection("events")
+                .get()
+                .await()
+            val items = snapshot.documents.mapNotNull { doc ->
+                val date = doc.getString("date") ?: return@mapNotNull null
+                val name = doc.getString("name") ?: return@mapNotNull null
+                val time = doc.getString("time") ?: return@mapNotNull null
+                val location = doc.getString("location") ?: ""
+                EventItem(id = doc.id, date = date, name = name, time = time, location = location)
+            }
+            Result.success(items)
         } catch (e: Exception) {
             Result.failure(e)
         }
