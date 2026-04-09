@@ -8,7 +8,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+object AppSettings {
+    var isDarkMode by mutableStateOf(false)
+    var notificationsEnabled by mutableStateOf(true)
+}
 // settings stuff - Zack
 /**
  * Settings screen allows users to manage their app preferences
