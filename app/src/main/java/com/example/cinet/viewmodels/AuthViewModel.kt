@@ -3,6 +3,7 @@ package com.example.cinet.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.ui.AuthState
 import com.google.firebase.auth.FirebaseAuth
@@ -35,12 +36,28 @@ class AuthViewModel(
     }
 
     fun retryProfileLoad() {
-        val user = auth.currentUser ?: return
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             repository.createOrLoadUserProfile()
+                .onSuccess { resolveState(it) }
+                .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
+        }
+    }
+
+    fun saveProfile(nickname: String, major: String, pronouns: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            repository.saveProfileDetails(nickname, major, pronouns)
                 .onSuccess { _authState.value = AuthState.Authenticated(it) }
                 .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
+        }
+    }
+
+    private fun resolveState(profile: UserProfile) {
+        _authState.value = if (profile.nickname.isBlank()) {
+            AuthState.ProfileSetup(profile)
+        } else {
+            AuthState.Authenticated(profile)
         }
     }
 
@@ -53,7 +70,7 @@ class AuthViewModel(
                 viewModelScope.launch {
                     _authState.value = AuthState.Loading
                     repository.createOrLoadUserProfile()
-                        .onSuccess { _authState.value = AuthState.Authenticated(it) }
+                        .onSuccess { resolveState(it) }
                         .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
                 }
             }

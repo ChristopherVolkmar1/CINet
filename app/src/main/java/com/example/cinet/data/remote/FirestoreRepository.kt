@@ -42,14 +42,39 @@ class FirestoreRepository(
         }
     }
 
+    suspend fun saveProfileDetails(
+        nickname: String,
+        major: String,
+        pronouns: String,
+    ): Result<UserProfile> {
+        return try {
+            val user = auth.currentUser ?: error("No signed-in user.")
+            val docRef = db.collection(FirestoreCollections.USERS).document(user.uid)
+
+            val profileUpdate = mapOf(
+                "nickname" to nickname,
+                "major"    to major,
+                "pronouns" to pronouns,
+            )
+
+            docRef.set(profileUpdate, SetOptions.merge()).await()
+
+            val snapshot = docRef.get().await()
+            val profile = snapshot.toObject(UserProfile::class.java)
+                ?: return Result.failure(Exception("Failed to parse UserProfile"))
+
+            Result.success(profile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun loadCurrentUserProfile(): UserProfile? {
         val uid = auth.currentUser?.uid ?: error("No signed-in user.")
-
         val snapshot = db.collection(FirestoreCollections.USERS)
             .document(uid)
             .get()
             .await()
-
         return snapshot.toObject(UserProfile::class.java)
     }
 
@@ -76,7 +101,6 @@ class FirestoreRepository(
         val snapshot = db.collection(FirestoreCollections.EVENTS)
             .get()
             .await()
-
         return snapshot.documents.mapNotNull { it.toObject(CampusEvent::class.java) }
     }
 }
