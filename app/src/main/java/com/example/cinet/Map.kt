@@ -1,12 +1,57 @@
 package com.example.cinet
 
+import android.content.Context
+import android.content.pm.PackageManager
+import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.FilterCenterFocus
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -14,18 +59,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.example.cinet.com.example.cinet.data.model.CampusRegistry
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.android.compose.GoogleMap
@@ -33,199 +81,488 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberUpdatedMarkerState
 import com.google.maps.model.TravelMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-enum class LocationCategory {
-    ACADEMIC, COMMUTER_PARKING, DINING, HOUSING
-}
+import com.google.firebase.firestore.GeoPoint
+import com.google.maps.android.compose.CameraPositionState
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.MarkerState
 
 data class CampusLocation(
-    val name: String,
-    val coordinates: LatLng,
-    val category: LocationCategory
-)
+    val name: String = "",
+    val category: String = "",
+    val coordinates: GeoPoint = GeoPoint(0.0, 0.0)
+) {
+    val latLng: LatLng
+        get() = LatLng(coordinates.latitude, coordinates.longitude)
+}
 
-@OptIn(ExperimentalPermissionsApi::class)
+data class SearchState(
+    val textFieldState: TextFieldState,
+    val results: List<String>,
+    val onSearch: (String) -> Unit
+)
 @Composable
 fun CampusMapScreen(
-    modifier: Modifier = Modifier,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
+    preSelectedLocation: CampusLocation? = null,
+    onFinishedLoading: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val textFieldState = rememberTextFieldState()
+    val coroutineScope = rememberCoroutineScope()
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-    val csuciBounds = LatLngBounds(
-        LatLng(34.155, -119.055),
-        LatLng(34.168, -119.035)
-    )
-
-    val permissionState = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
-
-    val mapProperties by remember(permissionState.status.isGranted) {
+    var hasPermission by remember { mutableStateOf(PermissionManager.hasAllPermissions(context)) }
+    // Map style now follows the global isDarkMode setting
+    val mapStyle: MapStyleOptions? = remember(AppSettings.isDarkMode) {
+        if (AppSettings.isDarkMode) {
+            MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_dark) as MapStyleOptions?
+        } else {
+            null
+        }
+    }
+    val mapProperties by remember(hasPermission, mapStyle) {
         mutableStateOf(
             MapProperties(
-                latLngBoundsForCameraTarget = csuciBounds,
-                minZoomPreference = 14f,
-                maxZoomPreference = 20f,
-                isMyLocationEnabled = permissionState.status.isGranted
+                isMyLocationEnabled = hasPermission,
+                mapStyleOptions = mapStyle
             )
         )
     }
+    androidx.activity.compose.BackHandler {
+        onBack()
+    }
 
-    val academicLocations = listOf(
-        CampusLocation("Aliso Hall", LatLng(34.161033533317216, -119.04554291019717), LocationCategory.ACADEMIC),
-        CampusLocation("Arroyo Hall", LatLng(34.160362571139856, -119.0449651371382), LocationCategory.ACADEMIC),
-        CampusLocation("Bell Tower", LatLng(34.161033426860186, -119.04327405083124), LocationCategory.ACADEMIC),
-        CampusLocation("Bell Tower East", LatLng(34.1613627873466, -119.04193224072041), LocationCategory.ACADEMIC),
-        CampusLocation("Bell Tower West", LatLng(34.16077413754563, -119.04413838504449), LocationCategory.ACADEMIC),
-        CampusLocation("Broome Library", LatLng(34.16272379037882, -119.04085866409868), LocationCategory.ACADEMIC),
-        CampusLocation("Chaparral Hall", LatLng(34.1620975730738, -119.04571940179336), LocationCategory.ACADEMIC),
-        CampusLocation("Del Norte Hall", LatLng(34.16314332680665, -119.04409404414939), LocationCategory.ACADEMIC),
-        CampusLocation("El Dorado Hall", LatLng(34.16421806224397, -119.04713710663997), LocationCategory.ACADEMIC),
-        CampusLocation("Gateway Hall", LatLng(34.164917303238425, -119.04526653254618), LocationCategory.ACADEMIC),
-        CampusLocation("Ironwood Hall", LatLng(34.16278192070162, -119.04589286088351), LocationCategory.ACADEMIC),
-        CampusLocation("Lindero Hall", LatLng(34.15952716715866, -119.04147320447237), LocationCategory.ACADEMIC),
-        CampusLocation("Madera Hall", LatLng(34.16291249920953, -119.04407142302078), LocationCategory.ACADEMIC),
-        CampusLocation("Manzanita Hall", LatLng(34.162752145230215, -119.04505967422949), LocationCategory.ACADEMIC),
-        CampusLocation("Malibu Hall", LatLng(34.16127971034514, -119.04036363349768), LocationCategory.ACADEMIC),
-        CampusLocation("Marin Hall", LatLng(34.16449348416405, -119.04518033627755), LocationCategory.ACADEMIC),
-        CampusLocation("Modoc Hall", LatLng(34.164118027818034, -119.0483579800719), LocationCategory.ACADEMIC),
-        CampusLocation("Napa Hall", LatLng(34.163790888257665, -119.04540396658717), LocationCategory.ACADEMIC),
-        CampusLocation("Ojai Hall", LatLng(34.16165367514373, -119.04266024098733), LocationCategory.ACADEMIC),
-        CampusLocation("Placer Hall", LatLng(34.163271303102604, -119.04319384405241), LocationCategory.ACADEMIC),
-        CampusLocation("Sage Hall", LatLng(34.164091848406024, -119.04219128128422), LocationCategory.ACADEMIC),
-        CampusLocation("Sierra Hall", LatLng(34.16234093150404, -119.04430321122032), LocationCategory.ACADEMIC),
-        CampusLocation("Shasta Hall", LatLng(34.16457201602076, -119.04463593717513), LocationCategory.ACADEMIC),
-        CampusLocation("Solano Hall", LatLng(34.16334765267999, -119.04519807735882), LocationCategory.ACADEMIC),
-        CampusLocation("Topanga Hall", LatLng(34.16009541167767, -119.04166559195076), LocationCategory.ACADEMIC),
-        CampusLocation("Yuba Hall", LatLng(34.164022422925036, -119.04109646938987), LocationCategory.ACADEMIC)
-    )
-
-    val diningLocations = listOf(
-        CampusLocation("American Pie Company", LatLng(34.16321171837447, -119.03931197917322), LocationCategory.DINING),
-        CampusLocation("Ekho's Cafe", LatLng(34.16309792014503, -119.03946822433113), LocationCategory.DINING),
-        CampusLocation("Freudian Sip", LatLng(34.162524752647805, -119.04086278682107), LocationCategory.DINING),
-        CampusLocation("Islands Cafe", LatLng(34.160430282161435, -119.04160590722023), LocationCategory.DINING),
-        CampusLocation("Mom Wong Kitchen", LatLng(34.16281772412409, -119.0392259681462), LocationCategory.DINING),
-        CampusLocation("Sea Store Market", LatLng(34.16137041992328, -119.04409100603398), LocationCategory.DINING),
-        CampusLocation("Tortillas Grill & Cantina", LatLng(34.16304343294648, -119.03946353999095), LocationCategory.DINING)
-    )
-
-    val commuterParking = listOf(
-        CampusLocation("A1 Parking", LatLng(34.163600395901376, -119.04259463208324), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A2 Parking", LatLng(34.16420505882201, -119.04162581055532), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A3 Parking", LatLng(34.16662463372068, -119.04684159985), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A4 Parking", LatLng(34.16422642302123, -119.0466532417237), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A5 Parking", LatLng(34.160303180725336, -119.04458319659938), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A6 Parking", LatLng(34.16325112229069, -119.0421188239597), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A7 Parking", LatLng(34.16064329832965, -119.04108600595718), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A8 Parking", LatLng(34.16305514764397, -119.04031656504462), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A10 Parking", LatLng(34.15935028132672, -119.04041059647916), LocationCategory.COMMUTER_PARKING),
-        CampusLocation("A11 Parking", LatLng(34.164527100140525, -119.04799474404118), LocationCategory.COMMUTER_PARKING),
-    )
-
-    val campusRegistry: kotlin.collections.Map<LocationCategory, List<CampusLocation>> = mapOf(
-        LocationCategory.ACADEMIC to academicLocations,
-        LocationCategory.DINING to diningLocations,
-        LocationCategory.COMMUTER_PARKING to commuterParking
-    )
-
-    val coroutineScope = rememberCoroutineScope()
+    val campusRegistry by viewModel.campusRegistry.collectAsState()
+    var selectedLocation by remember { mutableStateOf<CampusLocation?>(null) }
+    var activeFilter by remember { mutableStateOf<String?>(null) }
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
-
-    val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-    var userLocation by remember { mutableStateOf<LatLng?>(null) }
-
-    fun updateLocation() {
-        try {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                if (location != null) {
-                    userLocation = LatLng(location.latitude, location.longitude)
-                }
-            }
-        } catch (_: SecurityException) {
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        if (!permissionState.status.isGranted) {
-            permissionState.launchPermissionRequest()
-        } else {
-            updateLocation()
-        }
-    }
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val filteredNames = remember(textFieldState.text, activeFilter, campusRegistry) {
+        getFilteredLocations(campusRegistry, activeFilter, textFieldState.text.toString())
+            .map { it.name }
+    }
+
+    val markersToDraw = remember(activeFilter, textFieldState.text, campusRegistry, selectedLocation) {
+        val filtered = getFilteredLocations(campusRegistry, activeFilter, textFieldState.text.toString())
+        val current = selectedLocation
+        if (current != null) {
+            filtered.filter { it.name == current.name }
+        } else {
+            filtered
+        }
+    }
+
+    val focusManager = LocalFocusManager.current
+    var userLatLng by remember { mutableStateOf<LatLng?>(null) }
+    val requestRoute = { mode: TravelMode ->
+        val destination = selectedLocation?.latLng
+        if (destination != null && hasPermission) {
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    location?.let {
+                        userLatLng = LatLng(it.latitude, it.longitude)
+                        coroutineScope.launch {
+                            val path = fetchDirections(LatLng(it.latitude, it.longitude), destination, context, mode)
+                            polylinePoints = path
+                            cameraPositionState.animate(
+                                update = CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 18f),
+                                durationMs = 1000
+                            )
+                        }
+                    }
+                }
+            } catch (e: SecurityException) { Log.e("Route", "No Permission") }
+        }
+    }
+    val searchState = SearchState(
+        textFieldState = textFieldState,
+        results = filteredNames,
+        onSearch = { query ->
+            val target = campusRegistry.values.flatten().find {
+                it.name.equals(query, ignoreCase = true)
+            }
+            target?.let { location ->
+                selectedLocation = location
+                coroutineScope.launch {
+                    cameraPositionState.animate(
+                        update = CameraUpdateFactory.newLatLngZoom(location.latLng, 18f),
+                        durationMs = 1000
+                    )
+                }
+            }
+            textFieldState.edit { replace(0, length, "") }
+        }
+    )
+
+    LaunchedEffect(Unit) {
+        textFieldState.edit { replace(0, length, "") }
+        polylinePoints = emptyList()
+        selectedLocation = null
+
+        if (hasPermission) {
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    userLatLng = if (location != null) {
+                        LatLng(location.latitude, location.longitude)
+                    } else {
+                        LatLng(34.162, -119.043)
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e("Location", "Permission missing")
+            }
+        } else {
+            userLatLng = LatLng(34.162, -119.043)
+        }
+    }
+    LaunchedEffect(preSelectedLocation) {
+        if (preSelectedLocation == null ||  preSelectedLocation.coordinates.latitude == 0.0) return@LaunchedEffect
+        selectedLocation = preSelectedLocation
+        cameraPositionState.move(
+            update = CameraUpdateFactory.newLatLngZoom(preSelectedLocation.latLng, 18f)
+        )
+        onFinishedLoading()
+    }
+    DisposableEffect(hasPermission) {
+        if (!hasPermission) return@DisposableEffect onDispose {}
+
+        val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
+            com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+            2000L // update every 2 seconds
+        ).build()
+
+        val locationCallback = object : com.google.android.gms.location.LocationCallback() {
+            override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+                result.lastLocation?.let {
+                    userLatLng = LatLng(it.latitude, it.longitude)
+                }
+            }
+        }
+
+        try {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                android.os.Looper.getMainLooper()
+            )
+        } catch (e: SecurityException) {
+            Log.e("Location", "Permission missing")
+        }
+
+        onDispose {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+    }
+    Box {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             properties = mapProperties,
-            cameraPositionState = cameraPositionState
+            cameraPositionState = cameraPositionState,
+            onMapClick = { focusManager.clearFocus() },
+            uiSettings = MapUiSettings(
+                myLocationButtonEnabled = false,
+                zoomControlsEnabled = true
+            )
         ) {
-            if (polylinePoints.isNotEmpty()) {
-                Polyline(
-                    points = polylinePoints,
-                    color = Color(0xff0000ff),
-                    width = 10f,
-                    jointType = JointType.ROUND
-                )
-            }
-
-            val markersToDraw = campusRegistry.values.flatten()
             markersToDraw.forEach { location ->
-                val markerState = rememberUpdatedMarkerState(position = location.coordinates)
-
+                val markerState = remember(location.name) {
+                    MarkerState(position = location.latLng)
+                }
                 Marker(
                     state = markerState,
                     title = location.name,
-                    snippet = "Category: ${location.category.name.lowercase()}",
+                    snippet = "Category: ${location.category.lowercase()}",
                     icon = BitmapDescriptorFactory.defaultMarker(
                         when (location.category) {
-                            LocationCategory.ACADEMIC -> BitmapDescriptorFactory.HUE_RED
-                            LocationCategory.COMMUTER_PARKING -> BitmapDescriptorFactory.HUE_AZURE
-                            LocationCategory.DINING -> BitmapDescriptorFactory.HUE_ORANGE
-                            LocationCategory.HOUSING -> BitmapDescriptorFactory.HUE_VIOLET
+                            "ACADEMIC" -> BitmapDescriptorFactory.HUE_RED
+                            "COMMUTER_PARKING" -> BitmapDescriptorFactory.HUE_AZURE
+                            "DINING" -> BitmapDescriptorFactory.HUE_VIOLET
+                            else -> BitmapDescriptorFactory.HUE_VIOLET
                         }
                     ),
-                    onInfoWindowClick = {
-                        userLocation?.let { start ->
-                            coroutineScope.launch {
-                                val path = fetchDirections(start, location.coordinates, context)
-                                polylinePoints = path
-                            }
+                    onClick = {
+                        selectedLocation = location
+                        coroutineScope.launch {
+                            cameraPositionState.animate(
+                                update = CameraUpdateFactory.newLatLngZoom(location.latLng, 18f),
+                                durationMs = 1000
+                            )
                         }
+                        true
+                    }
+                )
+            }
+            if (polylinePoints.isNotEmpty()) {
+                Polyline(
+                    points = polylinePoints,
+                    color = Color(0xFF4285F4),
+                    width = 12f,
+                    jointType = JointType.ROUND
+                )
+            }
+        }
+
+        MapControls(
+            campusRegistry = campusRegistry,
+            searchState = searchState,
+            onFilterChange = { activeFilter = it },
+            selectedLocation = selectedLocation,
+            onDismissPopup = { selectedLocation = null },
+            onModeSelected = requestRoute
+        )
+
+        userLatLng?.let { user ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 11.dp, bottom = 86.dp)
+            ) {
+                CenterSelf(
+                    user = user,
+                    cameraPositionState = cameraPositionState
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CenterSelf(
+    user: LatLng,
+    cameraPositionState: CameraPositionState
+) {
+    val coroutineScope = rememberCoroutineScope()
+    Box {
+        Surface(
+            shape = RoundedCornerShape(4.dp),
+            color = Color(0xFFEEEEEE).copy(alpha = 0.9f),
+            shadowElevation = 0.dp,
+            modifier = Modifier.size(40.dp)
+        ) {
+            IconButton(
+                onClick = {
+                    coroutineScope.launch {
+                        cameraPositionState.animate(
+                            update = CameraUpdateFactory.newLatLngZoom(user, 18f),
+                            durationMs = 1000
+                        )
+                    }
+                }
+            ) { Icon(Icons.Default.FilterCenterFocus, contentDescription = "Center Self", tint = Color.Gray) }
+        }
+    }
+}
+
+@Composable
+fun FilterMenu(
+    categories: Set<String>,
+    onFilterChange: (String?) -> Unit
+) {
+    val categoryIcons = mapOf(
+        "academic" to Icons.Default.School,
+        "commuter_parking" to Icons.Default.DirectionsCar,
+        "dining" to Icons.Default.Restaurant,
+    )
+    var filterExpanded by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 4.dp,
+            modifier = Modifier.size(56.dp)
+        ) {
+            IconButton(
+                onClick = { filterExpanded = true }
+            ) { Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = MaterialTheme.colorScheme.onSurface) }
+        }
+        DropdownMenu(
+            expanded = filterExpanded,
+            onDismissRequest = { filterExpanded = false},
+            offset = DpOffset(x = 0.dp, y = 12.dp),
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            DropdownMenuItem(
+                text = { Text("All Locations") },
+                leadingIcon = {Icon(Icons.Default.Place, "All locations")},
+                onClick = { onFilterChange(null); filterExpanded = false }
+            )
+            categories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category.replace("_", " ").capitalizeWords()) },
+                    onClick = {
+                        onFilterChange(category)
+                        filterExpanded = false
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = categoryIcons[category] ?: Icons.Default.Place,
+                            contentDescription = null
+                        )
                     }
                 )
             }
         }
+    }
+}
+fun String.capitalizeWords(): String =
+    this.split("_")
+        .joinToString(" ") { word ->
+            word.lowercase().replaceFirstChar { it.uppercase() }
+        }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchLocationBar(
+    textFieldState: TextFieldState,
+    searchResults: List<String>,
+    onSearch: (String) -> Unit,
+) {
+    val focusManager = LocalFocusManager.current
+    var isFocused by remember { mutableStateOf(false) }
 
-        Button(
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-        ) {
-            Text("Back")
+    val uniqueResults = remember(searchResults) {
+        searchResults
+            .map { it.trim() }
+            .distinctBy { it.lowercase() }
+            .filter { it.isNotBlank() }
+    }
+
+    val showDropdown = isFocused && textFieldState.text.isNotEmpty() && uniqueResults.isNotEmpty()
+
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .imePadding()
+            .padding(bottom = 8.dp)
+    ) {
+        Column {
+            TextField(
+                value = textFieldState.text.toString(),
+                onValueChange = { textFieldState.edit { replace(0, length, it) } },
+                placeholder = { Text("Search", color = Color.Gray) },
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { isFocused = it.isFocused },
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Search
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        onSearch(textFieldState.text.toString())
+                        isFocused = false
+                        focusManager.clearFocus()
+                    }
+                )
+            )
+
+            if (showDropdown) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                uniqueResults.take(5).forEach { result ->
+                    ListItem(
+                        headlineContent = { Text(result, color = MaterialTheme.colorScheme.onSurface) },
+                        colors = ListItemDefaults.colors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSearch(result)
+                                isFocused = false
+                                focusManager.clearFocus()
+                            }
+                    )
+                }
+            }
         }
     }
+}
+@Composable
+fun MapControls(
+    campusRegistry: Map<String, List<CampusLocation>>,
+    searchState: SearchState,
+    onFilterChange: (String?) -> Unit,
+    selectedLocation: CampusLocation?,
+    onDismissPopup: () -> Unit,
+    onModeSelected: (TravelMode) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        FilterMenu(
+            categories = campusRegistry.keys,
+            onFilterChange = onFilterChange
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Box(Modifier.weight(1f)) {
+            SearchLocationBar(
+                textFieldState = searchState.textFieldState,
+                searchResults = searchState.results,
+                onSearch = searchState.onSearch
+            )
+        }
+
+        DirectionsPopup(
+            location = selectedLocation,
+            onDismiss = onDismissPopup,
+            onModeSelected = onModeSelected
+        )
+    }
+}
+
+fun getFilteredLocations(
+    fullRegistry: Map<String, List<CampusLocation>>,
+    selectedCategory: String?, // null means "all"
+    searchQuery: String
+): List<CampusLocation> {
+    val allLocations = fullRegistry.values.flatten()
+    return allLocations.filter { location ->
+        val matchesCategory = selectedCategory == null || location.category.equals(selectedCategory, ignoreCase = true)
+        val matchesSearch = searchQuery.isEmpty() || location.name.contains(searchQuery, ignoreCase = true)
+        matchesCategory && matchesSearch
+    }.sortedBy { it.name }
 }
 
 suspend fun fetchDirections(
     start: LatLng,
     end: LatLng,
-    context: android.content.Context
+    context: Context,
+    mode: TravelMode
 ): List<LatLng> {
     return withContext(Dispatchers.IO) {
         try {
             val ai = context.packageManager.getApplicationInfo(
                 context.packageName,
-                android.content.pm.PackageManager.GET_META_DATA
+                PackageManager.GET_META_DATA
             )
             val bundle = ai.metaData
             val apiKey = bundle.getString("com.google.android.geo.API_KEY")
@@ -235,7 +572,7 @@ suspend fun fetchDirections(
                 .build()
 
             val result = DirectionsApi.newRequest(geoContext)
-                .mode(TravelMode.WALKING)
+                .mode(mode)
                 .origin(com.google.maps.model.LatLng(start.latitude, start.longitude))
                 .destination(com.google.maps.model.LatLng(end.latitude, end.longitude))
                 .await()
@@ -246,6 +583,86 @@ suspend fun fetchDirections(
         } catch (e: Exception) {
             e.printStackTrace()
             listOf(start, end)
+        }
+    }
+}
+
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+fun DirectionsPopup(
+    location: CampusLocation?,
+    onDismiss: () -> Unit,
+    onModeSelected: (TravelMode) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+
+    // Only show if location is not null
+    if (location != null) {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+            containerColor = Color(0xFF1C1B1F),
+            contentColor = Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 40.dp)
+            ) {
+                Text(
+                    text = location.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White
+                )
+                Text(
+                    text = location.category.capitalizeWords(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = Color(0xFFD0BCFF))
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            onModeSelected(TravelMode.DRIVING)
+                            onDismiss()
+                        }
+                    ) {
+                        Text("Driving", color = Color.White)
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = Color(0xFFD0BCFF))
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            onModeSelected(TravelMode.WALKING)
+                            onDismiss()
+                        }
+                    ){
+                        Text("Walking", color = Color.White)
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.AutoMirrored.Filled.DirectionsBike, contentDescription = null, tint = Color(0xFFD0BCFF))
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            onModeSelected(TravelMode.BICYCLING)
+                            onDismiss()
+                        }
+                    ){
+                        Text("Biking", color = Color.White)
+                    }
+                }
+            }
         }
     }
 }
