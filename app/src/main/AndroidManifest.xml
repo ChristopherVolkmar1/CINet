@@ -18,6 +18,15 @@
         android:theme="@style/Theme.CINet"
         tools:replace="android:fullBackupContent,android:dataExtractionRules,android:allowBackup">
 
+
+        <receiver
+            android:name=".ClassReminderReceiver"
+            android:exported="false"
+            />
+        <receiver
+            android:name=".AssignmentReminderReceiver"
+            android:exported="false" />
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
