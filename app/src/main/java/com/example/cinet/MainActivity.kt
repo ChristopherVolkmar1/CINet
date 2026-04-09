@@ -12,6 +12,7 @@ import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.viewmodels.AuthViewModel
 import com.example.cinet.viewmodels.AuthViewModelFactory
 
+// settings stuff - Zack
 class MainActivity : ComponentActivity() {
 
     private val repository by lazy { FirestoreRepository() }
@@ -23,12 +24,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NotificationHelper.createChannel(this)
+        
         if (!PermissionManager.hasAllPermissions(this)) {
             PermissionManager.requestAllPermissions(this)
         }
+        
         enableEdgeToEdge()
+        
         setContent {
-            CINetTheme {
+            // App theme now watches the global dark mode setting
+            CINetTheme(darkTheme = AppSettings.isDarkMode) {
                 val authState by authViewModel.authState.collectAsState()
                 NavigationHandler(
                     authState = authState,
