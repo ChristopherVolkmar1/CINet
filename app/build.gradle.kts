@@ -93,4 +93,6 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.google.maps.services)
     implementation(libs.slf4j.simple)
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 }
