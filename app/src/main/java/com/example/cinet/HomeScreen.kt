@@ -5,17 +5,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cinet.com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.ui.theme.CINetTheme
 
 @Composable
@@ -29,8 +30,11 @@ fun HomeScreen(
     onMapClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
-    onAddClassClick: () -> Unit = {}
+    onAddClassClick: () -> Unit = {},
+    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
+    onNavigateToLocation: (String) -> Unit
 ) {
+    val academic by viewModel.academic.collectAsState(initial = emptyList())
     val context = LocalContext.current
     var weatherInfo by remember { mutableStateOf(WeatherInfo("...", "Loading...")) }
     
@@ -40,7 +44,15 @@ fun HomeScreen(
     
     var nameField by remember { mutableStateOf("") }
     var timeOrDateField by remember { mutableStateOf("") }
-    var locationField by remember { mutableStateOf("") }
+
+    var locationField by remember { mutableStateOf<CampusLocation?>(null) }
+    val textFieldState = rememberTextFieldState()
+    val academicNames = remember(textFieldState.text, academic) {
+        academic
+            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
+            .map { it.name }
+    }
+
     var amPmSelection by remember { mutableStateOf("AM") } // AM/PM choice
 
     // Call the weather fetching logic on launch
@@ -94,21 +106,31 @@ fun HomeScreen(
                             )
                         }
                     }
-                    
+
+                    // Location
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
+                    SearchLocationBar(
+                        textFieldState = textFieldState,
+                        searchResults = academicNames,
+                        onSearch = { query ->
+                            locationField = academic.find { it.name.equals(query, ignoreCase = true) }
+                            textFieldState.edit { replace(0, length, query) }
+
+                        }
+                    )
+                    /*OutlinedTextField(
                         value = locationField,
                         onValueChange = { locationField = it },
                         label = { Text("Location") },
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    )*/
                 }
             },
             confirmButton = {
                 Button(onClick = {
-                    if (nameField.isNotBlank() && timeOrDateField.isNotBlank() && locationField.isNotBlank()) {
+                    if (nameField.isNotBlank() && timeOrDateField.isNotBlank() && locationField != null) {
                         val fullTime = "$timeOrDateField $amPmSelection"
-                        val newItem = nameField to "$fullTime - $locationField"
+                        val newItem = nameField to "$fullTime | ${locationField?.name}"
                         
                         val newList = upcomingEventsItems.toMutableList()
                         if (editingIndex != null) {
@@ -122,7 +144,7 @@ fun HomeScreen(
                         editingIndex = null
                         nameField = ""
                         timeOrDateField = ""
-                        locationField = ""
+                        locationField = null
                     }
                 }) {
                     Text(if (editingIndex == null) "Add" else "Update")
@@ -139,7 +161,7 @@ fun HomeScreen(
                             editingIndex = null
                             nameField = ""
                             timeOrDateField = ""
-                            locationField = ""
+                            locationField = null
                         }) {
                             Text("Delete", color = MaterialTheme.colorScheme.error)
                         }
@@ -149,7 +171,7 @@ fun HomeScreen(
                         editingIndex = null
                         nameField = ""
                         timeOrDateField = ""
-                        locationField = ""
+                        locationField = null
                     }) {
                         Text("Cancel")
                     }
@@ -200,7 +222,8 @@ fun HomeScreen(
             title = "Today's Schedule",
             items = scheduleItems,
             onAddClick = onAddClassClick,
-            onItemClick = { _ -> onCalendarClick() } // Open calendar on item click
+            onItemClick = { _ -> onCalendarClick() }, // Open calendar on item click
+            onNavigateToLocation = onNavigateToLocation
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -213,7 +236,7 @@ fun HomeScreen(
                 editingIndex = null
                 nameField = ""
                 timeOrDateField = ""
-                locationField = ""
+                locationField = null
                 showDialog = true
             },
             onItemClick = { index ->
@@ -221,13 +244,14 @@ fun HomeScreen(
                 val item = upcomingEventsItems[index]
                 nameField = item.first
                 // Simple parsing for demo purposes
-                val parts = item.second.split(" - ")
+                val parts = item.second.split(" | ")
                 val timeParts = parts[0].split(" ")
                 timeOrDateField = if (timeParts.isNotEmpty()) timeParts[0] else ""
                 amPmSelection = if (timeParts.size > 1) timeParts[1] else "AM"
-                locationField = if (parts.size > 1) parts[1] else ""
+                locationField = academic.find { it.name == if (parts.size > 1) parts[1] else "" }
                 showDialog = true
-            }
+            },
+            onNavigateToLocation = onNavigateToLocation
         )
     }
 }
@@ -241,7 +265,8 @@ fun HomeScreenPreview() {
             scheduleItems = emptyList(),
             upcomingEventsItems = emptyList(),
             onUpdateSchedule = {},
-            onUpdateEvents = {}
+            onUpdateEvents = {},
+            onNavigateToLocation = { _ -> }
         )
     }
 }

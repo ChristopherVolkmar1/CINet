@@ -48,7 +48,8 @@ class CalendarViewModel : ViewModel() {
         name: String,
         meetingDays: List<String>,
         startTime: String,
-        endTime: String
+        endTime: String,
+        location: String
     ) {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
@@ -59,7 +60,8 @@ class CalendarViewModel : ViewModel() {
                     name = name,
                     meetingDays = sortedMeetingDays,
                     startTime = startTime,
-                    endTime = endTime
+                    endTime = endTime,
+                    location = location
                 )
                 refreshClasses()
                 android.util.Log.d("FirestoreDebug", "New class created: ${newClass.name}, id=${newClass.id}")
@@ -74,7 +76,8 @@ class CalendarViewModel : ViewModel() {
         name: String,
         meetingDays: List<String>,
         startTime: String,
-        endTime: String
+        endTime: String,
+        location: String
     ) {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
@@ -86,7 +89,8 @@ class CalendarViewModel : ViewModel() {
                     name = name,
                     meetingDays = sortedMeetingDays,
                     startTime = startTime,
-                    endTime = endTime
+                    endTime = endTime,
+                    location = location
                 )
 
                 // Keeps local scheduleItems consistent after class rename

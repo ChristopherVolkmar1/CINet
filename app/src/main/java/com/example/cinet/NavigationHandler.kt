@@ -18,6 +18,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cinet.com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.ui.AuthState
@@ -67,9 +69,12 @@ fun NavigationHandler(
 @Composable
 private fun MainScaffold(
     userProfile: UserProfile,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val calendarViewModel: CalendarViewModel = viewModel()
+    val campusRegistry by viewModel.campusRegistry.collectAsState()
+    var preSelectedMapLocation by remember { mutableStateOf<CampusLocation?>(null) }
 
     val calendarScheduleItems = remember(calendarViewModel.classItems, calendarViewModel.scheduleItems) {
         val cal = Calendar.getInstance()
@@ -82,7 +87,8 @@ private fun MainScaffold(
         val list = mutableListOf<Pair<String, String>>()
         calendarViewModel.classItems
             .filter { it.meetingDays.contains(dayName) }
-            .forEach { list.add(it.name to "${it.startTime} - ${it.endTime}") }
+            .forEach { list.add(it.name to "${it.startTime} - ${it.endTime} | ${it.location}") }
+        // Add assignments/tasks for today
         calendarViewModel.scheduleItems
             .filter { it.date == dateStr }
             .forEach { list.add(it.assignmentName to "Due: ${it.dueTime} (${it.className})") }
@@ -181,6 +187,11 @@ private fun MainScaffold(
                     onAddClassClick = {
                         showAddClassOnCalendar = true
                         currentScreen = Screen.Calendar
+                    },
+                    onNavigateToLocation = { locationName ->
+                        val location = campusRegistry["academic"]?.find { it.name == locationName }
+                        preSelectedMapLocation = location
+                        currentScreen = Screen.Map
                     }
                 )
                 Screen.Social -> when {
@@ -199,7 +210,11 @@ private fun MainScaffold(
                     )
                 }
                 Screen.Map -> CampusMapScreen(
-                    onBack = { currentScreen = Screen.Home }
+                    onBack = { currentScreen = Screen.Home },
+                    preSelectedLocation = preSelectedMapLocation,
+                    onFinishedLoading = {
+                        preSelectedMapLocation = null
+                    }
                 )
                 Screen.Calendar -> CalendarScreen(
                     onBack = {

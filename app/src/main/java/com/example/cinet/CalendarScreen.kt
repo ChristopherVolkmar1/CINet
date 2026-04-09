@@ -64,6 +64,7 @@ fun CalendarScreen(
     var selectedMeetingDays by remember { mutableStateOf(setOf<String>()) }
     val weekdayOptions = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
+    var locationField by remember { mutableStateOf<CampusLocation?>(null) }
     var showStudySessionDialog by remember { mutableStateOf(false) }
     var editingSession by remember { mutableStateOf<StudySession?>(null) }
     var sessionClassName by remember { mutableStateOf("") }
@@ -91,6 +92,8 @@ fun CalendarScreen(
         classStartTime = ""
         classEndTime = ""
         selectedMeetingDays = emptySet()
+        locationField = null
+        editingClass = null; className = ""; classStartTime = ""; classEndTime = ""; selectedMeetingDays = emptySet()
     }
 
     fun resetStudySessionForm() {
@@ -303,34 +306,45 @@ fun CalendarScreen(
             onMeetingDaysChange = { selectedMeetingDays = it },
             weekdayOptions = weekdayOptions,
             onPickStartTime = {
-                openTimePicker(context) { picked -> classStartTime = picked }
+                openTimePicker(context) { picked ->
+                    classStartTime = picked
+                }
             },
             onPickEndTime = {
-                openTimePicker(context) { picked -> classEndTime = picked }
+                openTimePicker(context) { picked ->
+                    classEndTime = picked
+                }
             },
             onDismiss = {
                 showClassDialog = false
                 resetClassForm()
             },
-            onConfirm = {
+            onConfirm = { location ->
                 if (
                     className.isNotBlank() &&
                     selectedMeetingDays.isNotEmpty() &&
                     classStartTime.isNotBlank() &&
                     classEndTime.isNotBlank()
                 ) {
-                    val c = editingClass
+                    val classToEdit = editingClass
                     val meetingDaysList = selectedMeetingDays.toList()
 
-                    if (c == null) {
-                        viewModel.addClass(className, meetingDaysList, classStartTime, classEndTime)
+                    if (classToEdit == null) {
+                        viewModel.addClass(
+                            name = className,
+                            meetingDays = meetingDaysList,
+                            startTime = classStartTime,
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
+                        )
 
                         val newClass = ClassItem(
                             id = "${className}_${classStartTime}_${meetingDaysList.joinToString("_")}",
                             name = className,
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
-                            endTime = classEndTime
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
                         )
 
                         ClassReminderScheduler.scheduleNextReminder(
@@ -339,16 +353,24 @@ fun CalendarScreen(
                             minutesBefore = AppSettings.classReminderMinutesBefore
                         )
                     } else {
-                        ClassReminderScheduler.cancelReminder(context, c)
+                        ClassReminderScheduler.cancelReminder(context, classToEdit)
 
-                        viewModel.updateClass(c.id, className, meetingDaysList, classStartTime, classEndTime)
-
-                        val updatedClass = ClassItem(
-                            id = c.id,
+                        viewModel.updateClass(
+                            classId = classToEdit.id,
                             name = className,
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
-                            endTime = classEndTime
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
+                        )
+
+                        val updatedClass = ClassItem(
+                            id = classToEdit.id,
+                            name = className,
+                            meetingDays = meetingDaysList,
+                            startTime = classStartTime,
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
                         )
 
                         ClassReminderScheduler.scheduleNextReminder(
