@@ -2,7 +2,6 @@ package com.example.cinet
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.text.TextUtils.replace
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +51,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import com.example.cinet.com.example.cinet.data.model.CampusRegistry
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -72,7 +74,6 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.android.compose.GoogleMap
@@ -88,10 +89,6 @@ import com.google.firebase.firestore.GeoPoint
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerState
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.tasks.await
 
 data class CampusLocation(
     val name: String = "",
@@ -109,10 +106,12 @@ data class SearchState(
 )
 @Composable
 fun CampusMapScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
+    preSelectedLocation: CampusLocation? = null,
+    onFinishedLoading: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val db = FirebaseFirestore.getInstance()
     val textFieldState = rememberTextFieldState()
     val coroutineScope = rememberCoroutineScope()
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
@@ -138,7 +137,7 @@ fun CampusMapScreen(
         onBack()
     }
 
-    var campusRegistry by remember { mutableStateOf<Map<String, List<CampusLocation>>>(emptyMap()) }
+    val campusRegistry by viewModel.campusRegistry.collectAsState()
     var selectedLocation by remember { mutableStateOf<CampusLocation?>(null) }
     var activeFilter by remember { mutableStateOf<String?>(null) }
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
@@ -224,23 +223,14 @@ fun CampusMapScreen(
         } else {
             userLatLng = LatLng(34.162, -119.043)
         }
-
-        try {
-            val collections = listOf("academic", "dining", "commuter_parking")
-            val results = coroutineScope {
-                collections.map { collectionName ->
-                    async(Dispatchers.IO) {
-                        val snapshot = db.collection(collectionName).get().await()
-                        val list = snapshot.toObjects(CampusLocation::class.java)
-                        Log.d("Firestore", "Fetched ${list.size} items from $collectionName")
-                        collectionName to list
-                    }
-                }.awaitAll()
-            }
-            campusRegistry = results.toMap()
-        } catch (e: Exception) {
-            Log.e("Firestore", "Error fetching data: ${e.message}")
-        }
+    }
+    LaunchedEffect(preSelectedLocation) {
+        if (preSelectedLocation == null ||  preSelectedLocation.coordinates.latitude == 0.0) return@LaunchedEffect
+        selectedLocation = preSelectedLocation
+        cameraPositionState.move(
+            update = CameraUpdateFactory.newLatLngZoom(preSelectedLocation.latLng, 18f)
+        )
+        onFinishedLoading()
     }
     DisposableEffect(hasPermission) {
         if (!hasPermission) return@DisposableEffect onDispose {}
@@ -355,7 +345,7 @@ fun CenterSelf(
     Box {
         Surface(
             shape = RoundedCornerShape(4.dp),
-            color = Color(0xFFEEEEEE).copy(alpha = 0.8f),
+            color = Color(0xFFEEEEEE).copy(alpha = 0.9f),
             shadowElevation = 0.dp,
             modifier = Modifier.size(40.dp)
         ) {
@@ -387,18 +377,19 @@ fun FilterMenu(
     Box {
         Surface(
             shape = CircleShape,
-            color = Color(0xFF1C1B1F),
+            color = MaterialTheme.colorScheme.surface,
             shadowElevation = 4.dp,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(56.dp)
         ) {
             IconButton(
                 onClick = { filterExpanded = true }
-            ) { Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = Color.Gray) }
+            ) { Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = MaterialTheme.colorScheme.onSurface) }
         }
         DropdownMenu(
             expanded = filterExpanded,
             onDismissRequest = { filterExpanded = false},
-            offset = DpOffset(x = 0.dp, y = 12.dp)
+            offset = DpOffset(x = 0.dp, y = 12.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             DropdownMenuItem(
                 text = { Text("All Locations") },
@@ -449,9 +440,12 @@ fun SearchLocationBar(
 
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = Color(0xFF1C1B1F),
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .imePadding()
+            .padding(bottom = 8.dp)
     ) {
         Column {
             TextField(
@@ -462,12 +456,14 @@ fun SearchLocationBar(
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = Color.White,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -485,12 +481,12 @@ fun SearchLocationBar(
             )
 
             if (showDropdown) {
-                HorizontalDivider(color = Color.DarkGray)
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 uniqueResults.take(5).forEach { result ->
                     ListItem(
-                        headlineContent = { Text(result, color = Color.White) },
+                        headlineContent = { Text(result, color = MaterialTheme.colorScheme.onSurface) },
                         colors = ListItemDefaults.colors(
-                            containerColor = Color(0xFF1C1B1F)
+                            containerColor = MaterialTheme.colorScheme.surface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()

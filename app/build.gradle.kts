@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
+    implementation(libs.lifecycle.viewmodel.compose)
 
     implementation(libs.play.services.location)
     implementation(libs.androidx.material3)

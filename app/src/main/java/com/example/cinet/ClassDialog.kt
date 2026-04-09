@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -17,8 +18,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.cinet.com.example.cinet.data.model.CampusRegistry
 
 @Composable
 fun ClassDialog(
@@ -33,9 +40,18 @@ fun ClassDialog(
     onPickStartTime: () -> Unit,
     onPickEndTime: () -> Unit,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-    onDelete: (() -> Unit)?
+    onConfirm: (CampusLocation?) -> Unit,
+    onDelete: (() -> Unit)?,
+    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
+    var locationField by remember { mutableStateOf<CampusLocation?>(null) }
+    val academic by viewModel.academic.collectAsState(initial = emptyList())
+    val textFieldState = rememberTextFieldState()
+    val academicNames = remember(textFieldState.text, academic) {
+        academic
+            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
+            .map { it.name }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -112,10 +128,21 @@ fun ClassDialog(
                 Button(onClick = onPickEndTime) {
                     Text("Pick End Time")
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SearchLocationBar(
+                    textFieldState = textFieldState,
+                    searchResults = academicNames,
+                    onSearch = { query ->
+                        locationField  = academic.find { it.name.equals(query, ignoreCase = true) }
+                        textFieldState.edit { replace(0, length, query) }
+                    }
+                )
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            Button(onClick = {onConfirm(locationField)}) {
                 Text(if (editingClass == null) "Save Class" else "Update Class")
             }
         },

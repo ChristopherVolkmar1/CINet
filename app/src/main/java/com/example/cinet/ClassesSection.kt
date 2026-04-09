@@ -51,9 +51,12 @@ fun ClassesSection(
 
                         // Assumes startTime/endTime are already formatted strings
                         // (no formatting logic is done here).
-                        Text(text = "${classItem.startTime} - ${classItem.endTime}")
+                        Text(text = "${classItem.startTime} - ${classItem.endTime} | ${classItem.location}")
 
                         Spacer(modifier = Modifier.height(4.dp))
+
+                        //Text(text = classItem.location)
+                        //Spacer(modifier = Modifier.height(4.dp))
 
                         // meetingDays must already be stored in display-ready format
                         // (e.g., "Mon", "Tue"), since this just joins them.
