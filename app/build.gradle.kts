@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.firebase.firestore)
+    implementation(libs.firebase.messaging)
 
     implementation(libs.play.services.location)
     implementation(libs.androidx.material3)
@@ -93,4 +94,6 @@ dependencies {
     implementation(libs.accompanist.permissions)
     implementation(libs.google.maps.services)
     implementation(libs.slf4j.simple)
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
 }
