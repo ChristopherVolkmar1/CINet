@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,8 +50,10 @@ fun SocialScreen(
     var searchResults by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
+        isLoading = true
         repository.getFriends().onSuccess { friends = it }
         repository.getPendingRequests().onSuccess { pendingRequests = it }
         repository.getSentRequests().onSuccess { sentRequests = it }
@@ -99,6 +102,13 @@ fun SocialScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Search")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { refreshKey++ },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Refresh")
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }

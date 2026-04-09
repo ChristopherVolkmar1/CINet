@@ -1,5 +1,8 @@
 package com.example.cinet
 
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -28,8 +31,7 @@ fun ProfileScreen(
     onOpenConversation: (Conversation) -> Unit,
     onBack: () -> Unit,
 ) {
-    val repository = SocialRepository()
-    val scope = rememberCoroutineScope()
+    val repository = remember { SocialRepository() }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -42,8 +44,6 @@ fun ProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Frontend team: add avatar/photo here using user.photoUrl
-
             Text(text = user.nickname, style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -61,7 +61,8 @@ fun ProfileScreen(
 
             Button(
                 onClick = {
-                    scope.launch {
+                    // Use GlobalScope so the coroutine survives navigation away from this screen
+                    kotlinx.coroutines.GlobalScope.launch {
                         repository.getOrCreateConversation(
                             participantIds = listOf(currentUserProfile.uid, user.uid),
                             participantNicknames = mapOf(

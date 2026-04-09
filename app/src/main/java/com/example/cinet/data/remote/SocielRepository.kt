@@ -62,8 +62,11 @@ class SocialRepository(
                 .whereEqualTo("status", "pending")
                 .get()
                 .await()
-            Result.success(snapshot.toObjects(FriendRequest::class.java))
+            val requests = snapshot.toObjects(FriendRequest::class.java)
+            android.util.Log.d("SocialRepository", "getPendingRequests: found ${requests.size} for uid $currentUid")
+            Result.success(requests)
         } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "getPendingRequests failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -144,9 +147,12 @@ class SocialRepository(
                 isGroup = isGroup,
                 groupName = groupName,
             )
+            android.util.Log.d("SocialRepository", "Creating new conversation: ${docRef.id}")
             docRef.set(conversation).await()
+            android.util.Log.d("SocialRepository", "Conversation created successfully")
             Result.success(conversation)
         } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "getOrCreateConversation failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -202,6 +208,7 @@ class SocialRepository(
                 .get().await()
             Result.success(snapshot.toObjects(Message::class.java))
         } catch (e: Exception) {
+            android.util.Log.e("SocialRepository", "sendMessage failed: ${e.message}")
             Result.failure(e)
         }
     }
