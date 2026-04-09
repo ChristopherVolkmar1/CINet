@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.cinet.AppSettings
 
@@ -15,19 +16,31 @@ private val DarkColorScheme = darkColorScheme(
     primary = CINetPrimaryDark,
     secondary = CINetSecondaryDark,
     tertiary = CINetTertiaryDark,
-    onPrimary = CINetTertiaryDark
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E1E),
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = CINetPrimaryLight,
     secondary = CINetSecondaryLight,
     tertiary = CINetTertiaryLight,
-    onPrimary = CINetTertiaryLight
+    background = CINetBackground,
+    surface = Color.White,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.White,
+    onBackground = Color.Black,
+    onSurface = Color.Black
 )
 
 @Composable
 fun CINetTheme(
-    darkTheme: Boolean = AppSettings.isDarkMode || isSystemInDarkTheme(),
+    darkTheme: Boolean = AppSettings.isDarkMode,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -36,6 +49,7 @@ fun CINetTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

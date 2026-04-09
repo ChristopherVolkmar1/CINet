@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme for Dark mode -->
+    <style name="Theme.CINet" parent="android:Theme.Material.NoActionBar" />
+
+    <!-- TimePicker theme that inherits our custom Dark theme when in system Dark Mode -->
+    <style name="Theme.CINet.TimePicker" parent="Theme.CINet.TimePicker.Dark" />
+</resources>
