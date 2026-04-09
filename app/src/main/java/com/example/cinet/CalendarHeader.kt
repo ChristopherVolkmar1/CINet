@@ -40,6 +40,8 @@ fun CalendarHeader(
             }
 
             Text(
+                // YearMonth.month.name returns ALL CAPS (e.g., "APRIL"),
+                // so this manually converts it to a readable format ("April").
                 text = "${currentMonth.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${currentMonth.year}",
                 style = MaterialTheme.typography.titleLarge
             )
@@ -49,6 +51,8 @@ fun CalendarHeader(
             }
         }
 
+        // Fixed-width spacer balances the left back button so the month text
+        // stays visually centered even though the right side has no icon.
         Spacer(modifier = Modifier.width(48.dp))
     }
 }

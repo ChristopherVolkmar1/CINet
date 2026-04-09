@@ -53,6 +53,8 @@ fun AssignmentDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (classItems.isEmpty()) {
+                    // Prevents assignment creation when no classes exist.
+                    // This dependency comes from the app's design (assignments must belong to a class).
                     Text(
                         text = "Create a class first before adding assignments.",
                         color = MaterialTheme.colorScheme.error
@@ -61,15 +63,18 @@ fun AssignmentDialog(
                     ExposedDropdownMenuBox(
                         expanded = classDropdownExpanded,
                         onExpandedChange = {
+                            // Controls dropdown visibility externally (state is owned by parent).
                             onClassDropdownExpandedChange(!classDropdownExpanded)
                         }
                     ) {
                         val selectedClassName = classItems
+                            // Converts stored class ID → display name.
                             .firstOrNull { it.id == selectedClassId }
                             ?.name ?: ""
 
                         OutlinedTextField(
                             value = selectedClassName,
+                            // Read-only field: user cannot type, only select via dropdown.
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Class") },
@@ -78,6 +83,7 @@ fun AssignmentDialog(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                // Required for ExposedDropdownMenuBox to correctly anchor dropdown.
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         )
 
@@ -91,6 +97,7 @@ fun AssignmentDialog(
                                 DropdownMenuItem(
                                     text = { Text(classItem.name) },
                                     onClick = {
+                                        // Stores only ID; actual object is resolved later (in ViewModel usage).
                                         onSelectedClassIdChange(classItem.id)
                                         onClassDropdownExpandedChange(false)
                                     }
@@ -113,6 +120,7 @@ fun AssignmentDialog(
 
                 OutlinedTextField(
                     value = dueTime,
+                    // Prevents manual editing; time must come from picker.
                     onValueChange = {},
                     label = { Text("Due Time") },
                     modifier = Modifier.fillMaxWidth(),
@@ -129,6 +137,7 @@ fun AssignmentDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
+                // Disabled when no classes exist to enforce class dependency at UI level.
                 enabled = classItems.isNotEmpty()
             ) {
                 Text(if (editingAssignment == null) "Save" else "Update")
@@ -140,6 +149,7 @@ fun AssignmentDialog(
                     Button(
                         onClick = onDelete,
                         colors = ButtonDefaults.buttonColors(
+                            // Uses theme error color to indicate destructive action.
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
@@ -147,6 +157,7 @@ fun AssignmentDialog(
                     }
                 }
 
+                // Null onDelete indicates create mode (no existing assignment to delete).
                 OutlinedButton(onClick = onDismiss) {
                     Text("Cancel")
                 }

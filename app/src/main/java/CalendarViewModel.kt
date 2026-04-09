@@ -8,8 +8,10 @@ import java.time.LocalDate
 import java.time.YearMonth
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+
 class CalendarViewModel : ViewModel() {
 
+    // mutableStateOf makes Compose automatically recompose UI when these values change.
     var currentMonth by mutableStateOf(YearMonth.now())
         private set
 
@@ -41,6 +43,8 @@ class CalendarViewModel : ViewModel() {
         endTime: String
     ) {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+        // Ensures consistent ordering regardless of user selection order.
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
 
         viewModelScope.launch {
@@ -78,6 +82,8 @@ class CalendarViewModel : ViewModel() {
                     endTime = endTime
                 )
 
+                // Keeps local scheduleItems consistent after class rename
+                // (Firestore stores className redundantly in assignments).
                 scheduleItems = scheduleItems.map { item ->
                     if (item.classId == classId) {
                         item.copy(className = name)
@@ -90,11 +96,13 @@ class CalendarViewModel : ViewModel() {
             }
         }
     }
+
     fun deleteClass(classId: String) {
         viewModelScope.launch {
             try {
                 repository.deleteClass(classId)
 
+                // Removes assignments tied to the deleted class locally.
                 scheduleItems = scheduleItems.filterNot { it.classId == classId }
 
                 refreshClasses()
@@ -110,6 +118,8 @@ class CalendarViewModel : ViewModel() {
         dueTime: String
     ) {
         val date = selectedDate ?: return
+
+        // Must match the same format used in Firestore + CalendarGrid comparisons.
         val formattedDate = formatDate(date)
 
         viewModelScope.launch {
@@ -127,6 +137,7 @@ class CalendarViewModel : ViewModel() {
             }
         }
     }
+
     fun updateScheduleItem(
         itemId: String,
         classItem: ClassItem,
@@ -169,9 +180,12 @@ class CalendarViewModel : ViewModel() {
         val formattedDate = formatDate(date)
 
         return scheduleItems
+            // Relies on ScheduleItem.date using same string format.
             .filter { it.date == formattedDate }
+            // Converts time string → sortable number (minutes since midnight).
             .sortedBy { parseTimeToSortableValue(it.dueTime) }
     }
+
     fun getClassesGroupedByDay(): Map<String, List<ClassItem>> {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
@@ -185,6 +199,7 @@ class CalendarViewModel : ViewModel() {
     fun getClassesForSelectedDate(): List<ClassItem> {
         val date = selectedDate ?: return emptyList()
 
+        // Converts LocalDate → matching string used in ClassItem.meetingDays.
         val dayName = when (date.dayOfWeek.value) {
             1 -> "Mon"
             2 -> "Tue"
@@ -200,14 +215,18 @@ class CalendarViewModel : ViewModel() {
             .filter { it.meetingDays.contains(dayName) }
             .sortedBy { parseTimeToSortableValue(it.startTime) }
     }
+
     private fun formatDate(date: LocalDate): String {
+        // Must stay consistent with Firestore storage + CalendarGrid comparison.
         return "%04d-%02d-%02d".format(
             date.year,
             date.monthValue,
             date.dayOfMonth
         )
     }
+
     private fun parseTimeToSortableValue(time: String): Int {
+        // Expects format like "hh:mm AM/PM"
         val parts = time.split(" ", ":")
         if (parts.size < 3) return Int.MAX_VALUE
 
@@ -215,6 +234,7 @@ class CalendarViewModel : ViewModel() {
         val minute = parts[1].toIntOrNull() ?: return Int.MAX_VALUE
         val amPm = parts[2]
 
+        // Converts 12-hour → 24-hour for sorting.
         if (amPm == "PM" && hour != 12) hour += 12
         if (amPm == "AM" && hour == 12) hour = 0
 
@@ -224,16 +244,22 @@ class CalendarViewModel : ViewModel() {
     private fun sortClassesByTime(classes: List<ClassItem>): List<ClassItem> {
         return classes.sortedBy { parseTimeToSortableValue(it.startTime) }
     }
+
     private val repository = CalendarFirestoreRepository()
+
     init {
+        // Automatically loads data when ViewModel is created.
         refreshClasses()
         refreshAssignments()
     }
+
     fun refreshClasses() {
         viewModelScope.launch {
             try {
                 classItems = sortClassesByTime(repository.loadClasses())
+
                 android.util.Log.d("FirestoreDebug", "Loaded classItems count: ${classItems.size}")
+
                 classItems.forEach {
                     android.util.Log.d(
                         "FirestoreDebug",
@@ -245,6 +271,7 @@ class CalendarViewModel : ViewModel() {
             }
         }
     }
+
     fun refreshAssignments() {
         viewModelScope.launch {
             try {

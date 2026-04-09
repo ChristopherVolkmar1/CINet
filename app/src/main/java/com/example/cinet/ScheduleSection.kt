@@ -27,8 +27,11 @@ fun ScheduleSection(
     Spacer(modifier = Modifier.height(8.dp))
 
     if (selectedDate == null) {
+        // Depends on parent screen not having a selected date yet.
         Text("Select a date to view scheduled items.")
     } else if (itemsForSelectedDate.isEmpty()) {
+        // itemsForSelectedDate is already filtered before reaching this composable,
+        // so empty here means no items match the selected date.
         Text("No items scheduled for $selectedDate")
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -36,6 +39,7 @@ fun ScheduleSection(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // Click handling is delegated upward, typically to open edit/view behavior.
                         .clickable { onItemClick(item) }
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -46,6 +50,8 @@ fun ScheduleSection(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(text = item.assignmentName)
                         Spacer(modifier = Modifier.height(4.dp))
+
+                        // Assumes dueTime is already stored in display-ready format.
                         Text(text = "Due: ${item.dueTime}")
                     }
                 }

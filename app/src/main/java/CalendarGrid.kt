@@ -26,14 +26,18 @@ fun CalendarGrid(
 ) {
     val firstDayOfMonth = currentMonth.atDay(1)
     val daysInMonth = currentMonth.lengthOfMonth()
+
+    // dayOfWeek.value = 1 (Mon) → 7 (Sun), so % 7 shifts Sunday to 0 for grid alignment.
     val startDayOfWeek = firstDayOfMonth.dayOfWeek.value % 7
 
     val days = mutableListOf<Int?>()
     repeat(startDayOfWeek) { days.add(null) }
+
     for (day in 1..daysInMonth) days.add(day)
+
+    // Pads the grid so total cells are divisible by 7 (full weeks).
     while (days.size % 7 != 0) days.add(null)
 
-    // Weekday labels
     Row(modifier = Modifier.fillMaxWidth()) {
         listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa").forEach {
             Box(
@@ -47,7 +51,6 @@ fun CalendarGrid(
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    // Calendar grid
     Column {
         days.chunked(7).forEach { week ->
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -64,12 +67,14 @@ fun CalendarGrid(
                             val isToday = cellDate == today
                             val isSelected = selectedDate == cellDate
 
+                            // Matches whatever format ScheduleItem.date uses.
                             val dateString = "%04d-%02d-%02d".format(
                                 cellDate.year,
                                 cellDate.monthValue,
                                 cellDate.dayOfMonth
                             )
 
+                            // Relies on ScheduleItem storing date as a formatted string.
                             val hasItems = scheduleItems.any { it.date == dateString }
 
                             Box(
@@ -82,6 +87,8 @@ fun CalendarGrid(
                                     )
                                     .then(
                                         if (isSelected) {
+                                            // Selection is indicated separately from "today",
+                                            // so both states can be visible at once.
                                             Modifier.border(
                                                 2.dp,
                                                 MaterialTheme.colorScheme.tertiary,
@@ -90,6 +97,8 @@ fun CalendarGrid(
                                         } else Modifier
                                     )
                                     .clickable {
+                                        // Same-date click triggers a different action
+                                        // (e.g., open dialog instead of just selecting).
                                         if (selectedDate == cellDate) {
                                             onSameDateClicked()
                                         } else {
@@ -113,6 +122,7 @@ fun CalendarGrid(
                                             modifier = Modifier
                                                 .size(4.dp)
                                                 .background(
+                                                    // Dot color adapts so it's visible on "today" background.
                                                     if (isToday) Color.White
                                                     else MaterialTheme.colorScheme.primary,
                                                     CircleShape

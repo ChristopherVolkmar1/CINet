@@ -43,6 +43,8 @@ fun ClassDialog(
         },
         text = {
             Column(
+                // Makes the dialog body scrollable so all fields remain reachable
+                // when content is taller than the available dialog space.
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
                 OutlinedTextField(
@@ -63,6 +65,8 @@ fun ClassDialog(
                         Checkbox(
                             checked = selectedMeetingDays.contains(day),
                             onCheckedChange = { checked ->
+                                // Uses Set add/remove behavior so duplicate day entries
+                                // cannot happen and unchecking cleanly removes the day.
                                 onMeetingDaysChange(
                                     if (checked) selectedMeetingDays + day
                                     else selectedMeetingDays - day
@@ -77,6 +81,8 @@ fun ClassDialog(
 
                 OutlinedTextField(
                     value = classStartTime,
+                    // Empty onValueChange + readOnly means this field is display-only;
+                    // time must come from the external picker callback.
                     onValueChange = {},
                     label = { Text("Start Time") },
                     modifier = Modifier.fillMaxWidth(),
@@ -93,6 +99,8 @@ fun ClassDialog(
 
                 OutlinedTextField(
                     value = classEndTime,
+                    // Same pattern as start time: prevents manual editing and keeps
+                    // time selection controlled by the picker.
                     onValueChange = {},
                     label = { Text("End Time") },
                     modifier = Modifier.fillMaxWidth(),
@@ -117,6 +125,8 @@ fun ClassDialog(
                     Button(
                         onClick = onDelete,
                         colors = ButtonDefaults.buttonColors(
+                            // Uses the theme error color so delete action is visually
+                            // distinguished as destructive without hardcoding a color.
                             containerColor = MaterialTheme.colorScheme.error
                         )
                     ) {
@@ -124,6 +134,8 @@ fun ClassDialog(
                     }
                 }
 
+                // Null onDelete is how the caller signals "create mode",
+                // so the delete action only appears while editing an existing class.
                 OutlinedButton(onClick = onDismiss) {
                     Text("Cancel")
                 }

@@ -23,34 +23,49 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(onBack: () -> Unit) {
+    // Provided by Compose; automatically scopes this ViewModel to the current UI lifecycle.
     val viewModel: CalendarViewModel = viewModel()
+
+    // Required because openTimePicker(...) depends on Android context (not visible here).
     val context = LocalContext.current
+
+    // remember prevents recomputing today's date on every recomposition.
     val today = remember { LocalDate.now() }
 
+    // These are backed by ViewModel state (likely StateFlow or mutableState),
+    // so UI updates automatically when they change.
     val classItems = viewModel.classItems
     val currentMonth = viewModel.currentMonth
     val selectedDate = viewModel.selectedDate
+
+    // These methods encapsulate filtering logic inside the ViewModel.
+    // The UI does not know how items/classes are filtered.
     val itemsForSelectedDate = viewModel.getItemsForSelectedDate()
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
 
     var showAssignmentDialog by remember { mutableStateOf(false) }
     var showClassDialog by remember { mutableStateOf(false) }
 
+    // Null = create mode, non-null = edit mode (used throughout dialogs).
     var editingAssignment by remember { mutableStateOf<ScheduleItem?>(null) }
     var editingClass by remember { mutableStateOf<ClassItem?>(null) }
 
     var assignmentName by remember { mutableStateOf("") }
     var dueTime by remember { mutableStateOf("") }
+
+    // Stores only the ID; actual ClassItem is resolved later from classItems.
     var selectedClassId by remember { mutableStateOf<String?>(null) }
+
     var classDropdownExpanded by remember { mutableStateOf(false) }
 
     var className by remember { mutableStateOf("") }
     var classStartTime by remember { mutableStateOf("") }
     var classEndTime by remember { mutableStateOf("") }
+
+    // Must match whatever format the ViewModel uses for meeting-day matching.
     var selectedMeetingDays by remember { mutableStateOf(setOf<String>()) }
 
     val weekdayOptions = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -75,11 +90,13 @@ fun CalendarScreen(onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            // Enables scrolling for entire screen (important for smaller devices).
             .verticalScroll(rememberScrollState())
     ) {
         CalendarHeader(
             currentMonth = currentMonth,
             onBack = onBack,
+            // Month navigation logic is handled inside ViewModel.
             onPreviousMonth = { viewModel.previousMonth() },
             onNextMonth = { viewModel.nextMonth() }
         )
@@ -92,6 +109,7 @@ fun CalendarScreen(onBack: () -> Unit) {
         ) {
             OutlinedButton(
                 onClick = {
+                    // Always reset before opening to avoid leftover state from edits.
                     resetClassForm()
                     showClassDialog = true
                 }
@@ -111,6 +129,7 @@ fun CalendarScreen(onBack: () -> Unit) {
                 viewModel.selectDate(day)
             },
             onSameDateClicked = {
+                // Behavior depends on CalendarGrid detecting "same date" clicks.
                 resetAssignmentForm()
                 showAssignmentDialog = true
             }
@@ -120,6 +139,7 @@ fun CalendarScreen(onBack: () -> Unit) {
             selectedDate = selectedDate,
             itemsForSelectedDate = itemsForSelectedDate,
             onItemClick = { item ->
+                // Pre-fills dialog fields so it behaves as an edit form.
                 editingAssignment = item
                 assignmentName = item.assignmentName
                 dueTime = item.dueTime
@@ -133,6 +153,7 @@ fun CalendarScreen(onBack: () -> Unit) {
             selectedDate = selectedDate,
             classesForSelectedDate = classesForSelectedDate,
             onClassClick = { classItem ->
+                // Converts stored list into Set for UI selection handling.
                 editingClass = classItem
                 className = classItem.name
                 classStartTime = classItem.startTime
@@ -160,11 +181,13 @@ fun CalendarScreen(onBack: () -> Unit) {
                 resetAssignmentForm()
             },
             onPickTime = {
+                // External helper; likely launches Android TimePickerDialog.
                 openTimePicker(context) { picked ->
                     dueTime = picked
                 }
             },
             onConfirm = {
+                // Resolves class reference from ID → object (required by ViewModel).
                 val selectedClass = classItems.firstOrNull { it.id == selectedClassId }
 
                 if (
@@ -194,6 +217,7 @@ fun CalendarScreen(onBack: () -> Unit) {
             },
             onDelete = if (editingAssignment != null) {
                 {
+                    // Delete only available in edit mode.
                     viewModel.deleteScheduleItem(editingAssignment!!.id)
                     showAssignmentDialog = false
                     resetAssignmentForm()

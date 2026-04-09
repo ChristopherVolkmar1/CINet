@@ -27,8 +27,11 @@ fun ClassesSection(
     Spacer(modifier = Modifier.height(8.dp))
 
     if (selectedDate == null) {
+        // This state depends on CalendarScreen not selecting a date yet.
         Text("Select a date to view classes for that day.")
     } else if (classesForSelectedDate.isEmpty()) {
+        // classesForSelectedDate is pre-filtered by the ViewModel,
+        // so empty here means "no classes match this date", not "no classes exist".
         Text("No classes scheduled for $selectedDate")
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -36,6 +39,7 @@ fun ClassesSection(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
+                        // Click behavior is delegated upward (likely opens edit dialog).
                         .clickable { onClassClick(classItem) }
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -44,8 +48,15 @@ fun ClassesSection(
                             style = MaterialTheme.typography.titleSmall
                         )
                         Spacer(modifier = Modifier.height(4.dp))
+
+                        // Assumes startTime/endTime are already formatted strings
+                        // (no formatting logic is done here).
                         Text(text = "${classItem.startTime} - ${classItem.endTime}")
+
                         Spacer(modifier = Modifier.height(4.dp))
+
+                        // meetingDays must already be stored in display-ready format
+                        // (e.g., "Mon", "Tue"), since this just joins them.
                         Text(text = classItem.meetingDays.joinToString(", "))
                     }
                 }
