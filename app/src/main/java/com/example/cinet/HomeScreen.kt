@@ -1,5 +1,6 @@
 package com.example.cinet
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +20,10 @@ import com.example.cinet.ui.theme.CINetTheme
 
 @Composable
 fun HomeScreen(
+    scheduleItems: List<Pair<String, String>>,
+    upcomingEventsItems: List<Pair<String, String>>,
+    onUpdateSchedule: (List<Pair<String, String>>) -> Unit,
+    onUpdateEvents: (List<Pair<String, String>>) -> Unit,
     modifier: Modifier = Modifier,
     onMapClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
@@ -26,14 +31,10 @@ fun HomeScreen(
     val context = LocalContext.current
     var weatherInfo by remember { mutableStateOf(WeatherInfo("...", "Loading...")) }
     
-    // State for the schedule items
-    var scheduleItems by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
-    // State for the upcoming events items
-    var upcomingEventsItems by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
-
-    // State for the "Add" dialog
+    // State for the "Add/Edit" dialog
     var showDialog by remember { mutableStateOf(false) }
     var addingToSchedule by remember { mutableStateOf(true) } // To distinguish between Schedule and Events
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
     
     var nameField by remember { mutableStateOf("") }
     var timeOrDateField by remember { mutableStateOf("") }
@@ -42,13 +43,22 @@ fun HomeScreen(
 
     // Call the weather fetching logic on launch
     LaunchedEffect(Unit) {
+        Log.d("HomeScreen", "LaunchedEffect triggered")
         weatherInfo = WeatherHelper.fetchCampusWeather(context)
     }
 
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text(if (addingToSchedule) "Add Schedule Item" else "Add Upcoming Event") },
+            title = { 
+                Text(
+                    if (editingIndex == null) {
+                        if (addingToSchedule) "Add Schedule Item" else "Add Upcoming Event"
+                    } else {
+                        if (addingToSchedule) "Edit Schedule Item" else "Edit Upcoming Event"
+                    }
+                ) 
+            },
             text = {
                 Column {
                     OutlinedTextField(
@@ -103,23 +113,66 @@ fun HomeScreen(
                     if (nameField.isNotBlank() && timeOrDateField.isNotBlank() && locationField.isNotBlank()) {
                         val fullTime = "$timeOrDateField $amPmSelection"
                         val newItem = nameField to "$fullTime - $locationField"
+                        
                         if (addingToSchedule) {
-                            scheduleItems = scheduleItems + newItem
+                            val newList = scheduleItems.toMutableList()
+                            if (editingIndex != null) {
+                                newList[editingIndex!!] = newItem
+                            } else {
+                                newList.add(newItem)
+                            }
+                            onUpdateSchedule(newList)
                         } else {
-                            upcomingEventsItems = upcomingEventsItems + newItem
+                            val newList = upcomingEventsItems.toMutableList()
+                            if (editingIndex != null) {
+                                newList[editingIndex!!] = newItem
+                            } else {
+                                newList.add(newItem)
+                            }
+                            onUpdateEvents(newList)
                         }
+                        
                         showDialog = false
+                        editingIndex = null
                         nameField = ""
                         timeOrDateField = ""
                         locationField = ""
                     }
                 }) {
-                    Text("Add")
+                    Text(if (editingIndex == null) "Add" else "Update")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("Cancel")
+                Row {
+                    if (editingIndex != null) {
+                        TextButton(onClick = {
+                            if (addingToSchedule) {
+                                val newList = scheduleItems.toMutableList()
+                                newList.removeAt(editingIndex!!)
+                                onUpdateSchedule(newList)
+                            } else {
+                                val newList = upcomingEventsItems.toMutableList()
+                                newList.removeAt(editingIndex!!)
+                                onUpdateEvents(newList)
+                            }
+                            showDialog = false
+                            editingIndex = null
+                            nameField = ""
+                            timeOrDateField = ""
+                            locationField = ""
+                        }) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    TextButton(onClick = { 
+                        showDialog = false
+                        editingIndex = null
+                        nameField = ""
+                        timeOrDateField = ""
+                        locationField = ""
+                    }) {
+                        Text("Cancel")
+                    }
                 }
             }
         )
@@ -167,7 +220,24 @@ fun HomeScreen(
             items = scheduleItems,
             onAddClick = { 
                 addingToSchedule = true
+                editingIndex = null
+                nameField = ""
+                timeOrDateField = ""
+                locationField = ""
                 showDialog = true 
+            },
+            onItemClick = { index ->
+                addingToSchedule = true
+                editingIndex = index
+                val item = scheduleItems[index]
+                nameField = item.first
+                // Simple parsing for demo purposes
+                val parts = item.second.split(" - ")
+                val timeParts = parts[0].split(" ")
+                timeOrDateField = if (timeParts.isNotEmpty()) timeParts[0] else ""
+                amPmSelection = if (timeParts.size > 1) timeParts[1] else "AM"
+                locationField = if (parts.size > 1) parts[1] else ""
+                showDialog = true
             }
         )
 
@@ -179,6 +249,23 @@ fun HomeScreen(
             items = upcomingEventsItems,
             onAddClick = {
                 addingToSchedule = false
+                editingIndex = null
+                nameField = ""
+                timeOrDateField = ""
+                locationField = ""
+                showDialog = true
+            },
+            onItemClick = { index ->
+                addingToSchedule = false
+                editingIndex = index
+                val item = upcomingEventsItems[index]
+                nameField = item.first
+                // Simple parsing for demo purposes
+                val parts = item.second.split(" - ")
+                val timeParts = parts[0].split(" ")
+                timeOrDateField = if (timeParts.isNotEmpty()) timeParts[0] else ""
+                amPmSelection = if (timeParts.size > 1) timeParts[1] else "AM"
+                locationField = if (parts.size > 1) parts[1] else ""
                 showDialog = true
             }
         )
@@ -189,6 +276,11 @@ fun HomeScreen(
 @Composable
 fun HomeScreenPreview() {
     CINetTheme {
-        HomeScreen()
+        HomeScreen(
+            scheduleItems = emptyList(),
+            upcomingEventsItems = emptyList(),
+            onUpdateSchedule = {},
+            onUpdateEvents = {}
+        )
     }
 }

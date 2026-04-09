@@ -1,7 +1,10 @@
 package com.example.cinet
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -74,7 +77,8 @@ fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condit
 fun InfoSection(
     title: String,
     items: List<Pair<String, String>>,
-    onAddClick: (() -> Unit)? = null
+    onAddClick: (() -> Unit)? = null,
+    onItemClick: ((Int) -> Unit)? = null
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -110,13 +114,23 @@ fun InfoSection(
                 color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.3f)
             )
             
-            items.forEach { (label, desc) ->
-                ListItem(
-                    label = label, 
-                    description = desc, 
-                    onStarClick = { /* Action for favorite */ },
-                    onArrowClick = { /* Action for navigation */ }
-                )
+            // Fixed height with scroll support when list is long
+            Box(modifier = Modifier.heightIn(max = 250.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
+                    items.forEachIndexed { index, (label, desc) ->
+                        ListItem(
+                            label = label, 
+                            description = desc, 
+                            onStarClick = { /* Action for favorite */ },
+                            onArrowClick = { /* Action for navigation */ },
+                            modifier = Modifier.clickable(enabled = onItemClick != null) {
+                                onItemClick?.invoke(index)
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -127,12 +141,13 @@ fun ListItem(
     label: String,
     description: String,
     onStarClick: () -> Unit = {},
-    onArrowClick: () -> Unit = {}
+    onArrowClick: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val contentColor = MaterialTheme.colorScheme.onSecondary
     
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

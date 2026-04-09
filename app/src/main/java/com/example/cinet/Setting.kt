@@ -31,3 +31,8 @@ fun SettingScreen(
         }
     }
 }
+
+object AppSettings {
+        var isDarkMap: Boolean
+        by mutableStateOf(true)
+}
