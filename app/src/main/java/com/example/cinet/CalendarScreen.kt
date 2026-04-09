@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
+import androidx.compose.runtime.LaunchedEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +43,10 @@ fun CalendarScreen(
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
     val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
     val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
+    LaunchedEffect(Unit) {
+        viewModel.refreshStudySessions()
+        viewModel.refreshEvents()
+    }
 
     var showAssignmentDialog by remember { mutableStateOf(false) }
     var showClassDialog by remember { mutableStateOf(initialShowClassDialog) }

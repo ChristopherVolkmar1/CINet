@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -20,7 +19,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +29,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.Message
@@ -48,7 +45,6 @@ fun ConversationScreen(
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val listState = rememberLazyListState()
 
@@ -57,23 +53,8 @@ fun ConversationScreen(
     var showStudyInviteDialog by remember { mutableStateOf(false) }
     var showEventInviteDialog by remember { mutableStateOf(false) }
     var myScheduleItems by remember { mutableStateOf<List<ScheduleItem>>(emptyList()) }
-
-    // State for accept dialogs — pre-filled from invite metadata
-    var acceptingStudyInvite by remember { mutableStateOf<Message?>(null) }
-    var acceptingEventInvite by remember { mutableStateOf<Message?>(null) }
-
-    // Pre-filled fields for study invite acceptance
-    var acceptSessionClassName by remember { mutableStateOf("") }
-    var acceptSessionTopic by remember { mutableStateOf("") }
-    var acceptSessionDate by remember { mutableStateOf("") }
-    var acceptSessionTime by remember { mutableStateOf("") }
-    var acceptSessionLocation by remember { mutableStateOf("") }
-
-    // Pre-filled fields for event invite acceptance
-    var acceptEventName by remember { mutableStateOf("") }
-    var acceptEventDate by remember { mutableStateOf("") }
-    var acceptEventTime by remember { mutableStateOf("") }
-    var acceptEventLocation by remember { mutableStateOf("") }
+    var myStudySessions by remember { mutableStateOf<List<StudySession>>(emptyList()) }
+    var myEvents by remember { mutableStateOf<List<EventItem>>(emptyList()) }
 
     DisposableEffect(conversation.id) {
         val listener = FirebaseFirestore.getInstance()
@@ -120,17 +101,27 @@ fun ConversationScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Study invite — loads assignments and study sessions only
                 OutlinedButton(
                     onClick = {
                         scope.launch {
                             repository.getMyScheduleItems().onSuccess { myScheduleItems = it }
+                            repository.getMyStudySessions().onSuccess { myStudySessions = it }
                             showStudyInviteDialog = true
                         }
                     }
                 ) {
                     Text("Study Invite", style = MaterialTheme.typography.labelSmall)
                 }
-                OutlinedButton(onClick = { showEventInviteDialog = true }) {
+                // Event invite — loads existing events for picker
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            repository.getMyEvents().onSuccess { myEvents = it }
+                            showEventInviteDialog = true
+                        }
+                    }
+                ) {
                     Text("Event Invite", style = MaterialTheme.typography.labelSmall)
                 }
             }
@@ -159,6 +150,8 @@ fun ConversationScreen(
                                         val location = message.metadata["location"] ?: ""
                                         android.util.Log.d("CalendarSave", "Saving study session: $className $topic $date $time")
                                         if (date.isNotBlank()) {
+                                            android.util.Log.d("CalendarSave", "metadata: ${message.metadata}")
+                                            android.util.Log.d("CalendarSave", "date: ${message.metadata["date"]}")
                                             calendarRepository.addStudySession(date, className, topic, time, location)
                                             android.util.Log.d("CalendarSave", "Study session saved successfully")
                                         } else {
@@ -218,10 +211,11 @@ fun ConversationScreen(
         }
     }
 
-    // Study invite sender dialog
+    // Study invite sender dialog — shows assignments and study sessions
     if (showStudyInviteDialog) {
         StudyInviteDialog(
             existingItems = myScheduleItems,
+            existingStudySessions = myStudySessions,
             onDismiss = { showStudyInviteDialog = false },
             onSendExisting = { item ->
                 scope.launch {
@@ -236,6 +230,24 @@ fun ConversationScreen(
                             "date" to item.date,
                             "time" to item.dueTime,
                             "location" to ""
+                        )
+                    )
+                    showStudyInviteDialog = false
+                }
+            },
+            onSendExistingSession = { session ->
+                scope.launch {
+                    val content = "Study invite: ${session.className} — ${session.topic} on ${session.date} at ${session.startTime}"
+                    repository.sendMessage(
+                        conversationId = conversation.id,
+                        content = content,
+                        type = "study_invite",
+                        metadata = mapOf(
+                            "className" to session.className,
+                            "topic" to session.topic,
+                            "date" to session.date,
+                            "time" to session.startTime,
+                            "location" to session.location
                         )
                     )
                     showStudyInviteDialog = false
@@ -256,9 +268,10 @@ fun ConversationScreen(
         )
     }
 
-    // Event invite sender dialog
+    // Event invite sender dialog — shows existing events with manual form option
     if (showEventInviteDialog) {
         EventInviteSenderDialog(
+            existingEvents = myEvents,
             onDismiss = { showEventInviteDialog = false },
             onSend = { name, date, time, location ->
                 scope.launch {
@@ -274,60 +287,9 @@ fun ConversationScreen(
             }
         )
     }
-
-    // Study invite accept dialog — pre-filled, user can edit before saving
-    if (acceptingStudyInvite != null) {
-        StudySessionDialog(
-            editingSession = null,
-            date = acceptSessionDate,
-            className = acceptSessionClassName,
-            onClassNameChange = { acceptSessionClassName = it },
-            topic = acceptSessionTopic,
-            onTopicChange = { acceptSessionTopic = it },
-            startTime = acceptSessionTime,
-            location = acceptSessionLocation,
-            onLocationChange = { acceptSessionLocation = it },
-            onPickStartTime = { openTimePicker(context) { picked -> acceptSessionTime = picked } },
-            onDismiss = { acceptingStudyInvite = null },
-            onConfirm = {
-                if (acceptSessionClassName.isNotBlank() && acceptSessionTopic.isNotBlank() && acceptSessionDate.isNotBlank()) {
-                    scope.launch {
-                        calendarRepository.addStudySession(acceptSessionDate, acceptSessionClassName, acceptSessionTopic, acceptSessionTime, acceptSessionLocation)
-                        repository.sendMessage(conversation.id, "Accepted your study invite!", "text")
-                        acceptingStudyInvite = null
-                    }
-                }
-            },
-            onDelete = null
-        )
-    }
-
-    // Event invite accept dialog — pre-filled, user can edit before saving
-    if (acceptingEventInvite != null) {
-        EventItemDialog(
-            editingEvent = null,
-            date = acceptEventDate,
-            eventName = acceptEventName,
-            onEventNameChange = { acceptEventName = it },
-            eventTime = acceptEventTime,
-            location = acceptEventLocation,
-            onLocationChange = { acceptEventLocation = it },
-            onPickTime = { openTimePicker(context) { picked -> acceptEventTime = picked } },
-            onDismiss = { acceptingEventInvite = null },
-            onConfirm = {
-                if (acceptEventName.isNotBlank() && acceptEventDate.isNotBlank()) {
-                    scope.launch {
-                        calendarRepository.addEvent(acceptEventDate, acceptEventName, acceptEventTime, acceptEventLocation)
-                        repository.sendMessage(conversation.id, "Accepted your event invite!", "text")
-                        acceptingEventInvite = null
-                    }
-                }
-            },
-            onDelete = null
-        )
-    }
 }
 
+// Frontend team: restyle this bubble however you want
 @Composable
 fun MessageBubble(
     message: Message,

@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 object AppSettings {
     var isDarkMode by mutableStateOf(false)
     var notificationsEnabled by mutableStateOf(true)
+    var classReminderMinutesBefore: Long = 10L
+    var assignmentReminderMinutesBefore: Long = 60L
 }
 // settings stuff - Zack
 /**

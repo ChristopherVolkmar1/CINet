@@ -5,13 +5,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -33,10 +39,13 @@ import java.util.TimeZone
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventInviteSenderDialog(
+    existingEvents: List<EventItem> = emptyList(),
     onDismiss: () -> Unit,
     onSend: (name: String, date: String, time: String, location: String) -> Unit,
 ) {
     val context = LocalContext.current
+    // false = pick from existing, true = create new manually
+    var isCreatingNew by remember { mutableStateOf(false) }
     var eventName by remember { mutableStateOf("") }
     var eventDate by remember { mutableStateOf("") }
     var eventTime by remember { mutableStateOf("") }
@@ -50,6 +59,7 @@ fun EventInviteSenderDialog(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
+                        // Format to yyyy-MM-dd to match CalendarFirestoreRepository date format
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         sdf.timeZone = TimeZone.getTimeZone("UTC")
                         eventDate = sdf.format(Date(millis))
@@ -67,66 +77,122 @@ fun EventInviteSenderDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Send Event Invite") },
+        title = { Text(if (isCreatingNew) "New Event Invite" else "Send Event Invite") },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(
-                    value = eventName,
-                    onValueChange = { eventName = it },
-                    label = { Text("Event Name") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = eventDate,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Date") },
-                    placeholder = { Text("Tap to pick a date") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { showDatePicker = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Pick Date")
+            Column {
+                if (isCreatingNew) {
+                    // Manual form for creating a new event invite on the spot
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        OutlinedTextField(
+                            value = eventName,
+                            onValueChange = { eventName = it },
+                            label = { Text("Event Name") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = eventDate,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Date") },
+                            placeholder = { Text("Tap to pick a date") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showDatePicker = true }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Pick Date")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = eventTime,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Time") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { openTimePicker(context) { eventTime = it } },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Pick Time")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = eventLocation,
+                            onValueChange = { eventLocation = it },
+                            label = { Text("Location (optional)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    // Pick from existing events
+                    if (existingEvents.isEmpty()) {
+                        Text(
+                            "No events found — create a new invite below.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        LazyColumn {
+                            items(existingEvents) { event ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        // Tapping sends immediately
+                                        .clickable {
+                                            onSend(event.name, event.date, event.time, event.location)
+                                        }
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(text = event.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(
+                                            text = "${event.time} on ${event.date}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (event.location.isNotBlank()) {
+                                            Text(
+                                                text = event.location,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = { isCreatingNew = true }) {
+                        Text("Create new instead")
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = eventTime,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Time") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { openTimePicker(context) { eventTime = it } },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Pick Time")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = eventLocation,
-                    onValueChange = { eventLocation = it },
-                    label = { Text("Location (optional)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         },
         confirmButton = {
-            Button(onClick = {
-                if (eventName.isNotBlank() && eventDate.isNotBlank() && eventTime.isNotBlank()) {
-                    onSend(eventName, eventDate, eventTime, eventLocation)
-                }
-            }) { Text("Send") }
+            if (isCreatingNew) {
+                Button(onClick = {
+                    if (eventName.isNotBlank() && eventDate.isNotBlank() && eventTime.isNotBlank()) {
+                        onSend(eventName, eventDate, eventTime, eventLocation)
+                    }
+                }) { Text("Send") }
+            }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+            // Back returns to picker, Cancel closes entirely
+            if (isCreatingNew) {
+                OutlinedButton(onClick = { isCreatingNew = false }) { Text("Back") }
+            } else {
+                OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+            }
         }
     )
 }

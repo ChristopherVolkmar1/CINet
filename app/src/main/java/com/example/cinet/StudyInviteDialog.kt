@@ -16,7 +16,6 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,11 +37,14 @@ import java.util.TimeZone
 @Composable
 fun StudyInviteDialog(
     existingItems: List<ScheduleItem>,
+    existingStudySessions: List<StudySession> = emptyList(),
     onDismiss: () -> Unit,
     onSendExisting: (ScheduleItem) -> Unit,
+    onSendExistingSession: (StudySession) -> Unit = {},
     onSendNew: (className: String, assignmentName: String, date: String, time: String) -> Unit,
 ) {
     val context = LocalContext.current
+    // false = pick from existing, true = create new
     var isCreatingNew by remember { mutableStateOf(false) }
     var newClassName by remember { mutableStateOf("") }
     var newAssignmentName by remember { mutableStateOf("") }
@@ -57,6 +59,7 @@ fun StudyInviteDialog(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
+                        // Format to yyyy-MM-dd to match CalendarFirestoreRepository date format
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         sdf.timeZone = TimeZone.getTimeZone("UTC")
                         newDate = sdf.format(Date(millis))
@@ -78,6 +81,7 @@ fun StudyInviteDialog(
         text = {
             Column {
                 if (isCreatingNew) {
+                    // Option B — create new study session on the spot
                     OutlinedTextField(
                         value = newClassName,
                         onValueChange = { newClassName = it },
@@ -124,34 +128,75 @@ fun StudyInviteDialog(
                         Text("Pick Time")
                     }
                 } else {
-                    if (existingItems.isEmpty()) {
+                    // Option A — pick from existing calendar items
+                    val hasAnyItems = existingItems.isNotEmpty() || existingStudySessions.isNotEmpty()
+
+                    if (!hasAnyItems) {
                         Text(
-                            "No assignments found — create a new invite below.",
+                            "No items found — create a new invite below.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        Text("Pick from your assignments:", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
                         LazyColumn {
-                            items(existingItems) { item ->
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .clickable { onSendExisting(item) }
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(text = item.className, style = MaterialTheme.typography.titleSmall)
-                                        Text(text = item.assignmentName)
-                                        Text(
-                                            text = "Due: ${item.dueTime} on ${item.date}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                            if (existingItems.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        "Assignments",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
                                 }
-                                HorizontalDivider()
+                                items(existingItems) { item ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp)
+                                            // Tapping sends immediately without going to create mode
+                                            .clickable { onSendExisting(item) }
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(text = item.className, style = MaterialTheme.typography.titleSmall)
+                                            Text(text = item.assignmentName)
+                                            Text(
+                                                text = "Due: ${item.dueTime} on ${item.date}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                }
+                            }
+
+                            if (existingStudySessions.isNotEmpty()) {
+                                item {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "Study Sessions",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
+                                items(existingStudySessions) { session ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp)
+                                            .clickable { onSendExistingSession(session) }
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text(text = session.className, style = MaterialTheme.typography.titleSmall)
+                                            Text(text = session.topic)
+                                            Text(
+                                                text = "${session.startTime} on ${session.date}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                }
                             }
                         }
                     }
@@ -176,6 +221,7 @@ fun StudyInviteDialog(
             }
         },
         dismissButton = {
+            // Back returns to picker, Cancel closes entirely
             TextButton(onClick = {
                 if (isCreatingNew) isCreatingNew = false else onDismiss()
             }) {

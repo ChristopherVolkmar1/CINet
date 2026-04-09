@@ -10,6 +10,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
+import com.example.cinet.StudySession
+import com.example.cinet.EventItem
 
 class SocialRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
@@ -275,6 +277,47 @@ class SocialRepository(
                 .update("metadata.response", response)
                 .await()
             Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMyStudySessions(): Result<List<StudySession>> {
+        return try {
+            val snapshot = db.collection("users")
+                .document(currentUid)
+                .collection("studySessions")
+                .get()
+                .await()
+            val items = snapshot.documents.mapNotNull { doc ->
+                val date = doc.getString("date") ?: return@mapNotNull null
+                val className = doc.getString("className") ?: return@mapNotNull null
+                val topic = doc.getString("topic") ?: return@mapNotNull null
+                val startTime = doc.getString("startTime") ?: return@mapNotNull null
+                val location = doc.getString("location") ?: ""
+                StudySession(id = doc.id, date = date, className = className, topic = topic, startTime = startTime, location = location)
+            }
+            Result.success(items)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getMyEvents(): Result<List<EventItem>> {
+        return try {
+            val snapshot = db.collection("users")
+                .document(currentUid)
+                .collection("events")
+                .get()
+                .await()
+            val items = snapshot.documents.mapNotNull { doc ->
+                val date = doc.getString("date") ?: return@mapNotNull null
+                val name = doc.getString("name") ?: return@mapNotNull null
+                val time = doc.getString("time") ?: return@mapNotNull null
+                val location = doc.getString("location") ?: ""
+                EventItem(id = doc.id, date = date, name = name, time = time, location = location)
+            }
+            Result.success(items)
         } catch (e: Exception) {
             Result.failure(e)
         }
