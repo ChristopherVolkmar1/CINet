@@ -1,5 +1,6 @@
 package com.example.cinet
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -64,10 +65,16 @@ private fun MainScaffold(
     onSignOut: () -> Unit
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
-
-    // Sub-navigation state for Social tab
     var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
     var activeConversation by remember { mutableStateOf<Conversation?>(null) }
+
+    BackHandler(enabled = currentScreen == Screen.Social &&
+            (selectedProfile != null || activeConversation != null)) {
+        when {
+            activeConversation != null -> activeConversation = null
+            selectedProfile != null -> selectedProfile = null
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -78,7 +85,6 @@ private fun MainScaffold(
                         selected = currentScreen == screen,
                         onClick = {
                             currentScreen = screen
-                            // Reset social sub-navigation when leaving the tab
                             if (screen != Screen.Social) {
                                 selectedProfile = null
                                 activeConversation = null

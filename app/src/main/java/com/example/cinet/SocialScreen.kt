@@ -46,6 +46,7 @@ fun SocialScreen(
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var pendingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var sentRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
+    var sentRequestNicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
@@ -56,7 +57,14 @@ fun SocialScreen(
         isLoading = true
         repository.getFriends().onSuccess { friends = it }
         repository.getPendingRequests().onSuccess { pendingRequests = it }
-        repository.getSentRequests().onSuccess { sentRequests = it }
+        repository.getSentRequests().onSuccess { requests ->
+            sentRequests = requests
+            val nicknames = mutableMapOf<String, String>()
+            requests.forEach { request ->
+                nicknames[request.receiverId] = repository.getUserNickname(request.receiverId)
+            }
+            sentRequestNicknames = nicknames
+        }
         isLoading = false
     }
 
@@ -127,8 +135,15 @@ fun SocialScreen(
                                     scope.launch {
                                         repository.sendFriendRequest(user)
                                         searchResults = searchResults - user
-                                        repository.getSentRequests()
-                                            .onSuccess { sentRequests = it }
+                                        repository.getSentRequests().onSuccess { requests ->
+                                            sentRequests = requests
+                                            val nicknames = mutableMapOf<String, String>()
+                                            requests.forEach { request ->
+                                                nicknames[request.receiverId] =
+                                                    repository.getUserNickname(request.receiverId)
+                                            }
+                                            sentRequestNicknames = nicknames
+                                        }
                                     }
                                 }) {
                                     Text("Add")
@@ -218,7 +233,8 @@ fun SocialScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = request.receiverId,
+                                    text = sentRequestNicknames[request.receiverId]
+                                        ?: request.receiverId,
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Text(
@@ -236,7 +252,7 @@ fun SocialScreen(
     }
 }
 
-// Frontend team: restyle this row however you want
+// Frontend: restyle this row however you want
 @Composable
 fun UserRow(
     user: UserProfile,

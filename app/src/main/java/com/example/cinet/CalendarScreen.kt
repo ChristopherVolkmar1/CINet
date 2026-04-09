@@ -23,98 +23,95 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(onBack: () -> Unit) {
-    // Provided by Compose; automatically scopes this ViewModel to the current UI lifecycle.
     val viewModel: CalendarViewModel = viewModel()
-
-    // Required because openTimePicker(...) depends on Android context (not visible here).
     val context = LocalContext.current
-
-    // remember prevents recomputing today's date on every recomposition.
     val today = remember { LocalDate.now() }
 
-    // These are backed by ViewModel state (likely StateFlow or mutableState),
-    // so UI updates automatically when they change.
     val classItems = viewModel.classItems
     val currentMonth = viewModel.currentMonth
     val selectedDate = viewModel.selectedDate
 
-    // These methods encapsulate filtering logic inside the ViewModel.
-    // The UI does not know how items/classes are filtered.
     val itemsForSelectedDate = viewModel.getItemsForSelectedDate()
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
+    val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
+    val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
 
+    // Assignment dialog state
     var showAssignmentDialog by remember { mutableStateOf(false) }
-    var showClassDialog by remember { mutableStateOf(false) }
-
-    // Null = create mode, non-null = edit mode (used throughout dialogs).
     var editingAssignment by remember { mutableStateOf<ScheduleItem?>(null) }
-    var editingClass by remember { mutableStateOf<ClassItem?>(null) }
-
     var assignmentName by remember { mutableStateOf("") }
     var dueTime by remember { mutableStateOf("") }
-
-    // Stores only the ID; actual ClassItem is resolved later from classItems.
     var selectedClassId by remember { mutableStateOf<String?>(null) }
-
     var classDropdownExpanded by remember { mutableStateOf(false) }
 
+    // Class dialog state
+    var showClassDialog by remember { mutableStateOf(false) }
+    var editingClass by remember { mutableStateOf<ClassItem?>(null) }
     var className by remember { mutableStateOf("") }
     var classStartTime by remember { mutableStateOf("") }
     var classEndTime by remember { mutableStateOf("") }
-
-    // Must match whatever format the ViewModel uses for meeting-day matching.
     var selectedMeetingDays by remember { mutableStateOf(setOf<String>()) }
-
     val weekdayOptions = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-    fun resetAssignmentForm() {
-        editingAssignment = null
-        assignmentName = ""
-        dueTime = ""
-        selectedClassId = null
-        classDropdownExpanded = false
-    }
+    // Study session dialog state
+    var showStudySessionDialog by remember { mutableStateOf(false) }
+    var editingSession by remember { mutableStateOf<StudySession?>(null) }
+    var sessionClassName by remember { mutableStateOf("") }
+    var sessionTopic by remember { mutableStateOf("") }
+    var sessionStartTime by remember { mutableStateOf("") }
+    var sessionLocation by remember { mutableStateOf("") }
 
+    // Event dialog state
+    var showEventDialog by remember { mutableStateOf(false) }
+    var editingEvent by remember { mutableStateOf<EventItem?>(null) }
+    var eventName by remember { mutableStateOf("") }
+    var eventTime by remember { mutableStateOf("") }
+    var eventLocation by remember { mutableStateOf("") }
+
+    fun resetAssignmentForm() {
+        editingAssignment = null; assignmentName = ""; dueTime = ""; selectedClassId = null; classDropdownExpanded = false
+    }
     fun resetClassForm() {
-        editingClass = null
-        className = ""
-        classStartTime = ""
-        classEndTime = ""
-        selectedMeetingDays = emptySet()
+        editingClass = null; className = ""; classStartTime = ""; classEndTime = ""; selectedMeetingDays = emptySet()
+    }
+    fun resetStudySessionForm() {
+        editingSession = null; sessionClassName = ""; sessionTopic = ""; sessionStartTime = ""; sessionLocation = ""
+    }
+    fun resetEventForm() {
+        editingEvent = null; eventName = ""; eventTime = ""; eventLocation = ""
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            // Enables scrolling for entire screen (important for smaller devices).
             .verticalScroll(rememberScrollState())
     ) {
         CalendarHeader(
             currentMonth = currentMonth,
             onBack = onBack,
-            // Month navigation logic is handled inside ViewModel.
             onPreviousMonth = { viewModel.previousMonth() },
             onNextMonth = { viewModel.nextMonth() }
         )
-
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Management buttons row
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedButton(
-                onClick = {
-                    // Always reset before opening to avoid leftover state from edits.
-                    resetClassForm()
-                    showClassDialog = true
-                }
-            ) {
-                Text("Manage Classes")
+            OutlinedButton(onClick = { resetClassForm(); showClassDialog = true }) {
+                Text("Classes")
+            }
+            OutlinedButton(onClick = { resetStudySessionForm(); showStudySessionDialog = true }) {
+                Text("Study")
+            }
+            OutlinedButton(onClick = { resetEventForm(); showEventDialog = true }) {
+                Text("Events")
             }
         }
 
@@ -125,27 +122,17 @@ fun CalendarScreen(onBack: () -> Unit) {
             selectedDate = selectedDate,
             today = today,
             scheduleItems = viewModel.scheduleItems,
-            onDateSelected = { day ->
-                viewModel.selectDate(day)
-            },
-            onSameDateClicked = {
-                // Behavior depends on CalendarGrid detecting "same date" clicks.
-                resetAssignmentForm()
-                showAssignmentDialog = true
-            }
+            onDateSelected = { day -> viewModel.selectDate(day) },
+            onSameDateClicked = { resetAssignmentForm(); showAssignmentDialog = true }
         )
 
         ScheduleSection(
             selectedDate = selectedDate,
             itemsForSelectedDate = itemsForSelectedDate,
             onItemClick = { item ->
-                // Pre-fills dialog fields so it behaves as an edit form.
-                editingAssignment = item
-                assignmentName = item.assignmentName
-                dueTime = item.dueTime
-                selectedClassId = item.classId
-                classDropdownExpanded = false
-                showAssignmentDialog = true
+                editingAssignment = item; assignmentName = item.assignmentName
+                dueTime = item.dueTime; selectedClassId = item.classId
+                classDropdownExpanded = false; showAssignmentDialog = true
             }
         )
 
@@ -153,17 +140,34 @@ fun CalendarScreen(onBack: () -> Unit) {
             selectedDate = selectedDate,
             classesForSelectedDate = classesForSelectedDate,
             onClassClick = { classItem ->
-                // Converts stored list into Set for UI selection handling.
-                editingClass = classItem
-                className = classItem.name
-                classStartTime = classItem.startTime
-                classEndTime = classItem.endTime
-                selectedMeetingDays = classItem.meetingDays.toSet()
-                showClassDialog = true
+                editingClass = classItem; className = classItem.name
+                classStartTime = classItem.startTime; classEndTime = classItem.endTime
+                selectedMeetingDays = classItem.meetingDays.toSet(); showClassDialog = true
+            }
+        )
+
+        StudySessionsSection(
+            selectedDate = selectedDate,
+            studySessionsForSelectedDate = studySessionsForSelectedDate,
+            onSessionClick = { session ->
+                editingSession = session; sessionClassName = session.className
+                sessionTopic = session.topic; sessionStartTime = session.startTime
+                sessionLocation = session.location; showStudySessionDialog = true
+            }
+        )
+
+        EventsSection(
+            selectedDate = selectedDate,
+            eventsForSelectedDate = eventsForSelectedDate,
+            onEventClick = { event ->
+                editingEvent = event; eventName = event.name
+                eventTime = event.time; eventLocation = event.location
+                showEventDialog = true
             }
         )
     }
 
+    // Assignment dialog
     if (showAssignmentDialog && selectedDate != null) {
         AssignmentDialog(
             selectedDate = selectedDate,
@@ -176,58 +180,24 @@ fun CalendarScreen(onBack: () -> Unit) {
             onSelectedClassIdChange = { selectedClassId = it },
             classDropdownExpanded = classDropdownExpanded,
             onClassDropdownExpandedChange = { classDropdownExpanded = it },
-            onDismiss = {
-                showAssignmentDialog = false
-                resetAssignmentForm()
-            },
-            onPickTime = {
-                // External helper; likely launches Android TimePickerDialog.
-                openTimePicker(context) { picked ->
-                    dueTime = picked
-                }
-            },
+            onDismiss = { showAssignmentDialog = false; resetAssignmentForm() },
+            onPickTime = { openTimePicker(context) { picked -> dueTime = picked } },
             onConfirm = {
-                // Resolves class reference from ID → object (required by ViewModel).
                 val selectedClass = classItems.firstOrNull { it.id == selectedClassId }
-
-                if (
-                    selectedClass != null &&
-                    assignmentName.isNotBlank() &&
-                    dueTime.isNotBlank()
-                ) {
+                if (selectedClass != null && assignmentName.isNotBlank() && dueTime.isNotBlank()) {
                     val item = editingAssignment
-                    if (item == null) {
-                        viewModel.addScheduleItem(
-                            classItem = selectedClass,
-                            assignmentName = assignmentName,
-                            dueTime = dueTime
-                        )
-                    } else {
-                        viewModel.updateScheduleItem(
-                            itemId = item.id,
-                            classItem = selectedClass,
-                            assignmentName = assignmentName,
-                            dueTime = dueTime
-                        )
-                    }
-
-                    showAssignmentDialog = false
-                    resetAssignmentForm()
+                    if (item == null) viewModel.addScheduleItem(selectedClass, assignmentName, dueTime)
+                    else viewModel.updateScheduleItem(item.id, selectedClass, assignmentName, dueTime)
+                    showAssignmentDialog = false; resetAssignmentForm()
                 }
             },
             onDelete = if (editingAssignment != null) {
-                {
-                    // Delete only available in edit mode.
-                    viewModel.deleteScheduleItem(editingAssignment!!.id)
-                    showAssignmentDialog = false
-                    resetAssignmentForm()
-                }
-            } else {
-                null
-            }
+                { viewModel.deleteScheduleItem(editingAssignment!!.id); showAssignmentDialog = false; resetAssignmentForm() }
+            } else null
         )
     }
 
+    // Class dialog
     if (showClassDialog) {
         ClassDialog(
             editingClass = editingClass,
@@ -238,55 +208,75 @@ fun CalendarScreen(onBack: () -> Unit) {
             selectedMeetingDays = selectedMeetingDays,
             onMeetingDaysChange = { selectedMeetingDays = it },
             weekdayOptions = weekdayOptions,
-            onPickStartTime = {
-                openTimePicker(context) { picked ->
-                    classStartTime = picked
-                }
-            },
-            onPickEndTime = {
-                openTimePicker(context) { picked ->
-                    classEndTime = picked
-                }
-            },
-            onDismiss = {
-                showClassDialog = false
-                resetClassForm()
-            },
+            onPickStartTime = { openTimePicker(context) { picked -> classStartTime = picked } },
+            onPickEndTime = { openTimePicker(context) { picked -> classEndTime = picked } },
+            onDismiss = { showClassDialog = false; resetClassForm() },
             onConfirm = {
-                if (
-                    className.isNotBlank() &&
-                    selectedMeetingDays.isNotEmpty() &&
-                    classStartTime.isNotBlank() &&
-                    classEndTime.isNotBlank()
-                ) {
-                    val classToEdit = editingClass
-                    if (classToEdit == null) {
-                        viewModel.addClass(
-                            name = className,
-                            meetingDays = selectedMeetingDays.toList(),
-                            startTime = classStartTime,
-                            endTime = classEndTime
-                        )
-                    } else {
-                        viewModel.updateClass(
-                            classId = classToEdit.id,
-                            name = className,
-                            meetingDays = selectedMeetingDays.toList(),
-                            startTime = classStartTime,
-                            endTime = classEndTime
-                        )
-                    }
-
-                    showClassDialog = false
-                    resetClassForm()
+                if (className.isNotBlank() && selectedMeetingDays.isNotEmpty() && classStartTime.isNotBlank() && classEndTime.isNotBlank()) {
+                    val c = editingClass
+                    if (c == null) viewModel.addClass(className, selectedMeetingDays.toList(), classStartTime, classEndTime)
+                    else viewModel.updateClass(c.id, className, selectedMeetingDays.toList(), classStartTime, classEndTime)
+                    showClassDialog = false; resetClassForm()
                 }
             },
             onDelete = if (editingClass != null) {
-                {
-                    viewModel.deleteClass(editingClass!!.id)
-                    showClassDialog = false
-                    resetClassForm()
+                { viewModel.deleteClass(editingClass!!.id); showClassDialog = false; resetClassForm() }
+            } else null
+        )
+    }
+
+    // Study session dialog
+    if (showStudySessionDialog && selectedDate != null) {
+        val dateStr = "%04d-%02d-%02d".format(selectedDate.year, selectedDate.monthValue, selectedDate.dayOfMonth)
+        StudySessionDialog(
+            editingSession = editingSession,
+            date = dateStr,
+            className = sessionClassName,
+            onClassNameChange = { sessionClassName = it },
+            topic = sessionTopic,
+            onTopicChange = { sessionTopic = it },
+            startTime = sessionStartTime,
+            location = sessionLocation,
+            onLocationChange = { sessionLocation = it },
+            onPickStartTime = { openTimePicker(context) { picked -> sessionStartTime = picked } },
+            onDismiss = { showStudySessionDialog = false; resetStudySessionForm() },
+            onConfirm = {
+                if (sessionClassName.isNotBlank() && sessionTopic.isNotBlank() && sessionStartTime.isNotBlank()) {
+                    val s = editingSession
+                    if (s == null) viewModel.addStudySession(dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation)
+                    else viewModel.updateStudySession(s.id, dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation)
+                    showStudySessionDialog = false; resetStudySessionForm()
                 }
+            },
+            onDelete = if (editingSession != null) {
+                { viewModel.deleteStudySession(editingSession!!.id); showStudySessionDialog = false; resetStudySessionForm() }
+            } else null
+        )
+    }
+
+    // Event dialog
+    if (showEventDialog && selectedDate != null) {
+        val dateStr = "%04d-%02d-%02d".format(selectedDate.year, selectedDate.monthValue, selectedDate.dayOfMonth)
+        EventItemDialog(
+            editingEvent = editingEvent,
+            date = dateStr,
+            eventName = eventName,
+            onEventNameChange = { eventName = it },
+            eventTime = eventTime,
+            location = eventLocation,
+            onLocationChange = { eventLocation = it },
+            onPickTime = { openTimePicker(context) { picked -> eventTime = picked } },
+            onDismiss = { showEventDialog = false; resetEventForm() },
+            onConfirm = {
+                if (eventName.isNotBlank() && eventTime.isNotBlank()) {
+                    val e = editingEvent
+                    if (e == null) viewModel.addEvent(dateStr, eventName, eventTime, eventLocation)
+                    else viewModel.updateEvent(e.id, dateStr, eventName, eventTime, eventLocation)
+                    showEventDialog = false; resetEventForm()
+                }
+            },
+            onDelete = if (editingEvent != null) {
+                { viewModel.deleteEvent(editingEvent!!.id); showEventDialog = false; resetEventForm() }
             } else null
         )
     }
