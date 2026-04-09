@@ -310,7 +310,8 @@ fun CalendarScreen(
                             name = className,
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
-                            endTime = classEndTime
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
                         )
 
                         ClassReminderScheduler.scheduleNextReminder(
@@ -335,7 +336,8 @@ fun CalendarScreen(
                             name = className,
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
-                            endTime = classEndTime
+                            endTime = classEndTime,
+                            location = location?.name ?: ""
                         )
 
                         ClassReminderScheduler.scheduleNextReminder(

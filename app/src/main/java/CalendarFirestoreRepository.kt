@@ -147,7 +147,7 @@ class CalendarFirestoreRepository(
         startTime: String,
         endTime: String,
         location: String
-    ) {
+    ): ClassItem{
         val uid = getUid()
 
         val classData = mapOf(
@@ -169,7 +169,8 @@ class CalendarFirestoreRepository(
             name = name,
             meetingDays = meetingDays,
             startTime = startTime,
-            endTime = endTime
+            endTime = endTime,
+            location = location
         )
 
         Log.d("FirestoreDebug", "Added class successfully: ${newClass.name}, id=${newClass.id}")
