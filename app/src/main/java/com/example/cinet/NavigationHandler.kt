@@ -89,7 +89,6 @@ private fun MainScaffold(
             .filter { it.meetingDays.contains(dayName) }
             .forEach { list.add(it.name to "${it.startTime} - ${it.endTime} | ${it.location}") }
         // Add assignments/tasks for today
-            .forEach { list.add(it.name to "${it.startTime} - ${it.endTime}") }
         calendarViewModel.scheduleItems
             .filter { it.date == dateStr }
             .forEach { list.add(it.assignmentName to "Due: ${it.dueTime} (${it.className})") }
