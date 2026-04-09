@@ -26,8 +26,17 @@ fun openTimePicker(
     // Uses current system time as the default selection when dialog opens.
     val calendar = Calendar.getInstance()
 
+    // Determine theme based on AppSettings
+    // Explicitly use Light or Dark themes to avoid system dark mode overrides
+    val themeResId = if (AppSettings.isDarkMode) {
+        R.style.Theme_CINet_TimePicker_Dark
+    } else {
+        R.style.Theme_CINet_TimePicker_Light
+    }
+
     TimePickerDialog(
         context,
+        themeResId,
         { _: TimePicker, hour: Int, minute: Int ->
             // Converts picked time immediately into display format before returning,
             // so all UI components receive consistent formatted strings.

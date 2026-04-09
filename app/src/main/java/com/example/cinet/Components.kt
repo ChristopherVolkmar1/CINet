@@ -39,6 +39,8 @@ fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condit
         else -> if (isNight) Icons.Default.NightsStay else Icons.Default.Cloud
     }
 
+    val contentColor = MaterialTheme.colorScheme.onPrimary
+
     Surface(
         modifier = modifier.height(60.dp),
         color = Color.White.copy(alpha = 0.2f),
@@ -59,13 +61,13 @@ fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condit
             Column {
                 Text(
                     text = temp,
-                    color = Color.White,
+                    color = contentColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
                 Text(
                     text = displayCondition,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = contentColor.copy(alpha = 0.8f),
                     fontSize = 12.sp
                 )
             }

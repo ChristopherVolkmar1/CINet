@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.cinet.AppSettings
 
@@ -22,12 +23,11 @@ private val DarkColorScheme = darkColorScheme(
     onTertiary = Color.White,
     onBackground = Color.White,
     onSurface = Color.White
-    onPrimary = CINetTertiaryDark
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = CINetPrimaryLight,
-    secondary = Color.White, // Surface of cards
+    secondary = CINetSecondaryLight,
     tertiary = CINetTertiaryLight,
     background = CINetBackground,
     surface = Color.White,
@@ -36,15 +36,11 @@ private val LightColorScheme = lightColorScheme(
     onTertiary = Color.White,
     onBackground = Color.Black,
     onSurface = Color.Black
-    onPrimary = CINetTertiaryLight
 )
 
 @Composable
 fun CINetTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    // Set to false to force our custom colors
-    darkTheme: Boolean = AppSettings.isDarkMode || isSystemInDarkTheme(),
+    darkTheme: Boolean = AppSettings.isDarkMode,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -53,6 +49,7 @@ fun CINetTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

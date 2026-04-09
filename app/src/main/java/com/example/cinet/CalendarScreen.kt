@@ -23,9 +23,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen(onBack: () -> Unit) {
+fun CalendarScreen(
+    onBack: () -> Unit,
+    initialShowClassDialog: Boolean = false
+) {
     // Provided by Compose; automatically scopes this ViewModel to the current UI lifecycle.
     val viewModel: CalendarViewModel = viewModel()
 
@@ -47,7 +51,7 @@ fun CalendarScreen(onBack: () -> Unit) {
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
 
     var showAssignmentDialog by remember { mutableStateOf(false) }
-    var showClassDialog by remember { mutableStateOf(false) }
+    var showClassDialog by remember { mutableStateOf(initialShowClassDialog) }
 
     // Null = create mode, non-null = edit mode (used throughout dialogs).
     var editingAssignment by remember { mutableStateOf<ScheduleItem?>(null) }

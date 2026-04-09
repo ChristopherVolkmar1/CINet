@@ -20,20 +20,22 @@ import com.example.cinet.ui.theme.CINetTheme
 
 @Composable
 fun HomeScreen(
+    nickname: String,
     scheduleItems: List<Pair<String, String>>,
     upcomingEventsItems: List<Pair<String, String>>,
     onUpdateSchedule: (List<Pair<String, String>>) -> Unit,
     onUpdateEvents: (List<Pair<String, String>>) -> Unit,
     modifier: Modifier = Modifier,
     onMapClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onCalendarClick: () -> Unit = {},
+    onAddClassClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var weatherInfo by remember { mutableStateOf(WeatherInfo("...", "Loading...")) }
     
-    // State for the "Add/Edit" dialog
+    // State for the "Add/Edit" dialog (Now only for Upcoming Events)
     var showDialog by remember { mutableStateOf(false) }
-    var addingToSchedule by remember { mutableStateOf(true) } // To distinguish between Schedule and Events
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     
     var nameField by remember { mutableStateOf("") }
@@ -51,20 +53,14 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { 
-                Text(
-                    if (editingIndex == null) {
-                        if (addingToSchedule) "Add Schedule Item" else "Add Upcoming Event"
-                    } else {
-                        if (addingToSchedule) "Edit Schedule Item" else "Edit Upcoming Event"
-                    }
-                ) 
+                Text(if (editingIndex == null) "Add Upcoming Event" else "Edit Upcoming Event") 
             },
             text = {
                 Column {
                     OutlinedTextField(
                         value = nameField,
                         onValueChange = { nameField = it },
-                        label = { Text(if (addingToSchedule) "Class Name" else "Event Name") },
+                        label = { Text("Event Name") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -76,12 +72,12 @@ fun HomeScreen(
                         OutlinedTextField(
                             value = timeOrDateField,
                             onValueChange = { timeOrDateField = it },
-                            label = { Text(if (addingToSchedule) "Time (e.g. 10:00)" else "Date/Time") },
+                            label = { Text("Date/Time") },
                             modifier = Modifier.weight(1f)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         
-                        // AM/PM Toggle Segmented Control-like Buttons
+                        // AM/PM Toggle
                         Row(
                             modifier = Modifier.padding(top = 8.dp)
                         ) {
@@ -114,23 +110,13 @@ fun HomeScreen(
                         val fullTime = "$timeOrDateField $amPmSelection"
                         val newItem = nameField to "$fullTime - $locationField"
                         
-                        if (addingToSchedule) {
-                            val newList = scheduleItems.toMutableList()
-                            if (editingIndex != null) {
-                                newList[editingIndex!!] = newItem
-                            } else {
-                                newList.add(newItem)
-                            }
-                            onUpdateSchedule(newList)
+                        val newList = upcomingEventsItems.toMutableList()
+                        if (editingIndex != null) {
+                            newList[editingIndex!!] = newItem
                         } else {
-                            val newList = upcomingEventsItems.toMutableList()
-                            if (editingIndex != null) {
-                                newList[editingIndex!!] = newItem
-                            } else {
-                                newList.add(newItem)
-                            }
-                            onUpdateEvents(newList)
+                            newList.add(newItem)
                         }
+                        onUpdateEvents(newList)
                         
                         showDialog = false
                         editingIndex = null
@@ -146,15 +132,9 @@ fun HomeScreen(
                 Row {
                     if (editingIndex != null) {
                         TextButton(onClick = {
-                            if (addingToSchedule) {
-                                val newList = scheduleItems.toMutableList()
-                                newList.removeAt(editingIndex!!)
-                                onUpdateSchedule(newList)
-                            } else {
-                                val newList = upcomingEventsItems.toMutableList()
-                                newList.removeAt(editingIndex!!)
-                                onUpdateEvents(newList)
-                            }
+                            val newList = upcomingEventsItems.toMutableList()
+                            newList.removeAt(editingIndex!!)
+                            onUpdateEvents(newList)
                             showDialog = false
                             editingIndex = null
                             nameField = ""
@@ -198,7 +178,8 @@ fun HomeScreen(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    text = "Welcome back to CINet, [user]",
+                    text = "Welcome back to CINet, $nickname",
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
@@ -214,31 +195,12 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Today's Schedule Section
+        // Today's Schedule Section (Sourced from Calendar)
         InfoSection(
             title = "Today's Schedule",
             items = scheduleItems,
-            onAddClick = { 
-                addingToSchedule = true
-                editingIndex = null
-                nameField = ""
-                timeOrDateField = ""
-                locationField = ""
-                showDialog = true 
-            },
-            onItemClick = { index ->
-                addingToSchedule = true
-                editingIndex = index
-                val item = scheduleItems[index]
-                nameField = item.first
-                // Simple parsing for demo purposes
-                val parts = item.second.split(" - ")
-                val timeParts = parts[0].split(" ")
-                timeOrDateField = if (timeParts.isNotEmpty()) timeParts[0] else ""
-                amPmSelection = if (timeParts.size > 1) timeParts[1] else "AM"
-                locationField = if (parts.size > 1) parts[1] else ""
-                showDialog = true
-            }
+            onAddClick = onAddClassClick,
+            onItemClick = { _ -> onCalendarClick() } // Open calendar on item click
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -248,7 +210,6 @@ fun HomeScreen(
             title = "Upcoming Events",
             items = upcomingEventsItems,
             onAddClick = {
-                addingToSchedule = false
                 editingIndex = null
                 nameField = ""
                 timeOrDateField = ""
@@ -256,7 +217,6 @@ fun HomeScreen(
                 showDialog = true
             },
             onItemClick = { index ->
-                addingToSchedule = false
                 editingIndex = index
                 val item = upcomingEventsItems[index]
                 nameField = item.first
@@ -277,6 +237,7 @@ fun HomeScreen(
 fun HomeScreenPreview() {
     CINetTheme {
         HomeScreen(
+            nickname = "User",
             scheduleItems = emptyList(),
             upcomingEventsItems = emptyList(),
             onUpdateSchedule = {},

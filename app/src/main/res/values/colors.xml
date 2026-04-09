@@ -7,4 +7,8 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- CINet Theme Colors -->
+    <color name="cinet_blue">#0067A2</color>
+    <color name="cinet_blue_dark">#004160</color>
 </resources>
