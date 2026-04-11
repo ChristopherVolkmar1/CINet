@@ -79,6 +79,14 @@ class FirestoreRepository(
         return snapshot.toObject(UserProfile::class.java)
     }
 
+    // Updates only the photoUrl field, called after a successful Storage upload
+    suspend fun updatePhotoUrl(uid: String, photoUrl: String) {
+        db.collection(FirestoreCollections.USERS)
+            .document(uid)
+            .set(mapOf("photoUrl" to photoUrl), SetOptions.merge())
+            .await()
+    }
+
     suspend fun createEvent(
         title: String,
         location: String,

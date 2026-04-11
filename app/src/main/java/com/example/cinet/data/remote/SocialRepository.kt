@@ -201,6 +201,7 @@ class SocialRepository(
                 id = docRef.id,
                 senderId = currentUid,
                 senderNickname = currentUser.nickname,
+                senderPhotoUrl = currentUser.photoUrl,
                 content = content,
                 type = type,
                 metadata = metadata,

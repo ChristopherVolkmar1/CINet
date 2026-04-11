@@ -1,6 +1,9 @@
 package com.example.cinet
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,10 +11,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -29,13 +34,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.Message
 import com.example.cinet.data.remote.SocialRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun ConversationScreen(
@@ -55,6 +66,22 @@ fun ConversationScreen(
     var myScheduleItems by remember { mutableStateOf<List<ScheduleItem>>(emptyList()) }
     var myStudySessions by remember { mutableStateOf<List<StudySession>>(emptyList()) }
     var myEvents by remember { mutableStateOf<List<EventItem>>(emptyList()) }
+    var otherUserPhotoUrl by remember { mutableStateOf("") } // header avatar photo
+    var currentUserPhotoUrl by remember { mutableStateOf("") } // current user's avatar
+
+    // Load both participants' photos on open
+    LaunchedEffect(conversation.id) {
+        val otherUid = conversation.participantIds.firstOrNull { it != currentUid } ?: return@LaunchedEffect
+
+        val otherSnapshot = FirebaseFirestore.getInstance()
+            .collection("users").document(otherUid).get().await()
+        otherUserPhotoUrl = otherSnapshot.getString("photoUrl") ?: ""
+
+        // Also load current user's photo for sent message avatars
+        val currentSnapshot = FirebaseFirestore.getInstance()
+            .collection("users").document(currentUid).get().await()
+        currentUserPhotoUrl = currentSnapshot.getString("photoUrl") ?: ""
+    }
 
     DisposableEffect(conversation.id) {
         val listener = FirebaseFirestore.getInstance()
@@ -86,19 +113,66 @@ fun ConversationScreen(
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
+
+            // Header — shows avatar and conversation title
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(onClick = onBack) { Text("Back") }
                 Spacer(modifier = Modifier.width(12.dp))
+
+                // Avatar — shows Google photo if available, otherwise initials
+                val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() }
+                if (headerPhoto != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(headerPhoto)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Profile photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 1.5.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            )
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .border(
+                                width = 1.5.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = conversationTitle.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(text = conversationTitle, style = MaterialTheme.typography.titleLarge)
             }
 
             HorizontalDivider()
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Study invite — loads assignments and study sessions only
@@ -130,7 +204,9 @@ fun ConversationScreen(
 
             LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f).padding(16.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(messages) { message ->
@@ -138,6 +214,7 @@ fun ConversationScreen(
                     MessageBubble(
                         message = message,
                         isCurrentUser = message.senderId == currentUid,
+                        currentUserPhotoUrl = currentUserPhotoUrl,
                         onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                             (message.type == "study_invite" || message.type == "event_invite")) {
                             {
@@ -185,7 +262,9 @@ fun ConversationScreen(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -294,47 +373,123 @@ fun ConversationScreen(
 fun MessageBubble(
     message: Message,
     isCurrentUser: Boolean,
+    currentUserPhotoUrl: String = "", // current user's photo for sent messages
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
 ) {
-    Column(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start
+        horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start,
+        verticalAlignment = Alignment.Top
     ) {
+        // Avatar on the left for incoming messages
         if (!isCurrentUser) {
-            Text(
-                text = message.senderNickname,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(2.dp))
+            val photoUrl = message.senderPhotoUrl.takeIf { it.isNotBlank() }
+            if (photoUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(photoUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Profile photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                )
+            } else {
+                // Fallback initials if no photo available
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = message.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
         }
-        Text(
-            text = message.content,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(4.dp)
-        )
 
-        val response = message.metadata["response"]
-        when {
-            // Already responded — show status label instead of buttons
-            response == "accepted" -> Text(
-                text = "✓ Accepted",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 4.dp)
+        Column(
+            horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start
+        ) {
+            if (!isCurrentUser) {
+                Text(
+                    text = message.senderNickname,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+            }
+            Text(
+                text = message.content,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(4.dp)
             )
-            response == "declined" -> Text(
-                text = "✗ Declined",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-            // Not yet responded — show buttons
-            onAccept != null && onDecline != null -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onAccept) { Text("Accept") }
-                    OutlinedButton(onClick = onDecline) { Text("Decline") }
+
+            val response = message.metadata["response"]
+            when {
+                // Already responded — show status label instead of buttons
+                response == "accepted" -> Text(
+                    text = "✓ Accepted",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                response == "declined" -> Text(
+                    text = "✗ Declined",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+                // Not yet responded — show buttons
+                onAccept != null && onDecline != null -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onAccept) { Text("Accept") }
+                        OutlinedButton(onClick = onDecline) { Text("Decline") }
+                    }
+                }
+            }
+        }
+
+        // Avatar on the right for sent messages
+        if (isCurrentUser) {
+            Spacer(modifier = Modifier.width(8.dp))
+            val photoUrl = currentUserPhotoUrl.takeIf { it.isNotBlank() }
+            if (photoUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(photoUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Your profile photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                )
+            } else {
+                // Fallback initials if no photo available
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = message.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
         }
