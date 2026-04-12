@@ -1,4 +1,4 @@
-package com.example.cinet.data.model
+package com.example.cinet.com.example.cinet.feature.calendar.model
 
 import com.google.firebase.Timestamp
 

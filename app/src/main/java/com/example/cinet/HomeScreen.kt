@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cinet.com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.com.example.cinet.core.model.CampusRegistry
 import com.example.cinet.ui.theme.CINetTheme
 
 @Composable

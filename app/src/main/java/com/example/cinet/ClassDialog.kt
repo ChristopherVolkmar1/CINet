@@ -25,7 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.cinet.com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.com.example.cinet.core.model.CampusRegistry
 
 @Composable
 fun ClassDialog(

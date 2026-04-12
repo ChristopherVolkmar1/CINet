@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.com.example.cinet.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,6 +7,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.example.cinet.AppSettings
+import com.example.cinet.NavigationHandler
+import com.example.cinet.NotificationHelper
+import com.example.cinet.PermissionManager
 import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.viewmodels.AuthViewModel
@@ -24,13 +28,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NotificationHelper.createChannel(this)
-        
+
         if (!PermissionManager.hasAllPermissions(this)) {
             PermissionManager.requestAllPermissions(this)
         }
         
         enableEdgeToEdge()
-        
+
         setContent {
             // App theme now watches the global dark mode setting
             CINetTheme(darkTheme = AppSettings.isDarkMode) {

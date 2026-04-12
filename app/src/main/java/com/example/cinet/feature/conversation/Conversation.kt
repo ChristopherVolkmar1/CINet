@@ -1,4 +1,4 @@
-package com.example.cinet.data.model
+package com.example.cinet.com.example.cinet.feature.conversation
 
 import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
@@ -13,4 +13,4 @@ data class Conversation(
     val groupName: String = "",
     @ServerTimestamp val lastUpdated: Date? = null,
 
-)
+    )

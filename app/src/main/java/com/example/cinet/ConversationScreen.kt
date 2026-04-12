@@ -40,8 +40,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.cinet.data.model.Conversation
-import com.example.cinet.data.model.Message
+import com.example.cinet.com.example.cinet.feature.conversation.Conversation
+import com.example.cinet.com.example.cinet.feature.conversation.Message
 import com.example.cinet.data.remote.SocialRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

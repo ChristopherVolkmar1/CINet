@@ -1,4 +1,4 @@
-package com.example.cinet.data.model
+package com.example.cinet.com.example.cinet.feature.profile
 
 import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date

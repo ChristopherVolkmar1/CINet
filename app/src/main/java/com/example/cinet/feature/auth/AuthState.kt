@@ -1,6 +1,6 @@
-package com.example.cinet.ui
+package com.example.cinet.com.example.cinet.feature.auth
 
-import com.example.cinet.data.model.UserProfile
+import com.example.cinet.com.example.cinet.feature.profile.UserProfile
 
 sealed class AuthState {
     object Loading : AuthState()

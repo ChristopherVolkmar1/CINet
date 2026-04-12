@@ -2,7 +2,7 @@ package com.example.cinet.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.cinet.data.model.UserProfile
+import com.example.cinet.com.example.cinet.feature.profile.UserProfile
 import com.example.cinet.data.remote.FirestoreRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -1,9 +1,9 @@
 package com.example.cinet.data.remote
 
-import com.example.cinet.data.model.Conversation
+import com.example.cinet.com.example.cinet.feature.conversation.Conversation
 import com.example.cinet.data.model.FriendRequest
-import com.example.cinet.data.model.Message
-import com.example.cinet.data.model.UserProfile
+import com.example.cinet.com.example.cinet.feature.conversation.Message
+import com.example.cinet.com.example.cinet.feature.profile.UserProfile
 import com.example.cinet.ScheduleItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

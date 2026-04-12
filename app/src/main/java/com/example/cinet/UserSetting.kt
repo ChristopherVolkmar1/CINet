@@ -20,7 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.cinet.data.model.UserProfile
+import com.example.cinet.com.example.cinet.feature.profile.UserProfile
 
 object AppSettings {
     var isDarkMode by mutableStateOf(false)

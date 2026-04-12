@@ -27,10 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cinet.com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.data.model.Conversation
-import com.example.cinet.data.model.UserProfile
-import com.example.cinet.ui.AuthState
+import com.example.cinet.com.example.cinet.core.model.CampusRegistry
+import com.example.cinet.com.example.cinet.feature.conversation.Conversation
+import com.example.cinet.com.example.cinet.feature.profile.UserProfile
+import com.example.cinet.com.example.cinet.feature.auth.AuthState
 import java.util.Calendar
 import java.util.Locale
 

@@ -32,7 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.FriendRequest
-import com.example.cinet.data.model.UserProfile
+import com.example.cinet.com.example.cinet.feature.profile.UserProfile
 import com.example.cinet.data.remote.SocialRepository
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.background

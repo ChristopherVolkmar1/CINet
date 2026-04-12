@@ -2,8 +2,8 @@ package com.example.cinet.data.remote
 
 import android.util.Log
 import com.example.cinet.data.FirestoreCollections
-import com.example.cinet.data.model.CampusEvent
-import com.example.cinet.data.model.UserProfile
+import com.example.cinet.com.example.cinet.feature.calendar.model.CampusEvent
+import com.example.cinet.com.example.cinet.feature.profile.UserProfile
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
