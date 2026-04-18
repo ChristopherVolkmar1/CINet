@@ -31,10 +31,12 @@ class AuthViewModel(
         observeAuthState()
     }
 
+    // signs the current user out of firebase
     fun signOut() {
         auth.signOut()
     }
 
+    // re-attempts loading the user's profile after a previous failure
     fun retryProfileLoad() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -44,6 +46,7 @@ class AuthViewModel(
         }
     }
 
+    // Saves the user's profile details to Firestore and updates state.
     fun saveProfile(nickname: String, major: String, pronouns: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -53,6 +56,7 @@ class AuthViewModel(
         }
     }
 
+    // Routes to ProfileSetup if nickname is blank, otherwise Authenticated.
     private fun resolveState(profile: UserProfile) {
         _authState.value = if (profile.nickname.isBlank()) {
             AuthState.ProfileSetup(profile)
@@ -61,6 +65,7 @@ class AuthViewModel(
         }
     }
 
+    // Listens for Firebase auth changes and loads the profile on sign-in.
     private fun observeAuthState() {
         authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
@@ -78,15 +83,18 @@ class AuthViewModel(
         auth.addAuthStateListener(authStateListener!!)
     }
 
+    // Removes the auth listener when the ViewModel is destroyed to prevent leaks.
     override fun onCleared() {
         super.onCleared()
         authStateListener?.let { auth.removeAuthStateListener(it) }
     }
 }
 
+// Factory for creating AuthViewModel with its repository dependency.
 class AuthViewModelFactory(
     private val repository: FirestoreRepository
 ) : ViewModelProvider.Factory {
+    // Instantiates the AuthViewModel requested by ViewModelProvider.
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
         AuthViewModel(repository) as T
