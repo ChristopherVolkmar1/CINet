@@ -86,6 +86,7 @@ private fun MainScaffold(
         )
         val list = mutableListOf<Pair<String, String>>()
         calendarViewModel.classItems
+        calendarViewModel.classItems
             .filter { it.meetingDays.contains(dayName) }
             .forEach { list.add(it.name to "${it.startTime} - ${it.endTime} | ${it.location}") }
         // Add assignments/tasks for today
@@ -99,6 +100,7 @@ private fun MainScaffold(
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
     var activeConversation by remember { mutableStateOf<Conversation?>(null) }
+    var showProfileEdit by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
@@ -118,7 +120,7 @@ private fun MainScaffold(
 
     var upcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
-    BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null) {
+    BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null || showProfileEdit) {
         when {
             activeConversation != null -> activeConversation = null
             selectedProfile != null -> selectedProfile = null
@@ -141,7 +143,10 @@ private fun MainScaffold(
                             }
                             if (screen != Screen.Calendar) {
                                 showAddClassOnCalendar = false
+                                if (screen != Screen.Settings)
+                                    showProfileEdit = false
                             }
+
                         },
                         label = {
                             Text(
@@ -223,10 +228,18 @@ private fun MainScaffold(
                     },
                     initialShowClassDialog = showAddClassOnCalendar
                 )
-                Screen.Settings -> SettingScreen(
-                    onBack = { currentScreen = Screen.Home },
-                    onSignOut = onSignOut
-                )
+                Screen.Settings -> if (showProfileEdit) {
+                    ProfileEditScreen(
+                        onBack = { showProfileEdit = false }
+                    )
+                } else {
+                    SettingScreen(
+                        onBack        = { currentScreen = Screen.Home },
+                        onSignOut     = onSignOut,
+                        onEditProfile = { showProfileEdit = true },
+                        userProfile   = userProfile  // ← add this
+                    )
+                }
             }
         }
     }

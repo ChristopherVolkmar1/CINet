@@ -35,6 +35,17 @@ import com.example.cinet.data.model.FriendRequest
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.SocialRepository
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.foundation.layout.size
 
 @Composable
 fun SocialScreen(
@@ -231,10 +242,31 @@ fun SocialScreen(
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Initials fallback only — sent requests don't carry photoUrl
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                                    .border(
+                                        width = 1.5.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val nickname = sentRequestNicknames[request.receiverId] ?: "?"
+                                Text(
+                                    text = nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = sentRequestNicknames[request.receiverId]
-                                        ?: request.receiverId,
+                                    text = sentRequestNicknames[request.receiverId] ?: request.receiverId,
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Text(
@@ -253,6 +285,7 @@ fun SocialScreen(
 }
 
 // Frontend: restyle this row however you want
+// Frontend: restyle this row however you want
 @Composable
 fun UserRow(
     user: UserProfile,
@@ -266,6 +299,48 @@ fun UserRow(
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Profile avatar — shows Google photo or initials fallback
+        val photoUrl = user.photoUrl.takeIf { it.isNotBlank() }
+        if (photoUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Profile photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape
+                    )
+            )
+        } else {
+            // Fallback: circle with first letter of nickname
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = user.nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
         Column(modifier = Modifier.weight(1f)) {
             Text(text = user.nickname, style = MaterialTheme.typography.bodyLarge)
             Text(
