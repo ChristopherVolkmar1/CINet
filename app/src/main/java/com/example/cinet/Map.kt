@@ -64,9 +64,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.cinet.com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.ui.theme.CINetTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -89,11 +92,13 @@ import com.google.firebase.firestore.GeoPoint
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerState
+import kotlinx.coroutines.async
 
 data class CampusLocation(
     val name: String = "",
     val category: String = "",
-    val coordinates: GeoPoint = GeoPoint(0.0, 0.0)
+    val coordinates: GeoPoint = GeoPoint(0.0, 0.0),
+    val description: String = ""
 ) {
     val latLng: LatLng
         get() = LatLng(coordinates.latitude, coordinates.longitude)
@@ -103,6 +108,17 @@ data class SearchState(
     val textFieldState: TextFieldState,
     val results: List<String>,
     val onSearch: (String) -> Unit
+)
+
+data class DirectionsResult(
+    val points: List<LatLng>,
+    val duration: String
+)
+
+data class RouteDurations(
+    var driving: String = "",
+    var walking: String = "",
+    var biking: String = "",
 )
 @Composable
 fun CampusMapScreen(
@@ -141,7 +157,7 @@ fun CampusMapScreen(
     var selectedLocation by remember { mutableStateOf<CampusLocation?>(null) }
     var activeFilter by remember { mutableStateOf<String?>(null) }
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
-
+    var durations by remember { mutableStateOf(RouteDurations())}
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
     }
@@ -171,8 +187,8 @@ fun CampusMapScreen(
                     location?.let {
                         userLatLng = LatLng(it.latitude, it.longitude)
                         coroutineScope.launch {
-                            val path = fetchDirections(LatLng(it.latitude, it.longitude), destination, context, mode)
-                            polylinePoints = path
+                            val result = fetchDirections(LatLng(it.latitude, it.longitude), destination, context, mode)
+                            polylinePoints = result.points
                             cameraPositionState.animate(
                                 update = CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 18f),
                                 durationMs = 1000
@@ -180,7 +196,7 @@ fun CampusMapScreen(
                         }
                     }
                 }
-            } catch (e: SecurityException) { Log.e("Route", "No Permission") }
+            } catch (_: SecurityException) { Log.e("Route", "No Permission") }
         }
     }
     val searchState = SearchState(
@@ -217,7 +233,7 @@ fun CampusMapScreen(
                         LatLng(34.162, -119.043)
                     }
                 }
-            } catch (e: SecurityException) {
+            } catch (_: SecurityException) {
                 Log.e("Location", "Permission missing")
             }
         } else {
@@ -231,6 +247,49 @@ fun CampusMapScreen(
             update = CameraUpdateFactory.newLatLngZoom(preSelectedLocation.latLng, 18f)
         )
         onFinishedLoading()
+    }
+    LaunchedEffect(selectedLocation, userLatLng) {
+        val destination = selectedLocation?.latLng ?: return@LaunchedEffect
+        val start = userLatLng ?: return@LaunchedEffect
+        if (hasPermission) {
+            try {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    coroutineScope.launch {
+                        val drive = async { fetchDirections(
+                            start,
+                            destination,
+                            context,
+                            TravelMode.DRIVING
+                        ) }
+                        val walk = async {fetchDirections(
+                            start,
+                            destination,
+                            context,
+                            TravelMode.WALKING
+                        ) }
+                        val bike = async { fetchDirections(
+                            start,
+                            destination,
+                            context,
+                            TravelMode.BICYCLING
+                        ) }
+
+                        val driving = drive.await()
+                        val walking = walk.await()
+                        val biking = bike.await()
+
+                        durations = durations.copy(
+                            driving = driving.duration,
+                            walking = walking.duration,
+                            biking = biking.duration
+                        )
+                    }
+
+                }
+            } catch (_: SecurityException) {
+                Log.e("Location", "Permission missing")
+            }
+        }
     }
     DisposableEffect(hasPermission) {
         if (!hasPermission) return@DisposableEffect onDispose {}
@@ -254,7 +313,7 @@ fun CampusMapScreen(
                 locationCallback,
                 android.os.Looper.getMainLooper()
             )
-        } catch (e: SecurityException) {
+        } catch (_: SecurityException) {
             Log.e("Location", "Permission missing")
         }
 
@@ -317,7 +376,8 @@ fun CampusMapScreen(
             onFilterChange = { activeFilter = it },
             selectedLocation = selectedLocation,
             onDismissPopup = { selectedLocation = null },
-            onModeSelected = requestRoute
+            onModeSelected = requestRoute,
+            routeDurations = durations
         )
 
         userLatLng?.let { user ->
@@ -508,7 +568,8 @@ fun MapControls(
     onFilterChange: (String?) -> Unit,
     selectedLocation: CampusLocation?,
     onDismissPopup: () -> Unit,
-    onModeSelected: (TravelMode) -> Unit
+    onModeSelected: (TravelMode) -> Unit,
+    routeDurations: RouteDurations
 ) {
     Row(
         modifier = Modifier
@@ -534,7 +595,8 @@ fun MapControls(
         DirectionsPopup(
             location = selectedLocation,
             onDismiss = onDismissPopup,
-            onModeSelected = onModeSelected
+            onModeSelected = onModeSelected,
+            routeDurations = routeDurations
         )
     }
 }
@@ -557,7 +619,7 @@ suspend fun fetchDirections(
     end: LatLng,
     context: Context,
     mode: TravelMode
-): List<LatLng> {
+): DirectionsResult {
     return withContext(Dispatchers.IO) {
         try {
             val ai = context.packageManager.getApplicationInfo(
@@ -577,23 +639,26 @@ suspend fun fetchDirections(
                 .destination(com.google.maps.model.LatLng(end.latitude, end.longitude))
                 .await()
 
-            result.routes.getOrNull(0)?.overviewPolyline?.decodePath()?.map {
+            val route = result.routes.getOrNull(0)
+            val duration = route?.legs?.getOrNull(0)?.duration?.humanReadable ?: ""
+            val points = route?.overviewPolyline?.decodePath()?.map {
                 LatLng(it.lat, it.lng)
             } ?: listOf(start, end)
+
+            DirectionsResult(points, duration)
         } catch (e: Exception) {
             e.printStackTrace()
-            listOf(start, end)
+            DirectionsResult(listOf(start, end), "")
         }
     }
 }
-
-
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun DirectionsPopup(
     location: CampusLocation?,
     onDismiss: () -> Unit,
-    onModeSelected: (TravelMode) -> Unit
+    onModeSelected: (TravelMode) -> Unit,
+    routeDurations: RouteDurations
 ) {
     val sheetState = rememberModalBottomSheetState()
 
@@ -609,23 +674,34 @@ fun DirectionsPopup(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, bottom = 40.dp)
+                    .padding(start = 24.dp, end = 24.dp, bottom = 30.dp)
             ) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.School,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(25.dp)
+                    )
+                    Text(
+                        text = location.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = location.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White
-                )
-                Text(
-                    text = location.category.capitalizeWords(),
+                    text = location.description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
-
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = Color(0xFFD0BCFF))
+                    Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = Color(0xFFD0BCFF), modifier = Modifier.size(30.dp))
                     Spacer(Modifier.width(8.dp))
                     TextButton(
                         onClick = {
@@ -633,12 +709,18 @@ fun DirectionsPopup(
                             onDismiss()
                         }
                     ) {
-                        Text("Driving", color = Color.White)
+                        Text("Driving", color = Color.White, fontSize = 18.sp)
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = routeDurations.driving,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
 
+                Spacer(modifier = Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = Color(0xFFD0BCFF))
+                    Icon(Icons.AutoMirrored.Filled.DirectionsWalk, contentDescription = null, tint = Color(0xFFD0BCFF), modifier = Modifier.size(30.dp))
                     Spacer(Modifier.width(8.dp))
                     TextButton(
                         onClick = {
@@ -646,12 +728,18 @@ fun DirectionsPopup(
                             onDismiss()
                         }
                     ){
-                        Text("Walking", color = Color.White)
+                        Text("Walking", color = Color.White, fontSize = 18.sp)
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = routeDurations.walking,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
 
+                Spacer(modifier = Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.AutoMirrored.Filled.DirectionsBike, contentDescription = null, tint = Color(0xFFD0BCFF))
+                    Icon(Icons.AutoMirrored.Filled.DirectionsBike, contentDescription = null, tint = Color(0xFFD0BCFF), modifier = Modifier.size(30.dp))
                     Spacer(Modifier.width(8.dp))
                     TextButton(
                         onClick = {
@@ -659,10 +747,32 @@ fun DirectionsPopup(
                             onDismiss()
                         }
                     ){
-                        Text("Biking", color = Color.White)
+                        Text("Biking", color = Color.White, fontSize = 18.sp)
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = routeDurations.biking,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun DirectionsPopupPreview() {
+    CINetTheme {
+        DirectionsPopup(
+            location = CampusLocation("Aliso Hall", "ACADEMIC"),
+            onDismiss = {},
+            onModeSelected = {},
+            routeDurations = RouteDurations(
+                driving = "1 mins",
+                walking = "2 mins",
+                biking = "3 mins"
+            )
+        )
     }
 }
