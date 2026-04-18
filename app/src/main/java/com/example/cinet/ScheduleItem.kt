@@ -8,4 +8,3 @@ data class ScheduleItem(
     val assignmentName: String,
     val dueTime: String
 )
-// To schedule a item

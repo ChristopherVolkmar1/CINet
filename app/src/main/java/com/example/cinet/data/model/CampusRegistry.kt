@@ -1,4 +1,4 @@
-package com.example.cinet.com.example.cinet.data.model
+package com.example.cinet.data.model
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -10,7 +10,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await

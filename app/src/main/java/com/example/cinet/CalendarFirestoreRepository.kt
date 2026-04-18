@@ -4,6 +4,8 @@ import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import kotlin.text.get
+import kotlin.text.set
 
 class CalendarFirestoreRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
@@ -37,7 +39,7 @@ class CalendarFirestoreRepository(
             val startTime = doc.getString("startTime") ?: return@mapNotNull null
             val endTime = doc.getString("endTime") ?: return@mapNotNull null
             val location = doc.getString("location") ?: ""
-            android.util.Log.d(
+            Log.d(
                 "FirestoreDebug",
                 "Loaded class -> id=${doc.id}, name=$name, meetingDays=$meetingDays, start=$startTime, end=$endTime"
             )

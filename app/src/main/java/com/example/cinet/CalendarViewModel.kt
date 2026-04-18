@@ -1,13 +1,15 @@
 package com.example.cinet
 
-import androidx.compose.runtime.getValue
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import java.time.LocalDate
-import java.time.YearMonth
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.YearMonth
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 
 class CalendarViewModel : ViewModel() {
 
@@ -64,9 +66,9 @@ class CalendarViewModel : ViewModel() {
                     location = location
                 )
                 refreshClasses()
-                android.util.Log.d("FirestoreDebug", "New class created: ${newClass.name}, id=${newClass.id}")
+                Log.d("FirestoreDebug", "New class created: ${newClass.name}, id=${newClass.id}")
             } catch (e: Exception) {
-                android.util.Log.e("FirestoreDebug", "addClass failed", e)
+                Log.e("FirestoreDebug", "addClass failed", e)
             }
         }
     }
@@ -101,7 +103,7 @@ class CalendarViewModel : ViewModel() {
 
                 refreshClasses()
             } catch (e: Exception) {
-                android.util.Log.e("FirestoreDebug", "updateClass failed", e)
+                Log.e("FirestoreDebug", "updateClass failed", e)
             }
         }
     }
@@ -114,7 +116,7 @@ class CalendarViewModel : ViewModel() {
                 scheduleItems = scheduleItems.filterNot { it.classId == classId }
                 refreshClasses()
             } catch (e: Exception) {
-                android.util.Log.e("FirestoreDebug", "deleteClass failed", e)
+                Log.e("FirestoreDebug", "deleteClass failed", e)
             }
         }
     }
@@ -255,15 +257,15 @@ class CalendarViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 classItems = sortClassesByTime(repository.loadClasses())
-                android.util.Log.d("FirestoreDebug", "Loaded classItems count: ${classItems.size}")
+                Log.d("FirestoreDebug", "Loaded classItems count: ${classItems.size}")
                 classItems.forEach {
-                    android.util.Log.d(
+                    Log.d(
                         "FirestoreDebug",
                         "Class in ViewModel: ${it.name}, days=${it.meetingDays}, start=${it.startTime}, end=${it.endTime}"
                     )
                 }
             } catch (e: Exception) {
-                android.util.Log.e("FirestoreDebug", "refreshClasses failed", e)
+                Log.e("FirestoreDebug", "refreshClasses failed", e)
             }
         }
     }

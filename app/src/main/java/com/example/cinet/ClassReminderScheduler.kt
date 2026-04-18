@@ -12,6 +12,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.example.cinet.ClassItem
 
 object ClassReminderScheduler {
 

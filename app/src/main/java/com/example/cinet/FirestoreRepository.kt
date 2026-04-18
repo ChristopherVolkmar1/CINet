@@ -1,6 +1,8 @@
 package com.example.cinet
 
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlin.text.get
+import kotlin.text.set
 import kotlinx.coroutines.tasks.await
 
 class FirestoreRepository {

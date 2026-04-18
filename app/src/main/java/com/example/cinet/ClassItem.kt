@@ -1,0 +1,10 @@
+package com.example.cinet
+
+data class ClassItem(
+    val id: String = "",
+    val name: String,
+    val meetingDays: List<String>,
+    val startTime: String,
+    val endTime: String,
+    val location: String
+)
