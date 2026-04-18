@@ -233,6 +233,9 @@ fun CampusMapScreen(
             }
             target?.let { location ->
                 selectedLocation = location
+                polylinePoints = emptyList()
+                showRemoveRoute = false
+                routeLocation = null
                 coroutineScope.launch {
                     cameraPositionState.animate(
                         update = CameraUpdateFactory.newLatLngZoom(location.latLng, 18f),
@@ -845,7 +848,7 @@ fun RemoveRoute(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+                    .padding(start = 48.dp, end = 24.dp, bottom = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
