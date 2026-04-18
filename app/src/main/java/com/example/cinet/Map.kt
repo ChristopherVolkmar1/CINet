@@ -1,8 +1,11 @@
 package com.example.cinet
 
+import android.R.attr.onClick
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
+import android.widget.ImageButton
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,12 +28,17 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.TravelExplore
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -63,6 +71,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
@@ -112,13 +121,15 @@ data class SearchState(
 
 data class DirectionsResult(
     val points: List<LatLng>,
-    val duration: String
+    val duration: String,
+    val travelMode: TravelMode,
+    val eta: String
 )
 
 data class RouteDurations(
     var driving: String = "",
     var walking: String = "",
-    var biking: String = "",
+    var biking: String = ""
 )
 @Composable
 fun CampusMapScreen(
@@ -155,9 +166,14 @@ fun CampusMapScreen(
 
     val campusRegistry by viewModel.campusRegistry.collectAsState()
     var selectedLocation by remember { mutableStateOf<CampusLocation?>(null) }
+    var routeLocation by remember { mutableStateOf<CampusLocation?>(null) }
     var activeFilter by remember { mutableStateOf<String?>(null) }
+
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var durations by remember { mutableStateOf(RouteDurations())}
+    var activeTravelMode by remember { mutableStateOf(TravelMode.WALKING) }
+    var showRemoveRoute by remember { mutableStateOf(false) }
+    var eta by remember { mutableStateOf("") }
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
     }
@@ -167,10 +183,12 @@ fun CampusMapScreen(
             .map { it.name }
     }
 
-    val markersToDraw = remember(activeFilter, textFieldState.text, campusRegistry, selectedLocation) {
+    val markersToDraw = remember(activeFilter, textFieldState.text, campusRegistry, selectedLocation, showRemoveRoute) {
         val filtered = getFilteredLocations(campusRegistry, activeFilter, textFieldState.text.toString())
         val current = selectedLocation
-        if (current != null) {
+        if (showRemoveRoute) {
+            filtered.filter { it.name == routeLocation?.name }
+        } else if (current != null) {
             filtered.filter { it.name == current.name }
         } else {
             filtered
@@ -180,6 +198,7 @@ fun CampusMapScreen(
     val focusManager = LocalFocusManager.current
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
     val requestRoute = { mode: TravelMode ->
+        activeTravelMode = mode
         val destination = selectedLocation?.latLng
         if (destination != null && hasPermission) {
             try {
@@ -188,9 +207,15 @@ fun CampusMapScreen(
                         userLatLng = LatLng(it.latitude, it.longitude)
                         coroutineScope.launch {
                             val result = fetchDirections(LatLng(it.latitude, it.longitude), destination, context, mode)
+                            eta = result.eta
                             polylinePoints = result.points
+
+                            val bounds = com.google.android.gms.maps.model.LatLngBounds.Builder()
+                                .include(LatLng(it.latitude, it.longitude))
+                                .include(destination)
+                                .build()
                             cameraPositionState.animate(
-                                update = CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 18f),
+                                update = CameraUpdateFactory.newLatLngBounds(bounds, 100),
                                 durationMs = 1000
                             )
                         }
@@ -283,6 +308,7 @@ fun CampusMapScreen(
                             walking = walking.duration,
                             biking = biking.duration
                         )
+                        routeLocation = selectedLocation
                     }
 
                 }
@@ -366,6 +392,27 @@ fun CampusMapScreen(
                     color = Color(0xFF4285F4),
                     width = 12f,
                     jointType = JointType.ROUND
+                )
+                showRemoveRoute = true
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .align(Alignment.BottomCenter)
+        ) {
+            if (showRemoveRoute) {
+                RemoveRoute(
+                    onDismiss = {
+                        polylinePoints = emptyList()
+                        showRemoveRoute = false
+                    },
+                    routeDurations = durations,
+                    location = routeLocation,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    travelMode = activeTravelMode,
+                    eta = eta
                 )
             }
         }
@@ -645,10 +692,14 @@ suspend fun fetchDirections(
                 LatLng(it.lat, it.lng)
             } ?: listOf(start, end)
 
-            DirectionsResult(points, duration)
+            val durationSeconds = route?.legs?.getOrNull(0)?.duration?.inSeconds ?: 0
+            val etaMillis = System.currentTimeMillis() + durationSeconds * 1000
+            val eta = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(etaMillis))
+
+            DirectionsResult(points, duration, mode, eta)
         } catch (e: Exception) {
             e.printStackTrace()
-            DirectionsResult(listOf(start, end), "")
+            DirectionsResult(listOf(start, end), "", TravelMode.WALKING, "")
         }
     }
 }
@@ -760,11 +811,80 @@ fun DirectionsPopup(
     }
 }
 
-@Preview(showBackground = true)
+@Composable
+fun RemoveRoute(
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit,
+    routeDurations: RouteDurations,
+    location: CampusLocation? = null,
+    travelMode: TravelMode,
+    eta: String
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        modifier = modifier.fillMaxWidth(0.70f),
+    ) {
+        Box (modifier = Modifier.fillMaxWidth().padding(4.dp)) {
+            // Delete route button
+            IconButton(
+                onClick = { onDismiss() },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 8.dp)
+                    .size(60.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Cancel,
+                    contentDescription = "Cancel",
+                    modifier = Modifier
+                        .size(60.dp),
+                    tint = Color.Gray
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+
+                        when (travelMode) {
+                            TravelMode.WALKING -> Icons.AutoMirrored.Filled.DirectionsWalk
+                            TravelMode.DRIVING -> Icons.Default.DirectionsCar
+                            TravelMode.BICYCLING -> Icons.AutoMirrored.Filled.DirectionsBike
+                            else -> Icons.Default.TravelExplore
+                        },
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(25.dp),
+                        tint = Color.Gray
+                    )
+                    Text(
+                        text = routeDurations.walking,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.Gray
+                    )
+                }
+                Text(
+                    text = "${location?.name} | $eta",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun DirectionsPopupPreview() {
     CINetTheme {
-        DirectionsPopup(
+        /*DirectionsPopup(
             location = CampusLocation("Aliso Hall", "ACADEMIC"),
             onDismiss = {},
             onModeSelected = {},
@@ -773,6 +893,22 @@ fun DirectionsPopupPreview() {
                 walking = "2 mins",
                 biking = "3 mins"
             )
-        )
+        )*/
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color(0xFF1C1B1F)),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            RemoveRoute(
+                onDismiss = {},
+                routeDurations = RouteDurations(
+                    driving = "1 mins",
+                    walking = "2 mins",
+                    biking = "3 mins"
+                ),
+                location = CampusLocation("Aliso Hall", "ACADEMIC"),
+                travelMode = TravelMode.DRIVING,
+                eta = "12:00AM"
+            )
+        }
     }
 }
