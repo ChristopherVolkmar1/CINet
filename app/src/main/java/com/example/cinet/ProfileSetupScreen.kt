@@ -29,7 +29,9 @@ import androidx.compose.ui.unit.dp
 
 private val pronounOptions = listOf(
     "He/Him",
+    "He/They",
     "She/Her",
+    "She/They",
     "They/Them",
     "Ze/Zir",
     "Xe/Xem",
