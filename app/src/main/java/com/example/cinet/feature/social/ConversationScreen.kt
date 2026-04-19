@@ -1,5 +1,4 @@
 package com.example.cinet.feature.social
-// !!! DO NOT CHANGE PACKAGE PATH !!!
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
