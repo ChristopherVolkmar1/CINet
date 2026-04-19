@@ -42,15 +42,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cinet.com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.ui.theme.CINetTheme
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.JointType
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.android.gms.maps.model.*
 import com.google.maps.DirectionsApi
 import com.google.maps.GeoApiContext
 import com.google.maps.android.compose.GoogleMap
