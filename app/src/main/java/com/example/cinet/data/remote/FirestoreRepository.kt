@@ -1,7 +1,6 @@
 package com.example.cinet.data.remote
 
 import android.util.Log
-import com.example.cinet.data.remote.FirestoreCollections
 import com.example.cinet.data.model.CampusEvent
 import com.example.cinet.data.model.UserProfile
 import com.google.firebase.Timestamp
