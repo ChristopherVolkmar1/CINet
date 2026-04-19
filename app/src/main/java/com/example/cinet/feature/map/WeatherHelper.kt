@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.map
 
 import android.content.Context
 import android.content.pm.PackageManager

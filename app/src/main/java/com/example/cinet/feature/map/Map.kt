@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.map
 
 import android.content.Context
 import android.content.pm.PackageManager
@@ -64,6 +64,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.cinet.core.permissions.PermissionManager
 
 // -------------------- Data classes --------------------
 

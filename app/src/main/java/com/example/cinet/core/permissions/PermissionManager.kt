@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.core.permissions
 
 import android.Manifest
 import android.app.Activity

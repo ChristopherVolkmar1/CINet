@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.auth
 
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
