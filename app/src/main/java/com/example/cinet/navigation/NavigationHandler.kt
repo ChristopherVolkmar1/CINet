@@ -1,4 +1,4 @@
-package com.example.cinet.navigation
+package com.example.cinet
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -21,7 +21,8 @@ import com.example.cinet.feature.calendar.calendarFiles.CalendarViewModel
 import com.example.cinet.ui.AuthState
 import java.util.Calendar
 import java.util.Locale
-import com.example.cinet.feature.auth.LoginScreen
+import com.example.cinet.feature.auth.*
+import com.example.cinet.*
 
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),

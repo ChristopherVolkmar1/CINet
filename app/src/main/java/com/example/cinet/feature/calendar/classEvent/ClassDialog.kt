@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.calendar.classEvent.ClassItem
+import com.example.cinet.*
 
 @Composable
 fun ClassDialog(
