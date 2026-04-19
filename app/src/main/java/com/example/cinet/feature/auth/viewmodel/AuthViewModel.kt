@@ -1,11 +1,11 @@
-package com.example.cinet.viewmodels
+package com.example.cinet.feature.auth.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.FirestoreRepository
-import com.example.cinet.ui.AuthState
+import com.example.cinet.feature.auth.AuthState
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

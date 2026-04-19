@@ -1,4 +1,5 @@
 package com.example.cinet
+// !!! DO NOT CHANGE PACKAGE PATH !!!
 
 
 import androidx.compose.foundation.layout.*
@@ -8,6 +9,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.cinet.core.notifications.AppNotification
+import com.example.cinet.core.notifications.NotificationType
+import com.example.cinet.core.notifications.NotificationHelper
 
 @Composable
 fun NotificationScreen(onBack: () -> Unit) {

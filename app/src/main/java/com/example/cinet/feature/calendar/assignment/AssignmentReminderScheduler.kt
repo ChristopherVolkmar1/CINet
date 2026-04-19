@@ -5,10 +5,10 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import com.example.cinet.AppNotification
+import com.example.cinet.core.notifications.AppNotification
 import com.example.cinet.AppSettings
 import com.example.cinet.NotificationHelper
-import com.example.cinet.NotificationType
+import com.example.cinet.core.notifications.NotificationType
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.Locale

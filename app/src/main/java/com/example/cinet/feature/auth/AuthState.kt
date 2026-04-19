@@ -1,4 +1,4 @@
-package com.example.cinet.ui
+package com.example.cinet.feature.auth
 
 import com.example.cinet.data.model.UserProfile
 

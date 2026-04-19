@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -11,6 +11,11 @@ import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.viewmodels.AuthViewModel
 import com.example.cinet.viewmodels.AuthViewModelFactory
+import com.example.cinet.core.permissions.PermissionManager
+import com.example.cinet.core.notifications.NotificationHelper
+import com.example.cinet.navigation.NavigationHandler.NavigationHandler
+
+
 
 // settings stuff - Zack
 class MainActivity : ComponentActivity() {

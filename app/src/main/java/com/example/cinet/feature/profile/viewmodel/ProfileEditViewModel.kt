@@ -1,4 +1,4 @@
-package com.example.cinet.viewmodels
+package com.example.cinet.feature.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

@@ -22,7 +22,8 @@ import com.example.cinet.ui.AuthState
 import java.util.Calendar
 import java.util.Locale
 import com.example.cinet.feature.auth.*
-import com.example.cinet.*
+import com.example.cinet.feature.map.CampusLocation
+import com.example.cinet.feature.map.CampusMapScreen
 
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),

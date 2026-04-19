@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.calendar.calendarFiles
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons

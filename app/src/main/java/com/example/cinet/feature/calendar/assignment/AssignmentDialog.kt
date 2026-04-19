@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.calendar.assignment
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*

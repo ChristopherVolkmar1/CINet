@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.calendar.classEvent
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
@@ -9,8 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.feature.calendar.classEvent.ClassItem
-import com.example.cinet.*
+import com.example.cinet.feature.map.CampusLocation
 
 @Composable
 fun ClassDialog(

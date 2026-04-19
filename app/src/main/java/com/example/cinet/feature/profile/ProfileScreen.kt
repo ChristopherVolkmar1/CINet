@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.profile
 
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.launch

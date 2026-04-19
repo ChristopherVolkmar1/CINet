@@ -1,4 +1,5 @@
 package com.example.cinet
+// !!! DO NOT CHANGE PACKAGE PATH !!!
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

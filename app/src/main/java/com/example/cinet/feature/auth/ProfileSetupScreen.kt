@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.auth
 
 
 import androidx.compose.foundation.layout.*

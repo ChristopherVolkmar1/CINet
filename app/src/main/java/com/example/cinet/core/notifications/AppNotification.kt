@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.core.notifications
 // Data model for representing notifications in the app
 data class AppNotification
     (

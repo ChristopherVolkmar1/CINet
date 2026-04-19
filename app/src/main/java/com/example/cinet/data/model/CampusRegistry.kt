@@ -3,7 +3,7 @@ package com.example.cinet.data.model
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.cinet.CampusLocation
+import com.example.cinet.feature.map.CampusLocation
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async

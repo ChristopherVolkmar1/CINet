@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.core.time
 
 import android.app.TimePickerDialog
 import android.content.Context

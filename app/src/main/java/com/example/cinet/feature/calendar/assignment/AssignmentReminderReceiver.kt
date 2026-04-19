@@ -3,9 +3,9 @@ package com.example.cinet.feature.calendar.assignment
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.example.cinet.AppNotification
+import com.example.cinet.core.notifications.AppNotification
 import com.example.cinet.NotificationHelper
-import com.example.cinet.NotificationType
+import com.example.cinet.core.notifications.NotificationType
 
 class AssignmentReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
