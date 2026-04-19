@@ -6,7 +6,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import com.example.cinet.AppSettings
+import com.example.cinet.feature.settings.AppSettings
 
 private val DarkColorScheme = darkColorScheme(
     primary = CINetPrimaryDark,

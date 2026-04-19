@@ -1,9 +1,11 @@
 package com.example.cinet.core.time
 
+import android.R
 import android.app.TimePickerDialog
 import android.content.Context
 import android.widget.TimePicker
 import java.util.Calendar
+import com.example.cinet.feature.settings.*
 
 fun formatPickedTime(hour24: Int, minute: Int): String {
     val amPm = if (hour24 >= 12) "PM" else "AM"

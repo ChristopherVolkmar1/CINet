@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.calendar.calendarFiles
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
@@ -12,19 +12,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
-import com.example.cinet.feature.calendar.assignment.AssignmentReminderScheduler
-import com.example.cinet.feature.calendar.classEvent.ClassItem
-import com.example.cinet.feature.calendar.classEvent.ClassReminderScheduler
-import com.example.cinet.feature.calendar.event.EventItem
-import com.example.cinet.feature.calendar.schedule.ScheduleItem
-import com.example.cinet.feature.calendar.study.StudySession
 import com.example.cinet.feature.map.CampusLocation
-import com.example.cinet.feature.calendar.calendarFiles.CalendarHeader
-import com.example.cinet.feature.calendar.calendarFiles.CalendarGrid
-import com.example.cinet.feature.calendar.calendarFiles.CalendarViewModel
-import com.example.cinet.feature.calendar.classEvent.ClassDialog
-import com.example.cinet.feature.calendar.assignment.AssignmentDialog
-import com.example.cinet.AppSettings
+import com.example.cinet.feature.settings.*
+import com.example.cinet.feature.calendar.schedule.*
+import com.example.cinet.feature.calendar.assignment.*
+import com.example.cinet.feature.calendar.classEvent.*
+import com.example.cinet.feature.calendar.event.*
+import com.example.cinet.feature.calendar.study.*
+import com.example.cinet.core.time.*
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

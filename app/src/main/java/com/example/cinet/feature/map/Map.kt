@@ -3,7 +3,7 @@ package com.example.cinet.feature.map
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
-import android.widget.ImageButton
+import android.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -65,6 +65,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.cinet.core.permissions.PermissionManager
+import com.example.cinet.feature.settings.AppSettings
+import com.example.cinet.ui.*
 
 // -------------------- Data classes --------------------
 

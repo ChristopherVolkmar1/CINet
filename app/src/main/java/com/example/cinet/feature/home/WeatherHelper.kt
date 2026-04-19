@@ -1,9 +1,10 @@
-package com.example.cinet.feature.map
+package com.example.cinet.feature.home
 
 import android.content.Context
 import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.URL
 
 data class WeatherInfo(
     val temp: String,
@@ -21,7 +22,7 @@ object WeatherHelper {
                 val apiKey = ai.metaData.getString("com.google.android.geo.API_KEY")
                 
                 val url = "https://weather.googleapis.com/v1/currentConditions:lookup?key=$apiKey&location.latitude=34.162&location.longitude=-119.043&unitsSystem=IMPERIAL"
-                val response = java.net.URL(url).readText()
+                val response = URL(url).readText()
                 
                 // Extracting temperature
                 val tempVal = response.substringAfter("\"degrees\":").substringBefore(",").toDouble().toInt()

@@ -19,8 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.cinet.viewmodels.ProfileEditState
-import com.example.cinet.viewmodels.ProfileEditViewModel
+import com.example.cinet.feature.profile.viewmodel.ProfileEditState
+import com.example.cinet.feature.profile.viewmodel.ProfileEditViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

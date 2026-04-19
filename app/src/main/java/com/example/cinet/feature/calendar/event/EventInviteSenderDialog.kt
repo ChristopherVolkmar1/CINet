@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.calendar.event
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,11 +11,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.cinet.feature.calendar.event.EventItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import com.example.cinet.core.time.openTimePicker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.home
 
 import android.util.Log
 import androidx.compose.foundation.background
@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.ui.theme.CINetTheme
+import com.example.cinet.feature.map.*
+
 
 @Composable
 fun HomeScreen(
@@ -118,12 +120,6 @@ fun HomeScreen(
 
                         }
                     )
-                    /*OutlinedTextField(
-                        value = locationField,
-                        onValueChange = { locationField = it },
-                        label = { Text("Location") },
-                        modifier = Modifier.fillMaxWidth()
-                    )*/
                 }
             },
             confirmButton = {

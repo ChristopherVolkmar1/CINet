@@ -9,13 +9,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.ui.theme.CINetTheme
-import com.example.cinet.viewmodels.AuthViewModel
-import com.example.cinet.viewmodels.AuthViewModelFactory
+import com.example.cinet.feature.auth.viewmodel.AuthViewModel
+import com.example.cinet.feature.auth.viewmodel.AuthViewModelFactory
 import com.example.cinet.core.permissions.PermissionManager
 import com.example.cinet.core.notifications.NotificationHelper
-import com.example.cinet.navigation.NavigationHandler.NavigationHandler
-
-
+import com.example.cinet.navigation.NavigationHandler
+import com.example.cinet.feature.settings.*
 
 // settings stuff - Zack
 class MainActivity : ComponentActivity() {

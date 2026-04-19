@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -14,17 +14,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.data.model.Conversation
-import com.example.cinet.data.model.UserProfile
-import com.example.cinet.feature.calendar.calendarFiles.CalendarViewModel
-import com.example.cinet.ui.AuthState
+import com.example.cinet.data.model.*
 import java.util.Calendar
 import java.util.Locale
 import com.example.cinet.feature.auth.*
-import com.example.cinet.feature.map.CampusLocation
-import com.example.cinet.feature.map.CampusMapScreen
-
+import com.example.cinet.feature.map.*
+import com.example.cinet.feature.home.HomeScreen
+import com.example.cinet.feature.social.*
+import com.example.cinet.feature.profile.*
+import com.example.cinet.feature.calendar.calendarFiles.*
+import com.example.cinet.feature.settings.*
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Social("Social", Icons.Default.People),

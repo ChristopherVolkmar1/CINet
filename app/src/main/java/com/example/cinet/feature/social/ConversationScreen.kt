@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.social
 // !!! DO NOT CHANGE PACKAGE PATH !!!
 
 import androidx.compose.foundation.background
@@ -27,6 +27,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.example.cinet.feature.calendar.study.*
+import com.example.cinet.feature.calendar.event.*
 
 @Composable
 fun ConversationScreen(

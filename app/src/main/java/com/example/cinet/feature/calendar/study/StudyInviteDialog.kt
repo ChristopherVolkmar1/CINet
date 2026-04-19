@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.calendar.study
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
-import com.example.cinet.feature.calendar.study.StudySession
+import com.example.cinet.core.time.openTimePicker
 import java.text.SimpleDateFormat
 import java.util.*
 

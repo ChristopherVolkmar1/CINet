@@ -1,10 +1,11 @@
-package com.example.cinet
-// !!! DO NOT CHANGE PACKAGE PATH !!!
+package com.example.cinet.core.notifications
 
-import com.example.cinet.NotificationHelper.showNotification
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.example.cinet.core.notifications.NotificationHelper.showNotification
+
+
 
 class FireBaseMessagingService : FirebaseMessagingService() {
 

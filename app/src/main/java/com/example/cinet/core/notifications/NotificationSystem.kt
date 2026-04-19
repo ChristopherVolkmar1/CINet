@@ -1,5 +1,4 @@
-package com.example.cinet
-// !!! DO NOT CHANGE PACKAGE PATH !!!
+package com.example.cinet.core.notifications
 
 import android.Manifest
 import android.R
@@ -12,7 +11,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.cinet.core.permissions.PermissionManager
-import com.example.cinet.core.notifications.*
+import com.example.cinet.feature.settings.*
 
 // settings stuff - Zack
 object NotificationHelper {

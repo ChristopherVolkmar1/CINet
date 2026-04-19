@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.map.CampusLocation
+import com.example.cinet.feature.map.SearchLocationBar
 
 @Composable
 fun ClassDialog(

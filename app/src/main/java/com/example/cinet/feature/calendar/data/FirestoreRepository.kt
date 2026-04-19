@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.calendar.data
 
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlin.text.get

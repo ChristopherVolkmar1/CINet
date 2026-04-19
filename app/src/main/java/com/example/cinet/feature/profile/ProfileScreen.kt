@@ -11,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.SocialRepository
-import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(

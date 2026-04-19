@@ -1,5 +1,4 @@
-package com.example.cinet
-// !!! DO NOT CHANGE PACKAGE PATH !!!
+package com.example.cinet.core.notifications
 
 class FakeNotificationRepository {
     // Returns a list of sample notifications to simulate backend / api data, use to simulate firebase
