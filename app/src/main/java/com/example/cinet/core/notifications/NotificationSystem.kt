@@ -10,7 +10,7 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.example.cinet.AppNotification
+import com.example.cinet.core.permissions.PermissionManager
 
 // settings stuff - Zack
 object NotificationHelper {
