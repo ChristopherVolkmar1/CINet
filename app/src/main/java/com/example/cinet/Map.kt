@@ -1,5 +1,6 @@
 package com.example.cinet
 
+import com.example.cinet.R
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
