@@ -1060,7 +1060,12 @@ fun RemoveRoute(
         modifier = modifier.wrapContentWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 16.dp),
+            modifier = Modifier.padding(
+                start = 8.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = 16.dp
+            ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             RouteCancelButton(onDismiss = onDismiss)
