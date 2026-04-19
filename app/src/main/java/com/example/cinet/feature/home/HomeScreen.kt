@@ -19,7 +19,8 @@ import androidx.compose.ui.unit.sp
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.feature.map.*
-
+import com.example.cinet.core.designsystem.InfoSection
+import com.example.cinet.core.designsystem.WeatherDisplay
 
 @Composable
 fun HomeScreen(

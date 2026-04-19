@@ -3,7 +3,7 @@ package com.example.cinet.feature.map
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
-import android.R
+import com.example.cinet.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
