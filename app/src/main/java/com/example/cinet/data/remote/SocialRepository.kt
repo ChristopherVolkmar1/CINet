@@ -9,6 +9,7 @@ import com.example.cinet.data.model.FriendRequest
 import com.example.cinet.data.model.Message
 import com.example.cinet.data.model.UserProfile
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
@@ -126,6 +127,44 @@ class SocialRepository(
             val profiles = loadUserProfiles(friendIds)
             Result.success(profiles)
         } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Removes a friend by deleting the friend doc from both users' subcollections. */
+    suspend fun removeFriend(friendUid: String): Result<Unit> {
+        return try {
+            db.collection("users")
+                .document(currentUid)
+                .collection("friends")
+                .document(friendUid)
+                .delete()
+                .await()
+
+            db.collection("users")
+                .document(friendUid)
+                .collection("friends")
+                .document(currentUid)
+                .delete()
+                .await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "removeFriend failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** Renames a group conversation. */
+    suspend fun renameConversation(conversationId: String, newName: String): Result<Unit> {
+        return try {
+            db.collection("conversations")
+                .document(conversationId)
+                .update("groupName", newName)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "renameConversation failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -487,7 +526,11 @@ class SocialRepository(
             .get()
             .await()
             .toObjects(Conversation::class.java)
-            .firstOrNull { it.participantIds.containsAll(participantIds) }
+            .firstOrNull {
+                !it.isGroup &&
+                        it.participantIds.size == participantIds.size &&
+                        it.participantIds.containsAll(participantIds)
+            }
     }
 
     /** Creates and saves a new conversation document. */
@@ -545,14 +588,23 @@ class SocialRepository(
             .await()
     }
 
-    /** Updates the last message preview for a conversation. */
+    /**
+     * Updates the last message preview and lastUpdated timestamp for a conversation.
+     * lastUpdated is written as a server timestamp so sort order in the list is correct.
+     */
     private suspend fun updateConversationLastMessage(
         conversationId: String,
         content: String,
     ) {
         db.collection("conversations")
             .document(conversationId)
-            .set(mapOf("lastMessage" to content), SetOptions.merge())
+            .set(
+                mapOf(
+                    "lastMessage" to content,
+                    "lastUpdated" to FieldValue.serverTimestamp()
+                ),
+                SetOptions.merge()
+            )
             .await()
     }
 
