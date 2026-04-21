@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.model.*
+import com.example.cinet.data.remote.SocialRepository
 import java.util.Calendar
 import java.util.Locale
 import com.example.cinet.feature.auth.*
@@ -24,6 +25,8 @@ import com.example.cinet.feature.social.*
 import com.example.cinet.feature.profile.*
 import com.example.cinet.feature.calendar.calendarFiles.*
 import com.example.cinet.feature.settings.*
+import kotlinx.coroutines.launch
+
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Social("Social", Icons.Default.People),
@@ -65,6 +68,9 @@ private fun MainScaffold(
     val calendarViewModel: CalendarViewModel = viewModel()
     val campusRegistry by viewModel.campusRegistry.collectAsState()
     var preSelectedMapLocation by remember { mutableStateOf<CampusLocation?>(null) }
+
+    val socialScope = rememberCoroutineScope()
+    val socialRepository = remember { SocialRepository() }
 
     val calendarScheduleItems = remember(calendarViewModel.classItems, calendarViewModel.scheduleItems) {
         val cal = Calendar.getInstance()
@@ -201,7 +207,18 @@ private fun MainScaffold(
                         onBack = { selectedProfile = null }
                     )
                     else -> SocialScreen(
-                        onOpenProfile = { selectedProfile = it }
+                        onOpenProfile = { selectedProfile = it },
+                        onOpenConversation = { friend ->
+                            socialScope.launch {
+                                socialRepository.getOrCreateConversation(
+                                    participantIds = listOf(userProfile.uid, friend.uid),
+                                    participantNicknames = mapOf(
+                                        userProfile.uid to userProfile.nickname,
+                                        friend.uid to friend.nickname
+                                    )
+                                ).onSuccess { activeConversation = it }
+                            }
+                        }
                     )
                 }
                 Screen.Map -> CampusMapScreen(
@@ -227,7 +244,7 @@ private fun MainScaffold(
                         onBack        = { currentScreen = Screen.Home },
                         onSignOut     = onSignOut,
                         onEditProfile = { showProfileEdit = true },
-                        userProfile   = userProfile  // ← add this
+                        userProfile   = userProfile
                     )
                 }
             }

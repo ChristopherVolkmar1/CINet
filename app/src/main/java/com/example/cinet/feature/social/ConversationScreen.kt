@@ -44,21 +44,23 @@ fun ConversationScreen(
     var messageInput by remember { mutableStateOf("") }
     var showStudyInviteDialog by remember { mutableStateOf(false) }
     var showEventInviteDialog by remember { mutableStateOf(false) }
+    var showRemoveFriendDialog by remember { mutableStateOf(false) }
     var myScheduleItems by remember { mutableStateOf<List<ScheduleItem>>(emptyList()) }
     var myStudySessions by remember { mutableStateOf<List<StudySession>>(emptyList()) }
     var myEvents by remember { mutableStateOf<List<EventItem>>(emptyList()) }
-    var otherUserPhotoUrl by remember { mutableStateOf("") } // header avatar photo
-    var currentUserPhotoUrl by remember { mutableStateOf("") } // current user's avatar
+    var otherUserPhotoUrl by remember { mutableStateOf("") }
+    var currentUserPhotoUrl by remember { mutableStateOf("") }
+
+    val otherUid = conversation.participantIds.firstOrNull { it != currentUid } ?: ""
 
     // Load both participants' photos on open
     LaunchedEffect(conversation.id) {
-        val otherUid = conversation.participantIds.firstOrNull { it != currentUid } ?: return@LaunchedEffect
+        if (otherUid.isBlank()) return@LaunchedEffect
 
         val otherSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(otherUid).get().await()
         otherUserPhotoUrl = otherSnapshot.getString("photoUrl") ?: ""
 
-        // Also load current user's photo for sent message avatars
         val currentSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(currentUid).get().await()
         currentUserPhotoUrl = currentSnapshot.getString("photoUrl") ?: ""
@@ -89,13 +91,40 @@ fun ConversationScreen(
             .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
     }
 
+    // Remove Friend confirmation dialog
+    if (showRemoveFriendDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveFriendDialog = false },
+            title = { Text("Remove Friend") },
+            text = { Text("Are you sure you want to remove $conversationTitle as a friend?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRemoveFriendDialog = false
+                        scope.launch {
+                            repository.removeFriend(otherUid)
+                            onBack()
+                        }
+                    }
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRemoveFriendDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // Header — shows avatar and conversation title
+            // Header — shows avatar, conversation title, and Remove Friend button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -145,7 +174,23 @@ fun ConversationScreen(
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(text = conversationTitle, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = conversationTitle,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Remove Friend button — only shown for direct (non-group) conversations
+                if (!conversation.isGroup && otherUid.isNotBlank()) {
+                    OutlinedButton(
+                        onClick = { showRemoveFriendDialog = true },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text("Remove Friend", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
             }
 
             HorizontalDivider()
@@ -354,7 +399,7 @@ fun ConversationScreen(
 fun MessageBubble(
     message: Message,
     isCurrentUser: Boolean,
-    currentUserPhotoUrl: String = "", // current user's photo for sent messages
+    currentUserPhotoUrl: String = "",
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
 ) {
@@ -380,7 +425,6 @@ fun MessageBubble(
                         .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
                 )
             } else {
-                // Fallback initials if no photo available
                 Box(
                     modifier = Modifier
                         .size(36.dp)
@@ -417,7 +461,6 @@ fun MessageBubble(
 
             val response = message.metadata["response"]
             when {
-                // Already responded — show status label instead of buttons
                 response == "accepted" -> Text(
                     text = "✓ Accepted",
                     style = MaterialTheme.typography.labelSmall,
@@ -430,7 +473,6 @@ fun MessageBubble(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp)
                 )
-                // Not yet responded — show buttons
                 onAccept != null && onDecline != null -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = onAccept) { Text("Accept") }
@@ -458,7 +500,6 @@ fun MessageBubble(
                         .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
                 )
             } else {
-                // Fallback initials if no photo available
                 Box(
                     modifier = Modifier
                         .size(36.dp)

@@ -130,6 +130,30 @@ class SocialRepository(
         }
     }
 
+    /** Removes a friend by deleting the friend doc from both users' subcollections. */
+    suspend fun removeFriend(friendUid: String): Result<Unit> {
+        return try {
+            db.collection("users")
+                .document(currentUid)
+                .collection("friends")
+                .document(friendUid)
+                .delete()
+                .await()
+
+            db.collection("users")
+                .document(friendUid)
+                .collection("friends")
+                .document(currentUid)
+                .delete()
+                .await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "removeFriend failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
     /** Finds an existing conversation or creates a new one. */
     suspend fun getOrCreateConversation(
         participantIds: List<String>,

@@ -5,6 +5,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,6 +21,16 @@ fun ProfileScreen(
     onBack: () -> Unit,
 ) {
     val repository = remember { SocialRepository() }
+    val scope = rememberCoroutineScope()
+
+    var isFriend by remember { mutableStateOf(false) }
+
+    // Check friendship status on load
+    LaunchedEffect(user.uid) {
+        repository.getFriends().onSuccess { friends ->
+            isFriend = friends.any { it.uid == user.uid }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -47,23 +58,33 @@ fun ProfileScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = {
-                    // Use GlobalScope so the coroutine survives navigation away from this screen
-                    kotlinx.coroutines.GlobalScope.launch {
-                        repository.getOrCreateConversation(
-                            participantIds = listOf(currentUserProfile.uid, user.uid),
-                            participantNicknames = mapOf(
-                                currentUserProfile.uid to currentUserProfile.nickname,
-                                user.uid to user.nickname
-                            )
-                        ).onSuccess { onOpenConversation(it) }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Message")
+            if (isFriend) {
+                Button(
+                    onClick = {
+                        // Use GlobalScope so the coroutine survives navigation away from this screen
+                        kotlinx.coroutines.GlobalScope.launch {
+                            repository.getOrCreateConversation(
+                                participantIds = listOf(currentUserProfile.uid, user.uid),
+                                participantNicknames = mapOf(
+                                    currentUserProfile.uid to currentUserProfile.nickname,
+                                    user.uid to user.nickname
+                                )
+                            ).onSuccess { onOpenConversation(it) }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Message")
+                }
+            } else {
+                Text(
+                    text = "Add ${user.nickname} as a friend to send a message",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
             }
+
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = onBack,
