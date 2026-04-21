@@ -109,7 +109,7 @@ private fun SearchInputField(
     TextField(
         value = textFieldState.text.toString(),
         onValueChange = { textFieldState.edit { replace(0, length, it) } },
-        placeholder = { Text("Search", color = Color.Gray) },
+        placeholder = { Text("Search location..", color = Color.Gray) },
         singleLine = true,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,

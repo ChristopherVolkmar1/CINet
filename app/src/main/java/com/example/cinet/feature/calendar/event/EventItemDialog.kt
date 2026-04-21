@@ -7,6 +7,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.feature.map.CampusLocation
+import com.example.cinet.feature.map.SearchLocationBar
 
 @Composable
 fun EventItemDialog(
@@ -15,13 +23,21 @@ fun EventItemDialog(
     eventName: String,
     onEventNameChange: (String) -> Unit,
     eventTime: String,
-    location: String,
-    onLocationChange: (String) -> Unit,
+    location: CampusLocation?,
+    onLocationChange: (CampusLocation?) -> Unit,
     onPickTime: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    viewModel: CampusRegistry = viewModel<CampusRegistry>()
 ) {
+    val academic by viewModel.academic.collectAsState(initial = emptyList())
+    val textFieldState = rememberTextFieldState()
+    val academicNames = remember(textFieldState.text, academic) {
+        academic
+            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
+            .map { it.name }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editingEvent == null) "Add Event" else "Edit Event") },
@@ -46,11 +62,14 @@ fun EventItemDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = onPickTime) { Text("Pick Time") }
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = onLocationChange,
-                    label = { Text("Location (optional)") },
-                    modifier = Modifier.fillMaxWidth()
+                SearchLocationBar(
+                    textFieldState = textFieldState,
+                    searchResults = academicNames,
+                    onSearch = { query ->
+                        val found = academic.find { it.name.equals(query, ignoreCase = true) }
+                        onLocationChange(found)
+                        textFieldState.edit { replace(0, length, query) }
+                    }
                 )
             }
         },
