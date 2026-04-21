@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.model.*
 import com.example.cinet.data.remote.SocialRepository
 import java.util.Calendar
@@ -65,7 +64,7 @@ private fun MainScaffold(
     onSignOut: () -> Unit,
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
-    val calendarViewModel: CalendarViewModel = viewModel()
+    val calendarViewModel: CalendarViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val campusRegistry by viewModel.campusRegistry.collectAsState()
     var preSelectedMapLocation by remember { mutableStateOf<CampusLocation?>(null) }
 
@@ -82,10 +81,8 @@ private fun MainScaffold(
         )
         val list = mutableListOf<Pair<String, String>>()
         calendarViewModel.classItems
-        calendarViewModel.classItems
             .filter { it.meetingDays.contains(dayName) }
             .forEach { list.add(it.name to "${it.startTime} - ${it.endTime} | ${it.location}") }
-        // Add assignments/tasks for today
         calendarViewModel.scheduleItems
             .filter { it.date == dateStr }
             .forEach { list.add(it.assignmentName to "Due: ${it.dueTime} (${it.className})") }
@@ -94,9 +91,13 @@ private fun MainScaffold(
 
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
-    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
-    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
     var showProfileEdit by remember { mutableStateOf(false) }
+
+    // Social sub-navigation stack
+    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
+    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var showNewConversation by remember { mutableStateOf(false) }
+    var showSocialScreen by remember { mutableStateOf(false) } // friends / search / requests
 
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
@@ -116,10 +117,16 @@ private fun MainScaffold(
 
     var upcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
-    BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null || showProfileEdit) {
+    val socialBackStackActive = currentScreen == Screen.Social &&
+            (activeConversation != null || selectedProfile != null ||
+                    showNewConversation || showSocialScreen)
+
+    BackHandler(enabled = currentScreen != Screen.Home || socialBackStackActive || showProfileEdit) {
         when {
             activeConversation != null -> activeConversation = null
+            showNewConversation -> showNewConversation = false
             selectedProfile != null -> selectedProfile = null
+            showSocialScreen -> showSocialScreen = false
             else -> currentScreen = Screen.Home
         }
     }
@@ -134,15 +141,17 @@ private fun MainScaffold(
                         onClick = {
                             currentScreen = screen
                             if (screen != Screen.Social) {
-                                selectedProfile = null
+                                // Clear social sub-navigation when leaving the tab
                                 activeConversation = null
+                                selectedProfile = null
+                                showNewConversation = false
+                                showSocialScreen = false
                             }
                             if (screen != Screen.Calendar) {
                                 showAddClassOnCalendar = false
                                 if (screen != Screen.Settings)
                                     showProfileEdit = false
                             }
-
                         },
                         label = {
                             Text(
@@ -195,7 +204,9 @@ private fun MainScaffold(
                         currentScreen = Screen.Map
                     }
                 )
+
                 Screen.Social -> when {
+                    // Deepest layer first
                     activeConversation != null -> ConversationScreen(
                         conversation = activeConversation!!,
                         onBack = { activeConversation = null }
@@ -206,7 +217,15 @@ private fun MainScaffold(
                         onOpenConversation = { activeConversation = it },
                         onBack = { selectedProfile = null }
                     )
-                    else -> SocialScreen(
+                    showNewConversation -> NewConversationScreen(
+                        currentUserProfile = userProfile,
+                        onBack = { showNewConversation = false },
+                        onOpenConversation = {
+                            showNewConversation = false
+                            activeConversation = it
+                        }
+                    )
+                    showSocialScreen -> SocialScreen(
                         onOpenProfile = { selectedProfile = it },
                         onOpenConversation = { friend ->
                             socialScope.launch {
@@ -216,18 +235,26 @@ private fun MainScaffold(
                                         userProfile.uid to userProfile.nickname,
                                         friend.uid to friend.nickname
                                     )
-                                ).onSuccess { activeConversation = it }
+                                ).onSuccess {
+                                    showSocialScreen = false
+                                    activeConversation = it
+                                }
                             }
                         }
                     )
+                    else -> ConversationsListScreen(
+                        onOpenConversation = { activeConversation = it },
+                        onNewConversation = { showNewConversation = true },
+                        onOpenFriends = { showSocialScreen = true }
+                    )
                 }
+
                 Screen.Map -> CampusMapScreen(
                     onBack = { currentScreen = Screen.Home },
                     preSelectedLocation = preSelectedMapLocation,
-                    onFinishedLoading = {
-                        preSelectedMapLocation = null
-                    }
+                    onFinishedLoading = { preSelectedMapLocation = null }
                 )
+
                 Screen.Calendar -> CalendarScreen(
                     onBack = {
                         currentScreen = Screen.Home
@@ -235,16 +262,17 @@ private fun MainScaffold(
                     },
                     initialShowClassDialog = showAddClassOnCalendar
                 )
+
                 Screen.Settings -> if (showProfileEdit) {
                     ProfileEditScreen(
                         onBack = { showProfileEdit = false }
                     )
                 } else {
                     SettingScreen(
-                        onBack        = { currentScreen = Screen.Home },
-                        onSignOut     = onSignOut,
+                        onBack = { currentScreen = Screen.Home },
+                        onSignOut = onSignOut,
                         onEditProfile = { showProfileEdit = true },
-                        userProfile   = userProfile
+                        userProfile = userProfile
                     )
                 }
             }
