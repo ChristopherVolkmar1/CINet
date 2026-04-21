@@ -497,34 +497,56 @@ fun MessageBubble(
                 Text(
                     text = message.senderNickname,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-            Text(
-                text = message.content,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(4.dp)
-            )
-
-            val response = message.metadata["response"]
-            when {
-                response == "accepted" -> Text(
-                    text = "✓ Accepted",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
-                response == "declined" -> Text(
-                    text = "✗ Declined",
-                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp)
                 )
-                onAccept != null && onDecline != null -> {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onAccept) { Text("Accept") }
-                        OutlinedButton(onClick = onDecline) { Text("Decline") }
+                Spacer(modifier = Modifier.height(2.dp))
+            }
+
+            val bubbleColor = if (isCurrentUser)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.secondaryContainer
+            val textColor = if (isCurrentUser)
+                MaterialTheme.colorScheme.onPrimary
+            else
+                MaterialTheme.colorScheme.onSecondaryContainer
+
+            Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                    topStart = if (isCurrentUser) 16.dp else 4.dp,
+                    topEnd = if (isCurrentUser) 4.dp else 16.dp,
+                    bottomStart = 16.dp,
+                    bottomEnd = 16.dp
+                ),
+                color = bubbleColor,
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor
+                    )
+
+                    val response = message.metadata["response"]
+                    when {
+                        response == "accepted" -> Text(
+                            text = "✓ Accepted",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = textColor.copy(alpha = 0.8f)
+                        )
+                        response == "declined" -> Text(
+                            text = "✗ Declined",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = textColor.copy(alpha = 0.6f)
+                        )
+                        onAccept != null && onDecline != null -> {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = onAccept) { Text("Accept") }
+                                OutlinedButton(onClick = onDecline) { Text("Decline") }
+                            }
+                        }
                     }
                 }
             }

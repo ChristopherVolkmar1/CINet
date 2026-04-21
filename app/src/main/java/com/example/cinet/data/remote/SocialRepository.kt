@@ -526,7 +526,11 @@ class SocialRepository(
             .get()
             .await()
             .toObjects(Conversation::class.java)
-            .firstOrNull { it.participantIds.containsAll(participantIds) }
+            .firstOrNull {
+                !it.isGroup &&
+                        it.participantIds.size == participantIds.size &&
+                        it.participantIds.containsAll(participantIds)
+            }
     }
 
     /** Creates and saves a new conversation document. */

@@ -29,6 +29,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun ConversationsListScreen(
@@ -296,7 +297,3 @@ private fun formatConversationTime(date: Date?): String {
         else -> SimpleDateFormat("MMM d", Locale.US).format(date)
     }
 }
-
-// Workaround for using await() inside LaunchedEffect without importing coroutines directly
-private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T =
-    kotlinx.coroutines.tasks.await(this)
