@@ -1,6 +1,7 @@
 package com.example.cinet.feature.calendar.study
 
 
+import android.text.TextUtils.replace
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -11,7 +12,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.feature.calendar.study.StudySession
+import com.example.cinet.feature.map.CampusLocation
+import com.example.cinet.feature.map.SearchLocationBar
+import com.example.cinet.data.model.CampusRegistry
+import androidx.compose.runtime.getValue
 
 @Composable
 fun StudySessionDialog(
@@ -22,13 +31,21 @@ fun StudySessionDialog(
     topic: String,
     onTopicChange: (String) -> Unit,
     startTime: String,
-    location: String,
-    onLocationChange: (String) -> Unit,
+    location: CampusLocation?,
+    onLocationChange: (CampusLocation?) -> Unit,
     onPickStartTime: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    viewModel: CampusRegistry = viewModel<CampusRegistry>()
 ) {
+    val academic by viewModel.academic.collectAsState(initial = emptyList())
+    val textFieldState = rememberTextFieldState()
+    val academicNames = remember(textFieldState.text, academic) {
+        academic
+            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
+            .map { it.name }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editingSession == null) "Add Study Session" else "Edit Study Session") },
@@ -60,11 +77,14 @@ fun StudySessionDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = onPickStartTime) { Text("Pick Start Time") }
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = onLocationChange,
-                    label = { Text("Location (optional)") },
-                    modifier = Modifier.fillMaxWidth()
+                SearchLocationBar(
+                    textFieldState = textFieldState,
+                    searchResults = academicNames,
+                    onSearch = { query ->
+                        val found = academic.find { it.name.equals(query, ignoreCase = true) }
+                        onLocationChange(found)
+                        textFieldState.edit { replace(0, length, query) }
+                    }
                 )
             }
         },

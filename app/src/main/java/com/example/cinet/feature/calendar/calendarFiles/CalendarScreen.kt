@@ -20,6 +20,7 @@ import com.example.cinet.feature.calendar.classEvent.*
 import com.example.cinet.feature.calendar.event.*
 import com.example.cinet.feature.calendar.study.*
 import com.example.cinet.core.time.*
+import com.example.cinet.data.model.CampusRegistry
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,13 +68,16 @@ fun CalendarScreen(
     var sessionClassName by remember { mutableStateOf("") }
     var sessionTopic by remember { mutableStateOf("") }
     var sessionStartTime by remember { mutableStateOf("") }
-    var sessionLocation by remember { mutableStateOf("") }
+    var sessionLocation by remember { mutableStateOf<CampusLocation?>(null) }
 
     var showEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<EventItem?>(null) }
     var eventName by remember { mutableStateOf("") }
     var eventTime by remember { mutableStateOf("") }
-    var eventLocation by remember { mutableStateOf("") }
+    var eventLocation by remember { mutableStateOf<CampusLocation?>(null) }
+
+    val campusRegistryViewModel: CampusRegistry = viewModel()
+    val academic by campusRegistryViewModel.academic.collectAsState(initial = emptyList())
 
     fun resetAssignmentForm() {
         editingAssignment = null
@@ -98,14 +102,14 @@ fun CalendarScreen(
         sessionClassName = ""
         sessionTopic = ""
         sessionStartTime = ""
-        sessionLocation = ""
+        sessionLocation = null
     }
 
     fun resetEventForm() {
         editingEvent = null
         eventName = ""
         eventTime = ""
-        eventLocation = ""
+        eventLocation = null
     }
 
     fun formatDate(date: LocalDate): String {
@@ -190,7 +194,7 @@ fun CalendarScreen(
                 sessionClassName = session.className
                 sessionTopic = session.topic
                 sessionStartTime = session.startTime
-                sessionLocation = session.location
+                sessionLocation = academic.find { it.name == session.location }
                 showStudySessionDialog = true
             }
         )
@@ -202,7 +206,7 @@ fun CalendarScreen(
                 editingEvent = event
                 eventName = event.name
                 eventTime = event.time
-                eventLocation = event.location
+                eventLocation = academic.find { it.name == event.location }
                 showEventDialog = true
             }
         )
@@ -410,8 +414,8 @@ fun CalendarScreen(
             onConfirm = {
                 if (sessionClassName.isNotBlank() && sessionTopic.isNotBlank() && sessionStartTime.isNotBlank()) {
                     val s = editingSession
-                    if (s == null) viewModel.addStudySession(dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation)
-                    else viewModel.updateStudySession(s.id, dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation)
+                    if (s == null) viewModel.addStudySession(dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation?.name ?: "")
+                    else viewModel.updateStudySession(s.id, dateStr, sessionClassName, sessionTopic, sessionStartTime, sessionLocation?.name ?: "")
                     showStudySessionDialog = false
                     resetStudySessionForm()
                 }
@@ -441,8 +445,8 @@ fun CalendarScreen(
             onConfirm = {
                 if (eventName.isNotBlank() && eventTime.isNotBlank()) {
                     val e = editingEvent
-                    if (e == null) viewModel.addEvent(dateStr, eventName, eventTime, eventLocation)
-                    else viewModel.updateEvent(e.id, dateStr, eventName, eventTime, eventLocation)
+                    if (e == null) viewModel.addEvent(dateStr, eventName, eventTime, eventLocation?.name ?: "")
+                    else viewModel.updateEvent(e.id, dateStr, eventName, eventTime, eventLocation?.name ?: "")
                     showEventDialog = false
                     resetEventForm()
                 }
