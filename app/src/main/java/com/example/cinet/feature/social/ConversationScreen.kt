@@ -2,6 +2,7 @@ package com.example.cinet.feature.social
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
@@ -12,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -45,6 +47,10 @@ fun ConversationScreen(
     var showStudyInviteDialog by remember { mutableStateOf(false) }
     var showEventInviteDialog by remember { mutableStateOf(false) }
     var showRemoveFriendDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameInput by remember { mutableStateOf("") }
+    // Local override so rename is reflected immediately without re-navigation
+    var displayGroupName by remember { mutableStateOf(conversation.groupName) }
     var myScheduleItems by remember { mutableStateOf<List<ScheduleItem>>(emptyList()) }
     var myStudySessions by remember { mutableStateOf<List<StudySession>>(emptyList()) }
     var myEvents by remember { mutableStateOf<List<EventItem>>(emptyList()) }
@@ -53,14 +59,20 @@ fun ConversationScreen(
 
     val otherUid = conversation.participantIds.firstOrNull { it != currentUid } ?: ""
 
+    val conversationTitle = if (conversation.isGroup) {
+        displayGroupName.ifBlank { "Group Chat" }
+    } else {
+        conversation.participantNicknames.entries
+            .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
+    }
+
     // Load both participants' photos on open
     LaunchedEffect(conversation.id) {
-        if (otherUid.isBlank()) return@LaunchedEffect
-
-        val otherSnapshot = FirebaseFirestore.getInstance()
-            .collection("users").document(otherUid).get().await()
-        otherUserPhotoUrl = otherSnapshot.getString("photoUrl") ?: ""
-
+        if (otherUid.isNotBlank()) {
+            val otherSnapshot = FirebaseFirestore.getInstance()
+                .collection("users").document(otherUid).get().await()
+            otherUserPhotoUrl = otherSnapshot.getString("photoUrl") ?: ""
+        }
         val currentSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(currentUid).get().await()
         currentUserPhotoUrl = currentSnapshot.getString("photoUrl") ?: ""
@@ -84,13 +96,6 @@ fun ConversationScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    val conversationTitle = if (conversation.isGroup) {
-        conversation.groupName
-    } else {
-        conversation.participantNicknames.entries
-            .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
-    }
-
     // Remove Friend confirmation dialog
     if (showRemoveFriendDialog) {
         AlertDialog(
@@ -106,12 +111,47 @@ fun ConversationScreen(
                             onBack()
                         }
                     }
-                ) {
-                    Text("Remove")
-                }
+                ) { Text("Remove") }
             },
             dismissButton = {
                 OutlinedButton(onClick = { showRemoveFriendDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Rename group dialog
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Group") },
+            text = {
+                OutlinedTextField(
+                    value = renameInput,
+                    onValueChange = { renameInput = it },
+                    label = { Text("Group name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val newName = renameInput.trim()
+                        if (newName.isNotBlank()) {
+                            showRenameDialog = false
+                            scope.launch {
+                                repository.renameConversation(conversation.id, newName)
+                                displayGroupName = newName
+                            }
+                        }
+                    },
+                    enabled = renameInput.isNotBlank()
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRenameDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -124,7 +164,7 @@ fun ConversationScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // Header — shows avatar, conversation title, and Remove Friend button
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -134,8 +174,8 @@ fun ConversationScreen(
                 Button(onClick = onBack) { Text("Back") }
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Avatar — shows Google photo if available, otherwise initials
-                val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() }
+                // Avatar — group uses tertiaryContainer tint to distinguish visually
+                val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() && !conversation.isGroup }
                 if (headerPhoto != null) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -147,23 +187,20 @@ fun ConversationScreen(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .border(
-                                width = 1.5.dp,
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = CircleShape
-                            )
+                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
                     )
                 } else {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .border(
-                                width = 1.5.dp,
-                                color = MaterialTheme.colorScheme.primary,
-                                shape = CircleShape
-                            ),
+                            .background(
+                                if (conversation.isGroup)
+                                    MaterialTheme.colorScheme.tertiaryContainer
+                                else
+                                    MaterialTheme.colorScheme.secondaryContainer
+                            )
+                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -174,13 +211,29 @@ fun ConversationScreen(
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = conversationTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f)
-                )
 
-                // Remove Friend button — only shown for direct (non-group) conversations
+                // Group name is tappable to rename; DM name is static
+                if (conversation.isGroup) {
+                    Text(
+                        text = conversationTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                renameInput = displayGroupName
+                                showRenameDialog = true
+                            }
+                    )
+                } else {
+                    Text(
+                        text = conversationTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Remove Friend button — only for direct (non-group) conversations
                 if (!conversation.isGroup && otherUid.isNotBlank()) {
                     OutlinedButton(
                         onClick = { showRemoveFriendDialog = true },
@@ -201,7 +254,6 @@ fun ConversationScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Study invite — loads assignments and study sessions only
                 OutlinedButton(
                     onClick = {
                         scope.launch {
@@ -213,7 +265,6 @@ fun ConversationScreen(
                 ) {
                     Text("Study Invite", style = MaterialTheme.typography.labelSmall)
                 }
-                // Event invite — loads existing events for picker
                 OutlinedButton(
                     onClick = {
                         scope.launch {
@@ -316,7 +367,6 @@ fun ConversationScreen(
         }
     }
 
-    // Study invite sender dialog — shows assignments and study sessions
     if (showStudyInviteDialog) {
         StudyInviteDialog(
             existingItems = myScheduleItems,
@@ -373,7 +423,6 @@ fun ConversationScreen(
         )
     }
 
-    // Event invite sender dialog — shows existing events with manual form option
     if (showEventInviteDialog) {
         EventInviteSenderDialog(
             existingEvents = myEvents,
@@ -408,7 +457,6 @@ fun MessageBubble(
         horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
-        // Avatar on the left for incoming messages
         if (!isCurrentUser) {
             val photoUrl = message.senderPhotoUrl.takeIf { it.isNotBlank() }
             if (photoUrl != null) {
@@ -482,7 +530,6 @@ fun MessageBubble(
             }
         }
 
-        // Avatar on the right for sent messages
         if (isCurrentUser) {
             Spacer(modifier = Modifier.width(8.dp))
             val photoUrl = currentUserPhotoUrl.takeIf { it.isNotBlank() }
