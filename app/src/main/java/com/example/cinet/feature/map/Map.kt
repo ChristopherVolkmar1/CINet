@@ -68,6 +68,7 @@ fun CampusMapScreen(
     var showRemoveRoute by remember { mutableStateOf(false) }
     var eta by remember { mutableStateOf("") }
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
+    var showBusSheet by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
@@ -194,7 +195,8 @@ fun CampusMapScreen(
             selectedLocation = selectedLocation,
             onDismissPopup = { selectedLocation = null },
             onModeSelected = requestRoute,
-            routeDurations = durations
+            routeDurations = durations,
+            onShowBusSchedule = { showBusSheet = true }
         )
 
         userLatLng?.let { user ->
@@ -206,6 +208,10 @@ fun CampusMapScreen(
             ) {
                 CenterSelf(user = user, cameraPositionState = cameraPositionState)
             }
+        }
+
+        if (showBusSheet) {
+            BusScheduleSheet(onDismiss = { showBusSheet = false })
         }
     }
 }
@@ -529,26 +535,17 @@ private fun markerHueFor(category: String): Float = when (category) {
     "ACADEMIC" -> BitmapDescriptorFactory.HUE_RED
     "COMMUTER_PARKING" -> BitmapDescriptorFactory.HUE_AZURE
     "DINING" -> BitmapDescriptorFactory.HUE_VIOLET
+    "TRANSIT" -> BitmapDescriptorFactory.HUE_ROSE
     else -> BitmapDescriptorFactory.HUE_VIOLET
 }
 
 // -------------------- Previews --------------------
 
 /** Design-time preview of the remove-route card on a dark background. */
-@Preview(showBackground = true, showSystemUi = true)
+/*@Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun DirectionsPopupPreview() {
     CINetTheme {
-        /*DirectionsPopup(
-            location = CampusLocation("Aliso Hall", "ACADEMIC"),
-            onDismiss = {},
-            onModeSelected = {},
-            routeDurations = RouteDurations(
-                driving = "1 mins",
-                walking = "2 mins",
-                biking = "3 mins"
-            )
-        )*/
         Box(
             modifier = Modifier.fillMaxSize().background(Color(0xFF1C1B1F)),
             contentAlignment = Alignment.BottomCenter
@@ -566,4 +563,4 @@ fun DirectionsPopupPreview() {
             )
         }
     }
-}
+}*/

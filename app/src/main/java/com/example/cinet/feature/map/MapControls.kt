@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.FilterList
@@ -54,7 +55,8 @@ fun MapControls(
     selectedLocation: CampusLocation?,
     onDismissPopup: () -> Unit,
     onModeSelected: (TravelMode) -> Unit,
-    routeDurations: RouteDurations
+    routeDurations: RouteDurations,
+    onShowBusSchedule: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -63,7 +65,7 @@ fun MapControls(
         verticalAlignment = Alignment.Top
     ) {
         FilterMenu(
-            categories = campusRegistry.keys,
+            categories = campusRegistry.keys + "transit",
             onFilterChange = onFilterChange
         )
 
@@ -81,7 +83,8 @@ fun MapControls(
             location = selectedLocation,
             onDismiss = onDismissPopup,
             onModeSelected = onModeSelected,
-            routeDurations = routeDurations
+            routeDurations = routeDurations,
+            onShowBusSchedule = onShowBusSchedule
         )
     }
 }
@@ -150,7 +153,8 @@ fun FilterMenu(
 private fun categoryIconMap(): Map<String, ImageVector> = mapOf(
     "academic" to Icons.Default.School,
     "commuter_parking" to Icons.Default.DirectionsCar,
-    "dining" to Icons.Default.Restaurant
+    "dining" to Icons.Default.Restaurant,
+    "transit" to Icons.Default.DirectionsBus
 )
 
 /** Title-cases each underscore-separated word (e.g. "commuter_parking" -> "Commuter Parking"). */

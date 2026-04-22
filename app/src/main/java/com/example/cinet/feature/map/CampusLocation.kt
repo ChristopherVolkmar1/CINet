@@ -17,6 +17,12 @@ data class CampusLocation(
         get() = LatLng(coordinates.latitude, coordinates.longitude)
 }
 
+val csuciTransitStop = CampusLocation(
+    name = "CSUCI Transit Stop",
+    category = "TRANSIT",
+    coordinates = GeoPoint(34.16546748540989, -119.04402834425024)
+)
+
 // -------------------- Location filtering --------------------
 
 /** Returns every location, alphabetically sorted, that matches the given category filter and search query. */
