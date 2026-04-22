@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.cinet.feature.map.CampusLocation
+import com.example.cinet.feature.map.csuciTransitStop
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -36,7 +37,7 @@ class CampusRegistry : ViewModel() {
                         }
                     }.awaitAll()
                 }
-                campusRegistry.value = results.toMap()
+                campusRegistry.value = results.toMap() + mapOf("transit" to listOf(csuciTransitStop))
             } catch (e: Exception) {
                 Log.e("Firestore", "Error fetching data: ${e.message}")
             }
