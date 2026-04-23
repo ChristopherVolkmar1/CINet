@@ -16,6 +16,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cinet.NewsArticle
+import com.example.cinet.NewsRepository
+import com.example.cinet.NewsSection
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.feature.map.*
@@ -36,6 +39,8 @@ fun HomeScreen(
     onSettingsClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onAddClassClick: () -> Unit = {},
+    onCIViewClick: (NewsArticle?) -> Unit = {},
+    onArticleClick: (NewsArticle) -> Unit = {},
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateToLocation: (String) -> Unit
 ) {
@@ -43,6 +48,10 @@ fun HomeScreen(
     val context = LocalContext.current
     var weatherInfo by remember { mutableStateOf(WeatherInfo("...", "Loading...")) }
     
+    // Real news data from repository
+    val newsRepository = remember { NewsRepository() }
+    var newsArticles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
+
     // State for the "Add/Edit" dialog (Now only for Upcoming Events)
     var showDialog by remember { mutableStateOf(false) }
     var editingIndex by remember { mutableStateOf<Int?>(null) }
@@ -79,6 +88,8 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         Log.d("HomeScreen", "LaunchedEffect triggered")
         weatherInfo = WeatherHelper.fetchCampusWeather(context)
+        // Fetch real news
+        newsArticles = newsRepository.fetchLatestNews()
     }
 
     if (showDialog) {
@@ -229,6 +240,15 @@ fun HomeScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // CI View Section
+        NewsSection(
+            articles = newsArticles,
+            onSeeAllClick = { onCIViewClick(null) },
+            onArticleClick = { onCIViewClick(it) }
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
