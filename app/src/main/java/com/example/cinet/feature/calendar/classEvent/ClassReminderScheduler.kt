@@ -1,84 +1,78 @@
 package com.example.cinet.feature.calendar.classEvent
 
+
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import com.example.cinet.app.MainActivity
 import com.example.cinet.core.notifications.AppNotification
 import com.example.cinet.core.notifications.NotificationHelper
 import com.example.cinet.core.notifications.NotificationType
-import com.example.cinet.feature.settings.AppSettings
-import java.time.*
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+
 
 object ClassReminderScheduler {
 
-    private val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
+
+    private val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
+
 
     fun scheduleNextReminder(
         context: Context,
         classItem: ClassItem,
-        minutesBefore: Long = AppSettings.classReminderMinutesBefore
+        minutesBefore: Int
     ) {
-        // Respect the per-class toggle
         if (!classItem.remindersEnabled) return
 
-        val nextClassDateTime = getNextClassDateTime(classItem) ?: return
-        val triggerTime = nextClassDateTime.minusMinutes(minutesBefore)
+
+        val nextDateTime = getNextClassDateTime(classItem) ?: return
+        val triggerTime = nextDateTime.minusMinutes(minutesBefore.toLong())
         val now = LocalDateTime.now()
 
-        val minutesUntilClass = Duration.between(now, nextClassDateTime).toMinutes()
 
-        // If the trigger time has already passed but class hasn't started yet,
-        // fire an immediate notification with a tap-to-map intent
-        if (triggerTime.isBefore(now)) {
-            if (nextClassDateTime.isAfter(now)) {
-                NotificationHelper.createChannels(context)
-
-                val tapIntent = Intent(context, MainActivity::class.java).apply {
-                    putExtra("open_map_for_location", classItem.location)
-                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                }
-                val contentPendingIntent = PendingIntent.getActivity(
-                    context,
-                    classItem.id.hashCode(),
-                    tapIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-
-                NotificationHelper.showNotification(
-                    context = context,
-                    notification = AppNotification(
-                        title = classItem.name,
-                        message = "Starts in $minutesUntilClass minutes at ${classItem.startTime}",
-                        type = NotificationType.REMINDER,
-                        timestamp = System.currentTimeMillis()
-                    ),
-                    contentIntent = contentPendingIntent
-                )
+        if (!triggerTime.isAfter(now)) {
+            val tapIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(MainActivity.EXTRA_OPEN_MAP_FOR_LOCATION, classItem.location)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
+
+
+            val contentPendingIntent = PendingIntent.getActivity(
+                context,
+                classItem.id.hashCode(),
+                tapIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+
+            NotificationHelper.showNotification(
+                context = context,
+                notification = AppNotification(
+                    title = classItem.name,
+                    message = "Starts in $minutesBefore minutes at ${classItem.startTime}",
+                    type = NotificationType.REMINDER,
+                    timestamp = System.currentTimeMillis()
+                ),
+                contentIntent = contentPendingIntent
+            )
             return
         }
 
-        val triggerMillis = triggerTime
-            .atZone(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
 
-        // Pass all ClassItem fields so ClassReminderReceiver can auto-reschedule
         val intent = Intent(context, ClassReminderReceiver::class.java).apply {
             putExtra("title", classItem.name)
             putExtra("message", "Starts in $minutesBefore minutes at ${classItem.startTime}")
-            putExtra("classId", classItem.id)
-            putExtra("className", classItem.name)
-            putStringArrayListExtra("meetingDays", ArrayList(classItem.meetingDays))
-            putExtra("startTime", classItem.startTime)
-            putExtra("endTime", classItem.endTime)
             putExtra("location", classItem.location)
         }
+
 
         val pendingIntent = PendingIntent.getBroadcast(
             context,
@@ -87,24 +81,37 @@ object ClassReminderScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+
+        val triggerMillis = triggerTime
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (alarmManager.canScheduleExactAlarms()) {
+
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
                 alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent
-                )
-            } else {
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent
+                    AlarmManager.RTC_WAKEUP,
+                    triggerMillis,
+                    pendingIntent
                 )
             }
-        } else {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent
-            )
+            else -> {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerMillis,
+                    pendingIntent
+                )
+            }
         }
+
+
+        Log.d("ClassReminderScheduler", "Scheduled reminder for ${classItem.name} at $triggerTime")
     }
+
 
     fun cancelReminder(context: Context, classItem: ClassItem) {
         val intent = Intent(context, ClassReminderReceiver::class.java)
@@ -114,41 +121,50 @@ object ClassReminderScheduler {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
     }
 
+
     private fun getNextClassDateTime(classItem: ClassItem): LocalDateTime? {
-        val startTime = try {
-            LocalTime.parse(classItem.startTime, timeFormatter)
-        } catch (e: Exception) {
-            return null
-        }
-
-        val validDays = classItem.meetingDays.mapNotNull { toDayOfWeek(it) }.toSet()
-        if (validDays.isEmpty()) return null
-
         val now = LocalDateTime.now()
+        val startTime = runCatching {
+            LocalTime.parse(classItem.startTime, timeFormatter)
+        }.getOrNull() ?: return null
 
-        for (offset in 0..7) {
+
+        val meetingDays = classItem.meetingDays.mapNotNull { mapDayOfWeek(it) }
+        if (meetingDays.isEmpty()) return null
+
+
+        for (offset in 0..13) {
             val date = LocalDate.now().plusDays(offset.toLong())
-            if (date.dayOfWeek in validDays) {
-                val candidate = LocalDateTime.of(date, startTime)
-                if (candidate.isAfter(now)) return candidate
+            if (meetingDays.contains(date.dayOfWeek)) {
+                val dateTime = LocalDateTime.of(date, startTime)
+                if (dateTime.isAfter(now)) {
+                    return dateTime
+                }
             }
         }
+
 
         return null
     }
 
-    private fun toDayOfWeek(day: String): DayOfWeek? = when (day) {
-        "Mon" -> DayOfWeek.MONDAY
-        "Tue" -> DayOfWeek.TUESDAY
-        "Wed" -> DayOfWeek.WEDNESDAY
-        "Thu" -> DayOfWeek.THURSDAY
-        "Fri" -> DayOfWeek.FRIDAY
-        "Sat" -> DayOfWeek.SATURDAY
-        "Sun" -> DayOfWeek.SUNDAY
-        else -> null
+
+    private fun mapDayOfWeek(day: String): DayOfWeek? {
+        return when (day.trim().lowercase()) {
+            "mon", "monday" -> DayOfWeek.MONDAY
+            "tue", "tues", "tuesday" -> DayOfWeek.TUESDAY
+            "wed", "wednesday" -> DayOfWeek.WEDNESDAY
+            "thu", "thurs", "thursday" -> DayOfWeek.THURSDAY
+            "fri", "friday" -> DayOfWeek.FRIDAY
+            "sat", "saturday" -> DayOfWeek.SATURDAY
+            "sun", "sunday" -> DayOfWeek.SUNDAY
+            else -> null
+        }
     }
 }
