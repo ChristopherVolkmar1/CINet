@@ -4,35 +4,68 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import com.example.cinet.data.remote.SettingsRepository
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
 object AppSettings {
     var isDarkMode by mutableStateOf(false)
     var notificationsEnabled by mutableStateOf(true)
-    var classReminderMinutesBefore: Long = 10L
-    var assignmentReminderMinutesBefore: Long = 60L
+    var classReminderMinutesBefore by mutableStateOf(10L)
+    var assignmentReminderMinutesBefore by mutableStateOf(60L)
+
+    private val repository = SettingsRepository()
+    private val scope = CoroutineScope(Dispatchers.Main)
+
+    /**
+     * Call this when the user logs in to fetch their saved settings from Firebase
+     */
+    fun loadFromFirebase() {
+        scope.launch {
+            val settings = repository.loadSettings()
+            settings?.let {
+                isDarkMode = it["isDarkMode"] as? Boolean ?: false
+                notificationsEnabled = it["notificationsEnabled"] as? Boolean ?: true
+                classReminderMinutesBefore = (it["classReminder"] as? Long) ?: 10L
+                assignmentReminderMinutesBefore = (it["assignmentReminder"] as? Long) ?: 60L
+            }
+        }
+    }
+
+    fun toggleDarkMode(enabled: Boolean) {
+        isDarkMode = enabled
+        scope.launch { repository.saveSetting("isDarkMode", enabled) }
+    }
+
+    fun toggleNotifications(enabled: Boolean) {
+        notificationsEnabled = enabled
+        scope.launch { repository.saveSetting("notificationsEnabled", enabled) }
+    }
 }
+
 // settings stuff - Zack
-/**
- * Settings screen allows users to manage their app preferences
- */
 @Composable
 fun SettingScreen(
     onBack: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    // Refresh settings when entering the screen to ensure they are up to date
+    LaunchedEffect(Unit) {
+        AppSettings.loadFromFirebase()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.Start
     ) {
-        // Header section
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -52,7 +85,6 @@ fun SettingScreen(
             )
         }
 
-        // dark mode on / off
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -60,7 +92,7 @@ fun SettingScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(text = "Night Mode", style = MaterialTheme.typography.bodyLarge)
                 Text(
                     text = "Applies a dark theme to the interface and campus map",
@@ -70,13 +102,12 @@ fun SettingScreen(
             }
             Switch(
                 checked = AppSettings.isDarkMode,
-                onCheckedChange = { AppSettings.isDarkMode = it }
+                onCheckedChange = { AppSettings.toggleDarkMode(it) }
             )
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-        // pop up noti toggle
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -84,7 +115,7 @@ fun SettingScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(text = "Notifications", style = MaterialTheme.typography.bodyLarge)
                 Text(
                     text = "Control whether the application sends alerts and updates",
@@ -94,13 +125,12 @@ fun SettingScreen(
             }
             Switch(
                 checked = AppSettings.notificationsEnabled,
-                onCheckedChange = { AppSettings.notificationsEnabled = it }
+                onCheckedChange = { AppSettings.toggleNotifications(it) }
             )
         }
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // sign out button
         OutlinedButton(
             onClick = onSignOut,
             modifier = Modifier.fillMaxWidth(),

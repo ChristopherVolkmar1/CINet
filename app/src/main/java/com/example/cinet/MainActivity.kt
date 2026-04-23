@@ -5,9 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.cinet.data.remote.FirestoreRepository
+import com.example.cinet.ui.AuthState
 import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.viewmodels.AuthViewModel
 import com.example.cinet.viewmodels.AuthViewModelFactory
@@ -32,9 +34,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         setContent {
+            val authState by authViewModel.authState.collectAsState()
+
+            // When the user is authenticated, load their persistent settings from Firebase
+            LaunchedEffect(authState) {
+                if (authState is AuthState.Authenticated || authState is AuthState.ProfileSetup) {
+                    AppSettings.loadFromFirebase()
+                }
+            }
+
             // App theme now watches the global dark mode setting
             CINetTheme(darkTheme = AppSettings.isDarkMode) {
-                val authState by authViewModel.authState.collectAsState()
                 NavigationHandler(
                     authState = authState,
                     onSignOut = { authViewModel.signOut() },
