@@ -1,7 +1,6 @@
 package com.example.cinet.data.remote
 
 import android.util.Log
-import com.example.cinet.data.FirestoreCollections
 import com.example.cinet.data.model.CampusEvent
 import com.example.cinet.data.model.UserProfile
 import com.google.firebase.Timestamp
@@ -77,6 +76,14 @@ class FirestoreRepository(
             .get()
             .await()
         return snapshot.toObject(UserProfile::class.java)
+    }
+
+    // Updates only the photoUrl field, called after a successful Storage upload
+    suspend fun updatePhotoUrl(uid: String, photoUrl: String) {
+        db.collection(FirestoreCollections.USERS)
+            .document(uid)
+            .set(mapOf("photoUrl" to photoUrl), SetOptions.merge())
+            .await()
     }
 
     suspend fun createEvent(

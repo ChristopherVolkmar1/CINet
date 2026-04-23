@@ -58,6 +58,7 @@ secrets {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("io.coil-kt:coil-compose:2.6.0")
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
