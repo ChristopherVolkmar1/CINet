@@ -1,5 +1,6 @@
 package com.example.cinet.navigation
 
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,6 +58,7 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 
+
 enum class Screen(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Social("Social", Icons.Default.People),
@@ -65,12 +67,15 @@ enum class Screen(val label: String, val icon: ImageVector) {
     Settings("Settings", Icons.Default.Settings)
 }
 
+
 @Composable
 fun NavigationHandler(
     authState: AuthState,
     onSignOut: () -> Unit,
     onRetry: () -> Unit,
-    onSaveProfile: (String, String, String) -> Unit
+    onSaveProfile: (String, String, String) -> Unit,
+    initialMapLocationName: String? = null,
+    onInitialMapLocationConsumed: () -> Unit = {}
 ) {
     when (authState) {
         is AuthState.Loading -> LoadingScreen()
@@ -84,30 +89,55 @@ fun NavigationHandler(
         )
         is AuthState.Authenticated -> MainScaffold(
             userProfile = authState.userProfile,
-            onSignOut = onSignOut
+            onSignOut = onSignOut,
+            initialMapLocationName = initialMapLocationName,
+            onInitialMapLocationConsumed = onInitialMapLocationConsumed
         )
     }
 }
 
+
 @Composable
 private fun MainScaffold(
     userProfile: UserProfile,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    initialMapLocationName: String? = null,
+    onInitialMapLocationConsumed: () -> Unit = {}
 ) {
     val authViewModel: AuthViewModel = viewModel()
     val calendarViewModel: CalendarViewModel = viewModel()
     val campusRegistryViewModel: CampusRegistry = viewModel()
     val campusRegistry by campusRegistryViewModel.campusRegistry.collectAsState()
     var preSelectedMapLocation by remember { mutableStateOf<CampusLocation?>(null) }
+    var currentScreen by remember { mutableStateOf(Screen.Home) }
+
+
+    LaunchedEffect(initialMapLocationName, campusRegistry) {
+        val locationName = initialMapLocationName ?: return@LaunchedEffect
+
+
+        val location = campusRegistry.values
+            .flatten()
+            .find { it.name.equals(locationName.trim(), ignoreCase = true) }
+
+
+        if (location != null) {
+            preSelectedMapLocation = location
+            currentScreen = Screen.Map
+            onInitialMapLocationConsumed()
+        }
+    }
+
 
     val repository = remember { SocialRepository() }
     val scope = rememberCoroutineScope()
 
-    // Sync global AppSettings object with the user profile from Firebase
+
     LaunchedEffect(userProfile) {
         AppSettings.isDarkMode = userProfile.isDarkMode
         AppSettings.notificationsEnabled = userProfile.notificationsEnabled
     }
+
 
     val calendarScheduleItems = remember(calendarViewModel.classItems, calendarViewModel.scheduleItems) {
         val cal = Calendar.getInstance()
@@ -121,24 +151,25 @@ private fun MainScaffold(
         calendarViewModel.classItems
             .filter { it.meetingDays.contains(dayName) }
             .forEach { list.add(it.name to "${it.startTime} - ${it.endTime} | ${it.location}") }
-        // Add assignments/tasks for today
         calendarViewModel.scheduleItems
             .filter { it.date == dateStr }
             .forEach { list.add(it.assignmentName to "Due: ${it.dueTime} (${it.className})") }
         list
     }
 
-    var currentScreen by remember { mutableStateOf(Screen.Home) }
+
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
     var activeConversation by remember { mutableStateOf<Conversation?>(null) }
 
-    // tracks news list and single article
+
     var showCIView by remember { mutableStateOf(false) }
     var selectedNewsArticle by remember { mutableStateOf<NewsArticle?>(null) }
 
+
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
+
 
     fun loadItems(key: String): List<Pair<String, String>> {
         val saved = sharedPrefs.getString(key, null) ?: return emptyList()
@@ -148,30 +179,30 @@ private fun MainScaffold(
         }
     }
 
+
     fun saveItems(key: String, items: List<Pair<String, String>>) {
         val stringified = items.joinToString("||") { "${it.first}|${it.second}" }
         sharedPrefs.edit().putString(key, stringified).apply()
     }
 
+
     var manualUpcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
-    // Use the HomeUpcomingEventsBuilder function to combine manual and campus events
+
     val displayUpcomingEventsItems = remember(manualUpcomingEventsItems, calendarViewModel.campusEventItems) {
         buildHomeUpcomingEventItems(context, manualUpcomingEventsItems, calendarViewModel.campusEventItems)
     }
 
-    // true if news is open
+
     val isShowingNews = showCIView || selectedNewsArticle != null
 
-    // handles android back button
+
     BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null || isShowingNews) {
         when {
-            // close article, go back to list
             selectedNewsArticle != null -> {
                 selectedNewsArticle = null
                 showCIView = true
             }
-            // close list, go home
             showCIView -> showCIView = false
             activeConversation != null -> activeConversation = null
             selectedProfile != null -> selectedProfile = null
@@ -179,10 +210,10 @@ private fun MainScaffold(
         }
     }
 
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            // hide bar when reading news
             if (!isShowingNews) {
                 NavigationBar {
                     Screen.entries.forEach { screen ->
@@ -190,7 +221,6 @@ private fun MainScaffold(
                             selected = currentScreen == screen,
                             onClick = {
                                 currentScreen = screen
-                                // clear news when switching tabs
                                 showCIView = false
                                 selectedNewsArticle = null
                                 if (screen != Screen.Social) {
@@ -228,15 +258,13 @@ private fun MainScaffold(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // full screen for news
                 .padding(if (isShowingNews) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
         ) {
             if (isShowingNews) {
                 CIViewScreen(
                     selectedArticleUrl = selectedNewsArticle?.url,
                     onArticleClick = { selectedNewsArticle = it },
-                    onBack = { 
-                        // back button on screen logic
+                    onBack = {
                         if (selectedNewsArticle != null) {
                             selectedNewsArticle = null
                             showCIView = true
@@ -265,7 +293,6 @@ private fun MainScaffold(
                             currentScreen = Screen.Calendar
                         },
                         onCIViewClick = { article ->
-                            // show list or article from home
                             if (article != null) {
                                 selectedNewsArticle = article
                             } else {
@@ -276,7 +303,9 @@ private fun MainScaffold(
                             selectedNewsArticle = article
                         },
                         onNavigateToLocation = { locationName ->
-                            val location = campusRegistry["academic"]?.find { it.name == locationName }
+                            val location = campusRegistry.values
+                                .flatten()
+                                .find { it.name.equals(locationName.trim(), ignoreCase = true) }
                             preSelectedMapLocation = location
                             currentScreen = Screen.Map
                         }
