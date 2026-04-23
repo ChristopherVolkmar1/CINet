@@ -1,7 +1,6 @@
 package com.example.cinet.data.remote
 
 import android.util.Log
-import com.example.cinet.data.FirestoreCollections
 import com.example.cinet.data.model.CampusEvent
 import com.example.cinet.data.model.UserProfile
 import com.google.firebase.Timestamp
@@ -34,8 +33,20 @@ class FirestoreRepository(
                 docRef.update("createdAt", FieldValue.serverTimestamp()).await()
             }
 
-            val profile = snapshot.toObject(UserProfile::class.java)
+            var profile = snapshot.toObject(UserProfile::class.java)
                 ?: return Result.failure(Exception("Failed to parse UserProfile"))
+
+            // Load persistent settings from the app_settings collection
+            val settingsSnapshot = db.collection(FirestoreCollections.APP_SETTINGS)
+                .document(user.uid)
+                .get()
+                .await()
+
+            if (settingsSnapshot.exists()) {
+                val isDarkMode = settingsSnapshot.getBoolean("isDarkMode") ?: profile.isDarkMode
+                val notificationsEnabled = settingsSnapshot.getBoolean("notificationsEnabled") ?: profile.notificationsEnabled
+                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled)
+            }
 
             Result.success(profile)
         } catch (e: Exception) {
@@ -60,23 +71,46 @@ class FirestoreRepository(
 
             docRef.set(profileUpdate, SetOptions.merge()).await()
 
-            val snapshot = docRef.get().await()
-            val profile = snapshot.toObject(UserProfile::class.java)
-                ?: return Result.failure(Exception("Failed to parse UserProfile"))
+            // After saving profile, reload the full profile including settings
+            createOrLoadUserProfile()
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
-            Result.success(profile)
+    suspend fun updateUserSettings(
+        isDarkMode: Boolean,
+        notificationsEnabled: Boolean
+    ): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: error("No signed-in user.")
+            // Write to the app_settings collection as per Firebase rules
+            db.collection(FirestoreCollections.APP_SETTINGS)
+                .document(uid)
+                .set(
+                    mapOf(
+                        "isDarkMode" to isDarkMode,
+                        "notificationsEnabled" to notificationsEnabled
+                    ),
+                    SetOptions.merge()
+                )
+                .await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     suspend fun loadCurrentUserProfile(): UserProfile? {
-        val uid = auth.currentUser?.uid ?: error("No signed-in user.")
-        val snapshot = db.collection(FirestoreCollections.USERS)
+        val uid = auth.currentUser?.uid ?: return null
+        return createOrLoadUserProfile().getOrNull()
+    }
+
+    suspend fun updatePhotoUrl(uid: String, photoUrl: String) {
+        db.collection(FirestoreCollections.USERS)
             .document(uid)
-            .get()
+            .set(mapOf("photoUrl" to photoUrl), SetOptions.merge())
             .await()
-        return snapshot.toObject(UserProfile::class.java)
     }
 
     suspend fun createEvent(
