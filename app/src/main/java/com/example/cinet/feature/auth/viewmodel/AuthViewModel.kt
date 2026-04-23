@@ -58,6 +58,39 @@ class AuthViewModel(
         }
     }
 
+    /**
+     * Updates user settings in Firestore and local state.
+     * Local state is updated immediately (optimistic update) for responsiveness.
+     */
+    fun updateSettings(isDarkMode: Boolean, notificationsEnabled: Boolean) {
+        val currentState = _authState.value
+        
+        // Optimistic update of local state
+        if (currentState is AuthState.Authenticated) {
+            _authState.value = AuthState.Authenticated(
+                currentState.userProfile.copy(
+                    isDarkMode = isDarkMode,
+                    notificationsEnabled = notificationsEnabled
+                )
+            )
+        } else if (currentState is AuthState.ProfileSetup) {
+            _authState.value = AuthState.ProfileSetup(
+                currentState.userProfile.copy(
+                    isDarkMode = isDarkMode,
+                    notificationsEnabled = notificationsEnabled
+                )
+            )
+        }
+
+        viewModelScope.launch {
+            repository.updateUserSettings(isDarkMode, notificationsEnabled)
+                .onFailure { e ->
+                    android.util.Log.e(TAG, "Failed to update settings in Firestore: ${e.message}")
+                    // Rollback could be implemented here if necessary
+                }
+        }
+    }
+
     // Routes to ProfileSetup if nickname is blank, otherwise Authenticated
     private fun resolveState(profile: UserProfile) {
         _authState.value = if (profile.nickname.isBlank()) {
