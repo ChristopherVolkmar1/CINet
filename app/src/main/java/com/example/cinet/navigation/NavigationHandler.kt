@@ -39,7 +39,9 @@ fun NavigationHandler(
     authState: AuthState,
     onSignOut: () -> Unit,
     onRetry: () -> Unit,
-    onSaveProfile: (String, String, String) -> Unit
+    onSaveProfile: (String, String, String) -> Unit,
+    initialMapLocationName: String? = null,
+    onInitialMapLocationConsumed: () -> Unit = {}
 ) {
     when (authState) {
         is AuthState.Loading -> LoadingScreen()
@@ -53,7 +55,9 @@ fun NavigationHandler(
         )
         is AuthState.Authenticated -> MainScaffold(
             userProfile = authState.userProfile,
-            onSignOut = onSignOut
+            onSignOut = onSignOut,
+            initialMapLocationName = initialMapLocationName,
+            onInitialMapLocationConsumed = onInitialMapLocationConsumed
         )
     }
 }
@@ -62,6 +66,8 @@ fun NavigationHandler(
 private fun MainScaffold(
     userProfile: UserProfile,
     onSignOut: () -> Unit,
+    initialMapLocationName: String? = null,
+    onInitialMapLocationConsumed: () -> Unit = {},
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val calendarViewModel: CalendarViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
@@ -90,6 +96,18 @@ private fun MainScaffold(
     }
 
     var currentScreen by remember { mutableStateOf(Screen.Home) }
+
+    LaunchedEffect(initialMapLocationName, campusRegistry) {
+        val locationName = initialMapLocationName ?: return@LaunchedEffect
+
+        val location = campusRegistry["academic"]?.find { it.name == locationName }
+        if (location != null) {
+            preSelectedMapLocation = location
+            currentScreen = Screen.Map
+            onInitialMapLocationConsumed()
+        }
+    }
+
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var showProfileEdit by remember { mutableStateOf(false) }
 
