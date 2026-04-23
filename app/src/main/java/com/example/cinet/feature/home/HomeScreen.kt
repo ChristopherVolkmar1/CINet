@@ -27,7 +27,8 @@ import java.util.Calendar
 fun HomeScreen(
     nickname: String,
     scheduleItems: List<Pair<String, String>>,
-    upcomingEventsItems: List<Pair<String, String>>,
+    manualUpcomingEventsItems: List<Pair<String, String>>,
+    displayUpcomingEventsItems: List<HomeUpcomingEventItem>,
     onUpdateSchedule: (List<Pair<String, String>>) -> Unit,
     onUpdateEvents: (List<Pair<String, String>>) -> Unit,
     modifier: Modifier = Modifier,
@@ -146,7 +147,7 @@ fun HomeScreen(
                         val fullTime = "$timeOrDateField $amPmSelection"
                         val newItem = nameField to "$fullTime | ${locationField?.name}"
                         
-                        val newList = upcomingEventsItems.toMutableList()
+                        val newList = manualUpcomingEventsItems.toMutableList()
                         if (editingIndex != null) {
                             newList[editingIndex!!] = newItem
                         } else {
@@ -168,7 +169,7 @@ fun HomeScreen(
                 Row {
                     if (editingIndex != null) {
                         TextButton(onClick = {
-                            val newList = upcomingEventsItems.toMutableList()
+                            val newList = manualUpcomingEventsItems.toMutableList()
                             newList.removeAt(editingIndex!!)
                             onUpdateEvents(newList)
                             showDialog = false
@@ -246,7 +247,7 @@ fun HomeScreen(
         // Upcoming Events Section
         InfoSection(
             title = "Upcoming Events",
-            items = upcomingEventsItems,
+            items = displayUpcomingEventsItems.map { it.title to it.description },
             onAddClick = {
                 editingIndex = null
                 nameField = ""
@@ -255,16 +256,29 @@ fun HomeScreen(
                 showDialog = true
             },
             onItemClick = { index ->
-                editingIndex = index
-                val item = upcomingEventsItems[index]
-                nameField = item.first
-                // Simple parsing for demo purposes
-                val parts = item.second.split(" | ")
-                val timeParts = parts[0].split(" ")
-                timeOrDateField = if (timeParts.isNotEmpty()) timeParts[0] else ""
-                amPmSelection = if (timeParts.size > 1) timeParts[1] else "AM"
-                locationField = academic.find { it.name == if (parts.size > 1) parts[1] else "" }
-                showDialog = true
+                val selectedItem = displayUpcomingEventsItems[index]
+                if (selectedItem.isCampusEvent) {
+                    onCalendarClick()
+                } else {
+                    val manualIndex = manualUpcomingEventsItems.indexOfFirst {
+                        it.first == selectedItem.title && it.second == selectedItem.description
+                    }
+
+                    if (manualIndex == -1) {
+                        onCalendarClick()
+                    } else {
+                        editingIndex = manualIndex
+                        val item = manualUpcomingEventsItems[manualIndex]
+                        nameField = item.first
+                        // Simple parsing for demo purposes
+                        val parts = item.second.split(" | ")
+                        val timeParts = parts[0].split(" ")
+                        timeOrDateField = if (timeParts.isNotEmpty()) timeParts[0] else ""
+                        amPmSelection = if (timeParts.size > 1) timeParts[1] else "AM"
+                        locationField = academic.find { it.name == if (parts.size > 1) parts[1] else "" }
+                        showDialog = true
+                    }
+                }
             },
             onNavigateToLocation = onNavigateToLocation
         )
@@ -278,7 +292,8 @@ fun HomeScreenPreview() {
         HomeScreen(
             nickname = "User",
             scheduleItems = emptyList(),
-            upcomingEventsItems = emptyList(),
+            manualUpcomingEventsItems = emptyList(),
+            displayUpcomingEventsItems = emptyList(),
             onUpdateSchedule = {},
             onUpdateEvents = {},
             onNavigateToLocation = { _ -> }
