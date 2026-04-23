@@ -1,6 +1,8 @@
 package com.example.cinet
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -26,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.data.model.Conversation
@@ -99,6 +102,10 @@ private fun MainScaffold(
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
     var activeConversation by remember { mutableStateOf<Conversation?>(null) }
+    
+    // tracks news list and single article
+    var showCIView by remember { mutableStateOf(false) }
+    var selectedNewsArticle by remember { mutableStateOf<NewsArticle?>(null) }
 
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
@@ -118,8 +125,19 @@ private fun MainScaffold(
 
     var upcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
-    BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null) {
+    // true if news is open
+    val isShowingNews = showCIView || selectedNewsArticle != null
+
+    // handles android back button
+    BackHandler(enabled = currentScreen != Screen.Home || selectedProfile != null || activeConversation != null || isShowingNews) {
         when {
+            // close article, go back to list
+            selectedNewsArticle != null -> {
+                selectedNewsArticle = null
+                showCIView = true
+            }
+            // close list, go home
+            showCIView -> showCIView = false
             activeConversation != null -> activeConversation = null
             selectedProfile != null -> selectedProfile = null
             else -> currentScreen = Screen.Home
@@ -129,39 +147,45 @@ private fun MainScaffold(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            NavigationBar {
-                Screen.entries.forEach { screen ->
-                    NavigationBarItem(
-                        selected = currentScreen == screen,
-                        onClick = {
-                            currentScreen = screen
-                            if (screen != Screen.Social) {
-                                selectedProfile = null
-                                activeConversation = null
-                            }
-                            if (screen != Screen.Calendar) {
-                                showAddClassOnCalendar = false
-                            }
-                        },
-                        label = {
-                            Text(
-                                text = screen.label,
-                                maxLines = 1,
-                                softWrap = false,
-                                style = MaterialTheme.typography.labelSmall
+            // hide bar when reading news
+            if (!isShowingNews) {
+                NavigationBar {
+                    Screen.entries.forEach { screen ->
+                        NavigationBarItem(
+                            selected = currentScreen == screen,
+                            onClick = {
+                                currentScreen = screen
+                                // clear news when switching tabs
+                                showCIView = false
+                                selectedNewsArticle = null
+                                if (screen != Screen.Social) {
+                                    selectedProfile = null
+                                    activeConversation = null
+                                }
+                                if (screen != Screen.Calendar) {
+                                    showAddClassOnCalendar = false
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = screen.label,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = screen.icon,
+                                    contentDescription = screen.label
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = screen.icon,
-                                contentDescription = screen.label
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    )
+                    }
                 }
             }
         }
@@ -169,64 +193,92 @@ private fun MainScaffold(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                // full screen for news
+                .padding(if (isShowingNews) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
         ) {
-            when (currentScreen) {
-                Screen.Home -> HomeScreen(
-                    nickname = userProfile.nickname,
-                    scheduleItems = calendarScheduleItems,
-                    upcomingEventsItems = upcomingEventsItems,
-                    onUpdateSchedule = { },
-                    onUpdateEvents = {
-                        upcomingEventsItems = it
-                        saveItems("event_items", it)
-                    },
-                    onMapClick = { currentScreen = Screen.Map },
-                    onSettingsClick = { currentScreen = Screen.Settings },
-                    onCalendarClick = { currentScreen = Screen.Calendar },
-                    onAddClassClick = {
-                        showAddClassOnCalendar = true
-                        currentScreen = Screen.Calendar
-                    },
-                    onNavigateToLocation = { locationName ->
-                        val location = campusRegistry["academic"]?.find { it.name == locationName }
-                        preSelectedMapLocation = location
-                        currentScreen = Screen.Map
+            if (isShowingNews) {
+                CIViewScreen(
+                    selectedArticleUrl = selectedNewsArticle?.url,
+                    onArticleClick = { selectedNewsArticle = it },
+                    onBack = { 
+                        // back button on screen logic
+                        if (selectedNewsArticle != null) {
+                            selectedNewsArticle = null
+                            showCIView = true
+                        } else {
+                            showCIView = false
+                        }
                     }
                 )
-                Screen.Social -> when {
-                    activeConversation != null -> ConversationScreen(
-                        conversation = activeConversation!!,
-                        onBack = { activeConversation = null }
+            } else {
+                when (currentScreen) {
+                    Screen.Home -> HomeScreen(
+                        nickname = userProfile.nickname,
+                        scheduleItems = calendarScheduleItems,
+                        upcomingEventsItems = upcomingEventsItems,
+                        onUpdateSchedule = { },
+                        onUpdateEvents = {
+                            upcomingEventsItems = it
+                            saveItems("event_items", it)
+                        },
+                        onMapClick = { currentScreen = Screen.Map },
+                        onSettingsClick = { currentScreen = Screen.Settings },
+                        onCalendarClick = { currentScreen = Screen.Calendar },
+                        onAddClassClick = {
+                            showAddClassOnCalendar = true
+                            currentScreen = Screen.Calendar
+                        },
+                        onCIViewClick = { article ->
+                            // show list or article from home
+                            if (article != null) {
+                                selectedNewsArticle = article
+                            } else {
+                                showCIView = true
+                            }
+                        },
+                        onArticleClick = { article ->
+                            selectedNewsArticle = article
+                        },
+                        onNavigateToLocation = { locationName ->
+                            val location = campusRegistry["academic"]?.find { it.name == locationName }
+                            preSelectedMapLocation = location
+                            currentScreen = Screen.Map
+                        }
                     )
-                    selectedProfile != null -> ProfileScreen(
-                        user = selectedProfile!!,
-                        currentUserProfile = userProfile,
-                        onOpenConversation = { activeConversation = it },
-                        onBack = { selectedProfile = null }
+                    Screen.Social -> when {
+                        activeConversation != null -> ConversationScreen(
+                            conversation = activeConversation!!,
+                            onBack = { activeConversation = null }
+                        )
+                        selectedProfile != null -> ProfileScreen(
+                            user = selectedProfile!!,
+                            currentUserProfile = userProfile,
+                            onOpenConversation = { activeConversation = it },
+                            onBack = { selectedProfile = null }
+                        )
+                        else -> SocialScreen(
+                            onOpenProfile = { selectedProfile = it }
+                        )
+                    }
+                    Screen.Map -> CampusMapScreen(
+                        onBack = { currentScreen = Screen.Home },
+                        preSelectedLocation = preSelectedMapLocation,
+                        onFinishedLoading = {
+                            preSelectedMapLocation = null
+                        }
                     )
-                    else -> SocialScreen(
-                        onOpenProfile = { selectedProfile = it }
+                    Screen.Calendar -> CalendarScreen(
+                        onBack = {
+                            currentScreen = Screen.Home
+                            showAddClassOnCalendar = false
+                        },
+                        initialShowClassDialog = showAddClassOnCalendar
+                    )
+                    Screen.Settings -> SettingScreen(
+                        onBack = { currentScreen = Screen.Home },
+                        onSignOut = onSignOut
                     )
                 }
-                Screen.Map -> CampusMapScreen(
-                    onBack = { currentScreen = Screen.Home },
-                    preSelectedLocation = preSelectedMapLocation,
-                    onFinishedLoading = {
-                        preSelectedMapLocation = null
-                    }
-                )
-                Screen.Calendar -> CalendarScreen(
-                    onBack = {
-                        currentScreen = Screen.Home
-                        showAddClassOnCalendar = false
-                    },
-                    initialShowClassDialog = showAddClassOnCalendar
-                )
-                Screen.Settings -> SettingScreen(
-                    onBack = { currentScreen = Screen.Home },
-                    onSignOut = onSignOut
-                )
             }
         }
     }
