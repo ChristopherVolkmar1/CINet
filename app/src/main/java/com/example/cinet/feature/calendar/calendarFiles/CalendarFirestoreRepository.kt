@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.calendar.event.EventItem
+import com.example.cinet.feature.calendar.event.EventSource
 import com.example.cinet.feature.calendar.study.StudySession
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -257,7 +258,7 @@ class CalendarFirestoreRepository(
             val name = doc.getString("name") ?: return@mapNotNull null
             val time = doc.getString("time") ?: return@mapNotNull null
             val location = doc.getString("location") ?: ""
-            EventItem(id = doc.id, date = date, name = name, time = time, location = location)
+            EventItem(id = doc.id, date = date, name = name, time = time, location = location, source = EventSource.USER)
         }
     }
 
