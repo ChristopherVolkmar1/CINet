@@ -20,7 +20,7 @@ import java.util.Calendar
 @Composable
 fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condition: String = "Partly Cloudy") {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val isNight = hour < 6 || hour >= 18 // Simple rule: 6 PM to 6 AM is night
+    val isNight = hour < 6 || hour >= 19 // Simple rule: 7 PM to 6 AM is night
 
     // Adjust condition text if it's night and sunny
     val displayCondition = if (isNight && (condition.contains("Sunny", ignoreCase = true) || condition.contains("Clear", ignoreCase = true))) {
@@ -78,6 +78,7 @@ fun WeatherDisplay(modifier: Modifier = Modifier, temp: String = "72°F", condit
 @Composable
 fun InfoSection(
     title: String,
+    subtitle: String? = null,
     items: List<Pair<String, String>>,
     onAddClick: (() -> Unit)? = null,
     onItemClick: ((Int) -> Unit)? = null,
@@ -95,12 +96,21 @@ fun InfoSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSecondary
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.onSecondary
+                    )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.7f)
+                        )
+                    }
+                }
                 if (onAddClick != null) {
                     IconButton(onClick = onAddClick) {
                         Icon(

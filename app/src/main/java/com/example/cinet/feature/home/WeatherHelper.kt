@@ -24,11 +24,10 @@ object WeatherHelper {
                 val url = "https://weather.googleapis.com/v1/currentConditions:lookup?key=$apiKey&location.latitude=34.162&location.longitude=-119.043&unitsSystem=IMPERIAL"
                 val response = URL(url).readText()
                 
-                // Extracting temperature
+
                 val tempVal = response.substringAfter("\"degrees\":").substringBefore(",").toDouble().toInt()
                 
-                // Extracting condition (rough parsing based on likely Google API response)
-                // Note: Real parsing should use a JSON library like GSON or Kotlinx.serialization
+
                 val condition = if (response.contains("\"conditionText\":")) {
                     response.substringAfter("\"conditionText\":\"").substringBefore("\"")
                 } else {
