@@ -21,6 +21,7 @@ import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.feature.map.*
 import com.example.cinet.core.designsystem.InfoSection
 import com.example.cinet.core.designsystem.WeatherDisplay
+import java.util.Calendar
 
 @Composable
 fun HomeScreen(
@@ -57,6 +58,21 @@ fun HomeScreen(
     }
 
     var amPmSelection by remember { mutableStateOf("AM") } // AM/PM choice
+
+    // Support Hours logic
+    val supportHoursSubtitle = remember {
+        val calendar = Calendar.getInstance()
+        val info = when (calendar.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY, Calendar.THURSDAY -> 
+                "11 AM - 7 PM | In Person & Online"
+            Calendar.FRIDAY -> 
+                "10 AM - 2 PM | In Person & Online"
+            Calendar.SUNDAY -> 
+                "5 PM - 7 PM | Online Only"
+            else -> "Closed | No Support Today"
+        }
+        "LRC Availability: $info"
+    }
 
     // Call the weather fetching logic on launch
     LaunchedEffect(Unit) {
@@ -124,6 +140,7 @@ fun HomeScreen(
                 }
             },
             confirmButton = {
+                @Suppress("DEPRECATION")
                 Button(onClick = {
                     if (nameField.isNotBlank() && timeOrDateField.isNotBlank() && locationField != null) {
                         val fullTime = "$timeOrDateField $amPmSelection"
@@ -217,6 +234,7 @@ fun HomeScreen(
         // Today's Schedule Section (Sourced from Calendar)
         InfoSection(
             title = "Today's Schedule",
+            subtitle = supportHoursSubtitle,
             items = scheduleItems,
             onAddClick = onAddClassClick,
             onItemClick = { _ -> onCalendarClick() }, // Open calendar on item click
