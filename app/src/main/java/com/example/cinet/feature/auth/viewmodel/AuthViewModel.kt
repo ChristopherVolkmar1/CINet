@@ -7,6 +7,8 @@ import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.feature.auth.AuthState
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,12 +33,12 @@ class AuthViewModel(
         observeAuthState()
     }
 
-    // signs the current user out of firebase
+    // Signs the current user out of Firebase
     fun signOut() {
         auth.signOut()
     }
 
-    // re-attempts loading the user's profile after a previous failure
+    // Re-attempts loading the user's profile after a previous failure
     fun retryProfileLoad() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -46,7 +48,7 @@ class AuthViewModel(
         }
     }
 
-    // Saves the user's profile details to Firestore and updates state.
+    // Saves the user's profile details to Firestore and updates state
     fun saveProfile(nickname: String, major: String, pronouns: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -56,7 +58,7 @@ class AuthViewModel(
         }
     }
 
-    // Routes to ProfileSetup if nickname is blank, otherwise Authenticated.
+    // Routes to ProfileSetup if nickname is blank, otherwise Authenticated
     private fun resolveState(profile: UserProfile) {
         _authState.value = if (profile.nickname.isBlank()) {
             AuthState.ProfileSetup(profile)
@@ -65,13 +67,31 @@ class AuthViewModel(
         }
     }
 
-    // Listens for Firebase auth changes and loads the profile on sign-in.
+    /**
+     * Proactively fetches the current FCM token and saves it to the user's
+     * Firestore document. Called on every sign-in so the token is always
+     * up to date even if onNewToken hasn't fired since the last install.
+     */
+    private fun saveFcmToken(uid: String) {
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(uid)
+                .update("fcmToken", token)
+                .addOnFailureListener { e ->
+                    android.util.Log.e(TAG, "Failed to save FCM token: ${e.message}")
+                }
+        }
+    }
+
+    // Listens for Firebase auth changes and loads the profile on sign-in
     private fun observeAuthState() {
         authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
             if (user == null) {
                 _authState.value = AuthState.Unauthenticated
             } else {
+                saveFcmToken(user.uid)
                 viewModelScope.launch {
                     _authState.value = AuthState.Loading
                     repository.createOrLoadUserProfile()
@@ -83,18 +103,17 @@ class AuthViewModel(
         auth.addAuthStateListener(authStateListener!!)
     }
 
-    // Removes the auth listener when the ViewModel is destroyed to prevent leaks.
+    // Removes the auth listener when the ViewModel is destroyed to prevent leaks
     override fun onCleared() {
         super.onCleared()
         authStateListener?.let { auth.removeAuthStateListener(it) }
     }
 }
 
-// Factory for creating AuthViewModel with its repository dependency.
+// Factory for creating AuthViewModel with its repository dependency
 class AuthViewModelFactory(
     private val repository: FirestoreRepository
 ) : ViewModelProvider.Factory {
-    // Instantiates the AuthViewModel requested by ViewModelProvider.
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
         AuthViewModel(repository) as T

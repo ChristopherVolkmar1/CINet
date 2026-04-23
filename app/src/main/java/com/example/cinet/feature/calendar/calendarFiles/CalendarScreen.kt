@@ -12,16 +12,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
-import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.settings.*
+import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.calendar.schedule.*
 import com.example.cinet.feature.calendar.assignment.*
-import com.example.cinet.feature.calendar.classEvent.*
+import com.example.cinet.feature.calendar.classEvent.ClassDialog
+import com.example.cinet.feature.calendar.classEvent.ClassItem
+import com.example.cinet.feature.calendar.classEvent.ClassReminderScheduler
+import com.example.cinet.feature.calendar.classEvent.ClassesSection
 import com.example.cinet.feature.calendar.event.*
 import com.example.cinet.feature.calendar.study.*
 import com.example.cinet.core.time.*
-import com.example.cinet.data.model.CampusRegistry
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +63,6 @@ fun CalendarScreen(
     var selectedMeetingDays by remember { mutableStateOf(setOf<String>()) }
     val weekdayOptions = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
-    var locationField by remember { mutableStateOf<CampusLocation?>(null) }
     var showStudySessionDialog by remember { mutableStateOf(false) }
     var editingSession by remember { mutableStateOf<StudySession?>(null) }
     var sessionClassName by remember { mutableStateOf("") }
@@ -75,9 +75,6 @@ fun CalendarScreen(
     var eventName by remember { mutableStateOf("") }
     var eventTime by remember { mutableStateOf("") }
     var eventLocation by remember { mutableStateOf<CampusLocation?>(null) }
-
-    val campusRegistryViewModel: CampusRegistry = viewModel()
-    val academic by campusRegistryViewModel.academic.collectAsState(initial = emptyList())
 
     fun resetAssignmentForm() {
         editingAssignment = null
@@ -93,8 +90,6 @@ fun CalendarScreen(
         classStartTime = ""
         classEndTime = ""
         selectedMeetingDays = emptySet()
-        locationField = null
-        editingClass = null; className = ""; classStartTime = ""; classEndTime = ""; selectedMeetingDays = emptySet()
     }
 
     fun resetStudySessionForm() {
@@ -112,9 +107,8 @@ fun CalendarScreen(
         eventLocation = null
     }
 
-    fun formatDate(date: LocalDate): String {
-        return "%04d-%02d-%02d".format(date.year, date.monthValue, date.dayOfMonth)
-    }
+    fun formatDate(date: LocalDate): String =
+        "%04d-%02d-%02d".format(date.year, date.monthValue, date.dayOfMonth)
 
     Column(
         modifier = Modifier
@@ -194,7 +188,7 @@ fun CalendarScreen(
                 sessionClassName = session.className
                 sessionTopic = session.topic
                 sessionStartTime = session.startTime
-                sessionLocation = academic.find { it.name == session.location }
+                sessionLocation = null // location is CampusLocation?, restored via search bar
                 showStudySessionDialog = true
             }
         )
@@ -206,7 +200,7 @@ fun CalendarScreen(
                 editingEvent = event
                 eventName = event.name
                 eventTime = event.time
-                eventLocation = academic.find { it.name == event.location }
+                eventLocation = null // location is CampusLocation?, restored via search bar
                 showEventDialog = true
             }
         )
@@ -233,14 +227,11 @@ fun CalendarScreen(
             },
             onConfirm = {
                 val selectedClass = classItems.firstOrNull { it.id == selectedClassId }
-
                 if (selectedClass != null && assignmentName.isNotBlank() && dueTime.isNotBlank()) {
                     val item = editingAssignment
                     val dateStr = formatDate(selectedDate)
-
                     if (item == null) {
                         viewModel.addScheduleItem(selectedClass, assignmentName, dueTime)
-
                         AssignmentReminderScheduler.scheduleReminder(
                             context = context,
                             date = dateStr,
@@ -258,9 +249,7 @@ fun CalendarScreen(
                             assignmentName = item.assignmentName,
                             dueTime = item.dueTime
                         )
-
                         viewModel.updateScheduleItem(item.id, selectedClass, assignmentName, dueTime)
-
                         AssignmentReminderScheduler.scheduleReminder(
                             context = context,
                             date = dateStr,
@@ -271,7 +260,6 @@ fun CalendarScreen(
                             minutesBefore = AppSettings.assignmentReminderMinutesBefore
                         )
                     }
-
                     showAssignmentDialog = false
                     resetAssignmentForm()
                 }
@@ -279,7 +267,6 @@ fun CalendarScreen(
             onDelete = if (editingAssignment != null) {
                 {
                     val item = editingAssignment!!
-
                     AssignmentReminderScheduler.cancelReminder(
                         context = context,
                         date = item.date,
@@ -287,7 +274,6 @@ fun CalendarScreen(
                         assignmentName = item.assignmentName,
                         dueTime = item.dueTime
                     )
-
                     viewModel.deleteScheduleItem(item.id)
                     showAssignmentDialog = false
                     resetAssignmentForm()
@@ -307,20 +293,16 @@ fun CalendarScreen(
             onMeetingDaysChange = { selectedMeetingDays = it },
             weekdayOptions = weekdayOptions,
             onPickStartTime = {
-                openTimePicker(context) { picked ->
-                    classStartTime = picked
-                }
+                openTimePicker(context) { picked -> classStartTime = picked }
             },
             onPickEndTime = {
-                openTimePicker(context) { picked ->
-                    classEndTime = picked
-                }
+                openTimePicker(context) { picked -> classEndTime = picked }
             },
             onDismiss = {
                 showClassDialog = false
                 resetClassForm()
             },
-            onConfirm = { location ->
+            onConfirm = { campusLocation, remindersEnabled ->
                 if (
                     className.isNotBlank() &&
                     selectedMeetingDays.isNotEmpty() &&
@@ -329,6 +311,7 @@ fun CalendarScreen(
                 ) {
                     val classToEdit = editingClass
                     val meetingDaysList = selectedMeetingDays.toList()
+                    val locationName = campusLocation?.name ?: ""
 
                     if (classToEdit == null) {
                         viewModel.addClass(
@@ -336,18 +319,18 @@ fun CalendarScreen(
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
                             endTime = classEndTime,
-                            location = location?.name ?: ""
+                            location = locationName,
+                            remindersEnabled = remindersEnabled
                         )
-
                         val newClass = ClassItem(
                             id = "${className}_${classStartTime}_${meetingDaysList.joinToString("_")}",
                             name = className,
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
                             endTime = classEndTime,
-                            location = location?.name ?: ""
+                            location = locationName,
+                            remindersEnabled = remindersEnabled
                         )
-
                         ClassReminderScheduler.scheduleNextReminder(
                             context = context,
                             classItem = newClass,
@@ -355,32 +338,30 @@ fun CalendarScreen(
                         )
                     } else {
                         ClassReminderScheduler.cancelReminder(context, classToEdit)
-
                         viewModel.updateClass(
                             classId = classToEdit.id,
                             name = className,
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
                             endTime = classEndTime,
-                            location = location?.name ?: ""
+                            location = locationName,
+                            remindersEnabled = remindersEnabled
                         )
-
                         val updatedClass = ClassItem(
                             id = classToEdit.id,
                             name = className,
                             meetingDays = meetingDaysList,
                             startTime = classStartTime,
                             endTime = classEndTime,
-                            location = location?.name ?: ""
+                            location = locationName,
+                            remindersEnabled = remindersEnabled
                         )
-
                         ClassReminderScheduler.scheduleNextReminder(
                             context = context,
                             classItem = updatedClass,
                             minutesBefore = AppSettings.classReminderMinutesBefore
                         )
                     }
-
                     showClassDialog = false
                     resetClassForm()
                 }
@@ -398,7 +379,7 @@ fun CalendarScreen(
     }
 
     if (showStudySessionDialog && selectedDate != null) {
-        val dateStr = "%04d-%02d-%02d".format(selectedDate.year, selectedDate.monthValue, selectedDate.dayOfMonth)
+        val dateStr = formatDate(selectedDate)
         StudySessionDialog(
             editingSession = editingSession,
             date = dateStr,
@@ -431,7 +412,7 @@ fun CalendarScreen(
     }
 
     if (showEventDialog && selectedDate != null) {
-        val dateStr = "%04d-%02d-%02d".format(selectedDate.year, selectedDate.monthValue, selectedDate.dayOfMonth)
+        val dateStr = formatDate(selectedDate)
         EventItemDialog(
             editingEvent = editingEvent,
             date = dateStr,

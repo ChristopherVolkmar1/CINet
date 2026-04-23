@@ -6,5 +6,6 @@ data class ClassItem(
     val meetingDays: List<String>,
     val startTime: String,
     val endTime: String,
-    val location: String
+    val location: String,
+    val remindersEnabled: Boolean = true, // per-class reminder toggle
 )
