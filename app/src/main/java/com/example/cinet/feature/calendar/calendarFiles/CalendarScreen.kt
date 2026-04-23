@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
@@ -42,10 +43,17 @@ fun CalendarScreen(
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
     val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
     val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
+    val markedDates = viewModel.getCalendarMarkedDates()
+
+    var reminderRefreshKey by remember { mutableStateOf(0) }
+    val reminderEventsForSelectedDate = remember(eventsForSelectedDate, reminderRefreshKey) {
+        buildReminderEventsForSelectedDate(context, eventsForSelectedDate)
+    }
 
     LaunchedEffect(Unit) {
         viewModel.refreshStudySessions()
         viewModel.refreshEvents()
+        viewModel.refreshCampusEvents()
     }
 
     var showAssignmentDialog by remember { mutableStateOf(false) }
@@ -71,7 +79,9 @@ fun CalendarScreen(
     var sessionLocation by remember { mutableStateOf<CampusLocation?>(null) }
 
     var showEventDialog by remember { mutableStateOf(false) }
+    var showCampusEventDialog by remember { mutableStateOf(false) }
     var editingEvent by remember { mutableStateOf<EventItem?>(null) }
+    var selectedCampusEvent by remember { mutableStateOf<EventItem?>(null) }
     var eventName by remember { mutableStateOf("") }
     var eventTime by remember { mutableStateOf("") }
     var eventLocation by remember { mutableStateOf<CampusLocation?>(null) }
@@ -147,6 +157,7 @@ fun CalendarScreen(
             selectedDate = selectedDate,
             today = today,
             scheduleItems = viewModel.scheduleItems,
+            markedDates = markedDates,
             onDateSelected = { day -> viewModel.selectDate(day) },
             onSameDateClicked = {
                 resetAssignmentForm()
@@ -157,6 +168,7 @@ fun CalendarScreen(
         ScheduleSection(
             selectedDate = selectedDate,
             itemsForSelectedDate = itemsForSelectedDate,
+            reminderEventsForSelectedDate = reminderEventsForSelectedDate,
             onItemClick = { item ->
                 editingAssignment = item
                 assignmentName = item.assignmentName
@@ -164,6 +176,10 @@ fun CalendarScreen(
                 selectedClassId = item.classId
                 classDropdownExpanded = false
                 showAssignmentDialog = true
+            },
+            onReminderClick = { event ->
+                selectedCampusEvent = event
+                showCampusEventDialog = true
             }
         )
 
@@ -188,7 +204,7 @@ fun CalendarScreen(
                 sessionClassName = session.className
                 sessionTopic = session.topic
                 sessionStartTime = session.startTime
-                sessionLocation = null // location is CampusLocation?, restored via search bar
+                sessionLocation = null
                 showStudySessionDialog = true
             }
         )
@@ -197,11 +213,16 @@ fun CalendarScreen(
             selectedDate = selectedDate,
             eventsForSelectedDate = eventsForSelectedDate,
             onEventClick = { event ->
-                editingEvent = event
-                eventName = event.name
-                eventTime = event.time
-                eventLocation = null // location is CampusLocation?, restored via search bar
-                showEventDialog = true
+                if (event.isCampusEvent) {
+                    selectedCampusEvent = event
+                    showCampusEventDialog = true
+                } else {
+                    editingEvent = event
+                    eventName = event.name
+                    eventTime = event.time
+                    eventLocation = null
+                    showEventDialog = true
+                }
             }
         )
     }
@@ -411,6 +432,17 @@ fun CalendarScreen(
         )
     }
 
+    if (showCampusEventDialog && selectedCampusEvent != null) {
+        HandleCampusEventReminderToggle(
+            event = selectedCampusEvent!!,
+            onReminderChanged = { reminderRefreshKey++ },
+            onDismiss = {
+                showCampusEventDialog = false
+                selectedCampusEvent = null
+            }
+        )
+    }
+
     if (showEventDialog && selectedDate != null) {
         val dateStr = formatDate(selectedDate)
         EventItemDialog(
@@ -441,4 +473,65 @@ fun CalendarScreen(
             } else null
         )
     }
+}
+
+/** Returns only the campus events on the selected day that currently have reminders enabled. */
+private fun buildReminderEventsForSelectedDate(
+    context: android.content.Context,
+    eventsForSelectedDate: List<EventItem>
+): List<EventItem> {
+    return eventsForSelectedDate.filter(isCampusEventWithReminderEnabled(context))
+}
+
+/** Builds the predicate used to keep only reminder-enabled campus events. */
+private fun isCampusEventWithReminderEnabled(context: android.content.Context): (EventItem) -> Boolean = { event ->
+    event.isCampusEvent && CampusEventReminderPreferences.isReminderEnabled(context, event.id)
+}
+
+@Composable
+private fun HandleCampusEventReminderToggle(
+    event: EventItem,
+    onReminderChanged: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var isReminderEnabled by remember(event.id) {
+        mutableStateOf(CampusEventReminderPreferences.isReminderEnabled(context, event.id))
+    }
+
+    CampusEventDetailsDialog(
+        event = event,
+        isReminderEnabled = isReminderEnabled,
+        onReminderToggle = { enabled ->
+            if (enabled) {
+                val wasScheduled = CampusEventReminderScheduler.scheduleReminder(context, event)
+                if (wasScheduled) {
+                    CampusEventReminderPreferences.setReminderEnabled(context, event.id, true)
+                    isReminderEnabled = true
+                    onReminderChanged()
+                    Toast.makeText(
+                        context,
+                        if (event.allDay) "Reminder set for 9:00 AM on the event day" else "Reminder set for 30 minutes before the event",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    CampusEventReminderPreferences.setReminderEnabled(context, event.id, false)
+                    isReminderEnabled = false
+                    onReminderChanged()
+                    Toast.makeText(
+                        context,
+                        "This event has already started, so a reminder could not be set",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } else {
+                CampusEventReminderScheduler.cancelReminder(context, event)
+                CampusEventReminderPreferences.setReminderEnabled(context, event.id, false)
+                isReminderEnabled = false
+                onReminderChanged()
+                Toast.makeText(context, "Reminder removed", Toast.LENGTH_SHORT).show()
+            }
+        },
+        onDismiss = onDismiss
+    )
 }

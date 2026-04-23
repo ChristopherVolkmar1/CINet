@@ -3,7 +3,15 @@ package com.example.cinet.feature.calendar.calendarFiles
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,22 +30,24 @@ fun CalendarGrid(
     selectedDate: LocalDate?,
     today: LocalDate,
     scheduleItems: List<ScheduleItem>,
+    markedDates: Set<String>,
     onDateSelected: (Int) -> Unit,
     onSameDateClicked: () -> Unit
 ) {
     val firstDayOfMonth = currentMonth.atDay(1)
     val daysInMonth = currentMonth.lengthOfMonth()
-
-    // dayOfWeek.value = 1 (Mon) → 7 (Sun), so % 7 shifts Sunday to 0 for grid alignment.
     val startDayOfWeek = firstDayOfMonth.dayOfWeek.value % 7
 
     val days = mutableListOf<Int?>()
     repeat(startDayOfWeek) { days.add(null) }
 
-    for (day in 1..daysInMonth) days.add(day)
+    for (day in 1..daysInMonth) {
+        days.add(day)
+    }
 
-    // Pads the grid so total cells are divisible by 7 (full weeks).
-    while (days.size % 7 != 0) days.add(null)
+    while (days.size % 7 != 0) {
+        days.add(null)
+    }
 
     Row(modifier = Modifier.fillMaxWidth()) {
         listOf("Su", "Mo", "Tu", "We", "Th", "Fr", "Sa").forEach {
@@ -67,39 +77,32 @@ fun CalendarGrid(
                             val cellDate = currentMonth.atDay(day)
                             val isToday = cellDate == today
                             val isSelected = selectedDate == cellDate
-
-                            // Matches whatever format ScheduleItem.date uses.
                             val dateString = "%04d-%02d-%02d".format(
                                 cellDate.year,
                                 cellDate.monthValue,
                                 cellDate.dayOfMonth
                             )
-
-                            // Relies on ScheduleItem storing date as a formatted string.
-                            val hasItems = scheduleItems.any { it.date == dateString }
+                            val hasItems = scheduleItems.any { it.date == dateString } || markedDates.contains(dateString)
 
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
                                     .background(
-                                        if (isToday) MaterialTheme.colorScheme.primary
-                                        else Color.Transparent,
+                                        if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent,
                                         CircleShape
                                     )
                                     .then(
                                         if (isSelected) {
-                                            // Selection is indicated separately from "today",
-                                            // so both states can be visible at once.
                                             Modifier.border(
                                                 2.dp,
                                                 MaterialTheme.colorScheme.tertiary,
                                                 CircleShape
                                             )
-                                        } else Modifier
+                                        } else {
+                                            Modifier
+                                        }
                                     )
                                     .clickable {
-                                        // Same-date click triggers a different action
-                                        // (e.g., open dialog instead of just selecting).
                                         if (selectedDate == cellDate) {
                                             onSameDateClicked()
                                         } else {
@@ -108,13 +111,10 @@ fun CalendarGrid(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(
                                         text = day.toString(),
-                                        color = if (isToday) Color.White
-                                        else MaterialTheme.colorScheme.onSurface
+                                        color = if (isToday) Color.White else MaterialTheme.colorScheme.onSurface
                                     )
 
                                     if (hasItems) {
@@ -123,9 +123,7 @@ fun CalendarGrid(
                                             modifier = Modifier
                                                 .size(4.dp)
                                                 .background(
-                                                    // Dot color adapts so it's visible on "today" background.
-                                                    if (isToday) Color.White
-                                                    else MaterialTheme.colorScheme.primary,
+                                                    if (isToday) Color.White else MaterialTheme.colorScheme.primary,
                                                     CircleShape
                                                 )
                                         )

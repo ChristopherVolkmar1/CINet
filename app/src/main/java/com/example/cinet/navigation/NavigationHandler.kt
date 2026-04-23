@@ -19,7 +19,7 @@ import java.util.Calendar
 import java.util.Locale
 import com.example.cinet.feature.auth.*
 import com.example.cinet.feature.map.*
-import com.example.cinet.feature.home.HomeScreen
+import com.example.cinet.feature.home.*
 import com.example.cinet.feature.social.*
 import com.example.cinet.feature.profile.*
 import com.example.cinet.feature.calendar.calendarFiles.*
@@ -119,6 +119,23 @@ private fun MainScaffold(
 
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
+    val campusReminderPrefs = remember {
+        context.getSharedPreferences("campus_event_reminders", android.content.Context.MODE_PRIVATE)
+    }
+    var campusReminderRefreshKey by remember { mutableStateOf(0) }
+
+    DisposableEffect(campusReminderPrefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key?.startsWith("reminder_") == true) {
+                campusReminderRefreshKey++
+            }
+        }
+
+        campusReminderPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            campusReminderPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
 
     fun loadItems(key: String): List<Pair<String, String>> {
         val saved = sharedPrefs.getString(key, null) ?: return emptyList()
@@ -134,6 +151,18 @@ private fun MainScaffold(
     }
 
     var upcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
+
+    val homeUpcomingEventsItems = remember(
+        upcomingEventsItems,
+        calendarViewModel.campusEventItems,
+        campusReminderRefreshKey
+    ) {
+        buildHomeUpcomingEventItems(
+            context = context,
+            manualItems = upcomingEventsItems,
+            campusEvents = calendarViewModel.campusEventItems
+        )
+    }
 
     val socialBackStackActive = currentScreen == Screen.Social &&
             (activeConversation != null || selectedProfile != null ||
@@ -203,7 +232,8 @@ private fun MainScaffold(
                 Screen.Home -> HomeScreen(
                     nickname = userProfile.nickname,
                     scheduleItems = calendarScheduleItems,
-                    upcomingEventsItems = upcomingEventsItems,
+                    manualUpcomingEventsItems = upcomingEventsItems,
+                    displayUpcomingEventsItems = homeUpcomingEventsItems,
                     onUpdateSchedule = { },
                     onUpdateEvents = {
                         upcomingEventsItems = it
