@@ -52,7 +52,8 @@ class CalendarFirestoreRepository(
                 meetingDays = meetingDays,
                 startTime = startTime,
                 endTime = endTime,
-                location = location
+                location = location,
+                remindersEnabled = doc.getBoolean("remindersEnabled") ?: true
             )
         }
     }
@@ -150,7 +151,8 @@ class CalendarFirestoreRepository(
         meetingDays: List<String>,
         startTime: String,
         endTime: String,
-        location: String
+        location: String,
+        remindersEnabled: Boolean = true
     ): ClassItem {
         val uid = getUid()
 
@@ -159,7 +161,8 @@ class CalendarFirestoreRepository(
             "meetingDays" to meetingDays,
             "startTime" to startTime,
             "endTime" to endTime,
-            "location" to location
+            "location" to location,
+            "remindersEnabled" to remindersEnabled
         )
 
         val docRef = db.collection("users")
@@ -174,7 +177,8 @@ class CalendarFirestoreRepository(
             meetingDays = meetingDays,
             startTime = startTime,
             endTime = endTime,
-            location = location
+            location = location,
+            remindersEnabled = remindersEnabled
         )
 
         Log.d("FirestoreDebug", "Added class successfully: ${newClass.name}, id=${newClass.id}")
@@ -188,7 +192,8 @@ class CalendarFirestoreRepository(
         meetingDays: List<String>,
         startTime: String,
         endTime: String,
-        location: String
+        location: String,
+        remindersEnabled: Boolean = true
     ) {
         val uid = getUid()
 
@@ -197,7 +202,8 @@ class CalendarFirestoreRepository(
             "meetingDays" to meetingDays,
             "startTime" to startTime,
             "endTime" to endTime,
-            "location" to location
+            "location" to location,
+            "remindersEnabled" to remindersEnabled
         )
 
         db.collection("users")

@@ -56,7 +56,8 @@ class CalendarViewModel : ViewModel() {
         meetingDays: List<String>,
         startTime: String,
         endTime: String,
-        location: String
+        location: String,
+        remindersEnabled: Boolean = true
     ) {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
@@ -68,7 +69,8 @@ class CalendarViewModel : ViewModel() {
                     meetingDays = sortedMeetingDays,
                     startTime = startTime,
                     endTime = endTime,
-                    location = location
+                    location = location,
+                    remindersEnabled = remindersEnabled
                 )
                 refreshClasses()
                 Log.d("FirestoreDebug", "New class created: ${newClass.name}, id=${newClass.id}")
@@ -84,7 +86,8 @@ class CalendarViewModel : ViewModel() {
         meetingDays: List<String>,
         startTime: String,
         endTime: String,
-        location: String
+        location: String,
+        remindersEnabled: Boolean = true
     ) {
         val orderedDays = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val sortedMeetingDays = meetingDays.sortedBy { orderedDays.indexOf(it) }
@@ -97,7 +100,8 @@ class CalendarViewModel : ViewModel() {
                     meetingDays = sortedMeetingDays,
                     startTime = startTime,
                     endTime = endTime,
-                    location = location
+                    location = location,
+                    remindersEnabled = remindersEnabled
                 )
 
                 // Keeps local scheduleItems consistent after class rename
