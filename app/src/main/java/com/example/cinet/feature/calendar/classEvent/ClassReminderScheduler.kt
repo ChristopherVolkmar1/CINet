@@ -11,6 +11,7 @@ import com.example.cinet.core.notifications.NotificationType
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.example.cinet.app.MainActivity
 
 object ClassReminderScheduler {
 
@@ -31,6 +32,19 @@ object ClassReminderScheduler {
 
         if (triggerTime.isBefore(LocalDateTime.now())) {
             NotificationHelper.createChannel(context)
+
+            val tapIntent = Intent(context, MainActivity::class.java).apply {
+                putExtra(MainActivity.EXTRA_OPEN_MAP_FOR_LOCATION, classItem.location)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+
+            val contentPendingIntent = PendingIntent.getActivity(
+                context,
+                classItem.id.hashCode(),
+                tapIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             NotificationHelper.showNotification(
                 context = context,
                 notification = AppNotification(
@@ -38,7 +52,8 @@ object ClassReminderScheduler {
                     message = "Starts in $minutesUntilClass minutes at ${classItem.startTime}",
                     type = NotificationType.REMINDER,
                     timestamp = System.currentTimeMillis()
-                )
+                ),
+                contentIntent = contentPendingIntent
             )
             return
         }
@@ -51,6 +66,7 @@ object ClassReminderScheduler {
         val intent = Intent(context, ClassReminderReceiver::class.java).apply {
             putExtra("title", classItem.name)
             putExtra("message", "Starts in $minutesBefore minutes at ${classItem.startTime}")
+            putExtra("location", classItem.location)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(

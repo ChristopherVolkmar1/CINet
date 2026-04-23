@@ -4,6 +4,7 @@ import android.Manifest
 import android.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
@@ -13,7 +14,6 @@ import androidx.core.app.NotificationManagerCompat
 import com.example.cinet.core.permissions.PermissionManager
 import com.example.cinet.feature.settings.*
 
-// settings stuff - Zack
 object NotificationHelper {
     private const val CHANNEL_ID = "cinet_channel"
 
@@ -22,7 +22,7 @@ object NotificationHelper {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "CINet Notifications",
-                NotificationManager.IMPORTANCE_HIGH 
+                NotificationManager.IMPORTANCE_HIGH
             )
 
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -30,8 +30,11 @@ object NotificationHelper {
         }
     }
 
-    fun showNotification(context: Context, notification: AppNotification) {
-        // Verification of user notification preference from Settings - Zack
+    fun showNotification(
+        context: Context,
+        notification: AppNotification,
+        contentIntent: PendingIntent? = null
+    ) {
         if (!AppSettings.notificationsEnabled) {
             Log.d("NotificationHelper", "Notifications are currently disabled by user settings.")
             return
@@ -53,10 +56,13 @@ object NotificationHelper {
                     NotificationType.EVENT -> NotificationCompat.PRIORITY_LOW
                 }
             )
+            .setAutoCancel(true)
+
+        contentIntent?.let { builder.setContentIntent(it) }
 
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-            == PackageManager.PERMISSION_GRANTED) {
-
+            == PackageManager.PERMISSION_GRANTED
+        ) {
             NotificationManagerCompat.from(context).notify(
                 notification.timestamp.hashCode(),
                 builder.build()
