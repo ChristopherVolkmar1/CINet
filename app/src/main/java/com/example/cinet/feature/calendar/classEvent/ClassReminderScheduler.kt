@@ -39,11 +39,14 @@ object ClassReminderScheduler {
 
 
         if (!triggerTime.isAfter(now)) {
+            val actualMinutesUntilClass = java.time.Duration.between(now, nextDateTime)
+                .toMinutes()
+                .coerceAtLeast(0)
+
             val tapIntent = Intent(context, MainActivity::class.java).apply {
                 putExtra(MainActivity.EXTRA_OPEN_MAP_FOR_LOCATION, classItem.location)
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
-
 
             val contentPendingIntent = PendingIntent.getActivity(
                 context,
@@ -52,12 +55,11 @@ object ClassReminderScheduler {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-
             NotificationHelper.showNotification(
                 context = context,
                 notification = AppNotification(
                     title = classItem.name,
-                    message = "Starts in $minutesBefore minutes at ${classItem.startTime}",
+                    message = "Starts in $actualMinutesUntilClass minutes at ${classItem.startTime}",
                     type = NotificationType.REMINDER,
                     timestamp = System.currentTimeMillis()
                 ),
