@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -11,12 +11,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+
 object AppSettings {
     var isDarkMode by mutableStateOf(false)
     var notificationsEnabled by mutableStateOf(true)
     var classReminderMinutesBefore: Long = 10L
     var assignmentReminderMinutesBefore: Long = 60L
 }
+
 // settings stuff - Zack
 /**
  * Settings screen allows users to manage their app preferences
@@ -24,7 +26,10 @@ object AppSettings {
 @Composable
 fun SettingScreen(
     onBack: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    isDarkMode: Boolean,
+    notificationsEnabled: Boolean,
+    onSettingsChange: (Boolean, Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -69,8 +74,8 @@ fun SettingScreen(
                 )
             }
             Switch(
-                checked = AppSettings.isDarkMode,
-                onCheckedChange = { AppSettings.isDarkMode = it }
+                checked = isDarkMode,
+                onCheckedChange = { onSettingsChange(it, notificationsEnabled) }
             )
         }
 
@@ -93,8 +98,8 @@ fun SettingScreen(
                 )
             }
             Switch(
-                checked = AppSettings.notificationsEnabled,
-                onCheckedChange = { AppSettings.notificationsEnabled = it }
+                checked = notificationsEnabled,
+                onCheckedChange = { onSettingsChange(isDarkMode, it) }
             )
         }
 

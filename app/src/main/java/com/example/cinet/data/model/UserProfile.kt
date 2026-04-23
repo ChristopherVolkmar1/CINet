@@ -11,6 +11,8 @@ data class UserProfile(
     val pronouns: String = "",
     val photoUrl: String = "",
     val fcmToken: String? = null, // used to send push notifications to this user's device
+    val isDarkMode: Boolean = false,
+    val notificationsEnabled: Boolean = true,
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val lastLoginAt: Date? = null,
 )
