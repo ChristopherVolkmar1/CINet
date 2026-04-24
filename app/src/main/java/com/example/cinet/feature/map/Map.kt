@@ -1,26 +1,31 @@
 package com.example.cinet.feature.map
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.util.Log
-import com.example.cinet.R
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.example.cinet.R
+import com.example.cinet.core.permissions.PermissionManager
 import com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.ui.theme.CINetTheme
+import com.example.cinet.feature.settings.AppSettings
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.JointType
@@ -31,8 +36,7 @@ import com.google.maps.model.TravelMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import com.example.cinet.core.permissions.PermissionManager
-import com.example.cinet.feature.settings.AppSettings
+
 
 // Main campus map screen. Wires together state, side-effects, permissions,
 // user location tracking, and all map overlay composables.
@@ -172,7 +176,9 @@ fun CampusMapScreen(
             onRouteVisible = { showRemoveRoute = true }
         )
 
-        Box(modifier = Modifier.fillMaxSize().align(Alignment.BottomCenter)) {
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .align(Alignment.BottomCenter)) {
             if (showRemoveRoute) {
                 RemoveRoute(
                     onDismiss = {
@@ -273,7 +279,8 @@ private fun InitializeCampusState(
 ) {
     LaunchedEffect(Unit) {
         textFieldState.edit { replace(0, length, "") }
-        onPolylinePoints(emptyList())
+        // This is where the route gets deleted when the map is reloaded, delete the comment to have it be removed again
+        //onPolylinePoints(emptyList())
         onSelectedLocation(null)
 
         if (hasPermission) {
@@ -511,12 +518,28 @@ private fun CampusMarker(
     coroutineScope: CoroutineScope,
     onSelected: (CampusLocation) -> Unit
 ) {
+    val context = LocalContext.current
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val customIcon = remember(location.category) {
+        val resId = when (location.category) {
+            "ACADEMIC" -> R.drawable.school
+            "TRANSIT" -> R.drawable.bus_stop
+            "COMMUTER_PARKING" -> R.drawable.parking
+            "DINING" -> R.drawable.dining
+            else -> R.drawable.unlisted
+        }
+        customMarker(
+            context = context,
+            iconResId = resId,
+            backgroundColor = secondaryColor
+        )
+    }
     val markerState = remember(location.name) { MarkerState(position = location.latLng) }
     Marker(
         state = markerState,
         title = location.name,
         snippet = "Category: ${location.category.lowercase()}",
-        icon = BitmapDescriptorFactory.defaultMarker(markerHueFor(location.category)),
+        icon = customIcon,
         onClick = {
             onSelected(location)
             coroutineScope.launch {
@@ -530,13 +553,45 @@ private fun CampusMarker(
     )
 }
 
-/** Returns the default-marker hue used for a given campus category. */
+/** Returns the default-marker hue used for a given campus category OR desired icon*/
 private fun markerHueFor(category: String): Float = when (category) {
     "ACADEMIC" -> BitmapDescriptorFactory.HUE_RED
     "COMMUTER_PARKING" -> BitmapDescriptorFactory.HUE_AZURE
     "DINING" -> BitmapDescriptorFactory.HUE_VIOLET
     "TRANSIT" -> BitmapDescriptorFactory.HUE_ROSE
     else -> BitmapDescriptorFactory.HUE_VIOLET
+}
+fun customMarker(context: Context, iconResId: Int, backgroundColor: Color): BitmapDescriptor? {
+    val pinDrawable = ContextCompat.getDrawable(context, R.drawable.pin)
+    val iconDrawable = ContextCompat.getDrawable(context, iconResId)
+    val size = 105
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    pinDrawable?.let {
+        it.setTint(backgroundColor.toArgb())
+        it.setBounds(0, 0, size, size)
+        it.draw(canvas)
+    }
+    iconDrawable?.let {
+        it.setTint(android.graphics.Color.WHITE)
+        val iconSize = (size * 0.5).toInt()
+        val left = (size - iconSize) / 2
+        val top = size / 10
+
+        it.setBounds(left, top, left + iconSize, top + iconSize)
+        it.draw(canvas)
+    }
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
+}
+
+private fun bitmapDescriptorFromVector(context: Context, vectorResId: Int): BitmapDescriptor? {
+    return ContextCompat.getDrawable(context, vectorResId)?.run {
+        setBounds(0, 0, intrinsicWidth, intrinsicHeight)
+        val bitmap = Bitmap.createBitmap(intrinsicWidth, intrinsicHeight, Bitmap.Config.ARGB_8888)
+        draw(Canvas(bitmap))
+        BitmapDescriptorFactory.fromBitmap(bitmap)
+    }
 }
 
 // -------------------- Previews --------------------

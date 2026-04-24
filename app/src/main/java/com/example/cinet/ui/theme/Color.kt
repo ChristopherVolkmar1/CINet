@@ -16,3 +16,6 @@ val CINetTertiaryLight = Color.Black
 val CINetPrimaryDark = Color(0xFF004160)
 val CINetSecondaryDark = Color(0xFF006140)
 val CINetTertiaryDark = Color.White
+
+val CINetButtonGreenLight = Color(0xFF0D8654)
+val CINetButtonGreenDark = Color(0xFF0D8654)
