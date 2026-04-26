@@ -520,26 +520,25 @@ private fun CampusMarker(
 ) {
     val context = LocalContext.current
     val secondaryColor = MaterialTheme.colorScheme.secondary
-    val customIcon = remember(location.category) {
-        val resId = when (location.category) {
-            "ACADEMIC" -> R.drawable.school
-            "TRANSIT" -> R.drawable.bus_stop
-            "COMMUTER_PARKING" -> R.drawable.parking
-            "DINING" -> R.drawable.dining
-            else -> R.drawable.unlisted
+    val customIcon = remember(location.category, secondaryColor) {
+        try {
+            customMarker(context, when (location.category) {
+                "ACADEMIC" -> R.drawable.school
+                "TRANSIT" -> R.drawable.bus_stop
+                "COMMUTER_PARKING" -> R.drawable.parking
+                "DINING" -> R.drawable.dining
+                else -> R.drawable.unlisted
+            }, secondaryColor)
+        } catch (e: Exception) {
+            null
         }
-        customMarker(
-            context = context,
-            iconResId = resId,
-            backgroundColor = secondaryColor
-        )
     }
     val markerState = remember(location.name) { MarkerState(position = location.latLng) }
     Marker(
         state = markerState,
         title = location.name,
         snippet = "Category: ${location.category.lowercase()}",
-        icon = customIcon,
+        icon = customIcon ?: BitmapDescriptorFactory.defaultMarker(markerHueFor(location.category)),
         onClick = {
             onSelected(location)
             coroutineScope.launch {

@@ -2,6 +2,7 @@ package com.example.cinet.feature.map
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,8 +13,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
@@ -53,6 +54,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.example.cinet.ui.theme.CINetTheme
 import com.google.maps.model.TravelMode
+import java.time.LocalDate
+import java.time.LocalTime
+import java.util.Locale
 
 // Bottom sheet that displays a selected campus location and lets the user
 // pick a travel mode (driving, walking, biking) to generate a route.
@@ -62,6 +66,7 @@ data class RouteDurations(
     var walking: String = "",
     var biking: String = ""
 )
+
 
 // -------------------- Directions popup --------------------
 
@@ -147,27 +152,70 @@ private fun categoryIcon(category: String): ImageVector = when (category) {
     "TRANSIT" -> Icons.Default.DirectionsTransit
     else -> Icons.Default.School
 }
+
+fun isOpen(hours: DayHours?): Boolean {
+    if (hours == null || hours.isClosed) return false
+    val current = LocalTime.now()
+    val currentTime = (current.hour * 100) + current.minute
+    return currentTime >= hours.open && currentTime < hours.close
+}
+
+fun getStatusForLocation(weeklyHours: WeeklyHours?): String {
+    if (weeklyHours == null) return "UNKNOWN"
+    val dayOfWeek = LocalDate.now().dayOfWeek.name.lowercase()
+
+    val todayHours = when (dayOfWeek) {
+        "monday" -> weeklyHours.monday
+        "tuesday" -> weeklyHours.tuesday
+        "wednesday" -> weeklyHours.wednesday
+        "thursday" -> weeklyHours.thursday
+        "friday" -> weeklyHours.friday
+        "saturday" -> weeklyHours.saturday
+        "sunday" -> weeklyHours.sunday
+        else -> null
+    }
+
+    return if (isOpen(todayHours)) {
+        "Open Now"
+    } else {
+        "Closed"
+    }
+}
 @Composable
-private fun Status(isOpen: Boolean) {
+private fun StatusBox(status: String) {
+    val backgroundColor = when (status) {
+        "OPEN" -> MaterialTheme.colorScheme.secondaryContainer
+        "CLOSED" -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
     Surface(
         shape = RoundedCornerShape(36.dp),
-        color = if (isOpen) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.error,
+        color = backgroundColor,
         tonalElevation = 4.dp,
         shadowElevation = 2.dp,
-        modifier = Modifier.wrapContentSize().offset(y = (-24).dp)
+        modifier = Modifier
+            .widthIn(min = 50.dp)
+            .height(32.dp)
+            .offset(y = (-24).dp)
     ) {
-        Text(
-            if (isOpen) "OPEN" else "CLOSED",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.onSecondary,
-            letterSpacing = 1.sp,
+        Box (
+            contentAlignment = Alignment.Center,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
+        ) {
+            Text(
+                text = status.uppercase(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSecondary,
+                letterSpacing = 1.sp,
+                maxLines = 1
+            )
+        }
     }
 }
 @Composable
 private fun LocationHeader(location: CampusLocation, onShowBusSchedule: () -> Unit = {}) {
+    val status = getStatusForLocation(location.hours)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
             categoryIcon(location.category),
@@ -196,7 +244,7 @@ private fun LocationHeader(location: CampusLocation, onShowBusSchedule: () -> Un
             }
         }
         Spacer(modifier = Modifier.weight(1f))
-        Status(true)
+        StatusBox(status)
     }
 }
 
@@ -214,8 +262,8 @@ private fun TravelModeButton(
             containerColor = MaterialTheme.colorScheme.secondaryContainer, // Background
             contentColor = MaterialTheme.colorScheme.onSecondary    // Text/Icon
         ),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 1.dp),
-        modifier = modifier.height(48.dp)
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 1.dp),
+        modifier = modifier.height(48.dp).width(110.dp)
     ) {
         Icon(
             imageVector = icon,
@@ -223,7 +271,9 @@ private fun TravelModeButton(
             modifier = Modifier.size(25.dp)
         )
         Spacer(Modifier.width(2.dp))
-        Text(text = duration, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = duration, style = MaterialTheme.typography.bodyLarge, maxLines = 1, softWrap = false
+        )
     }
 }
 
@@ -273,19 +323,63 @@ fun BusScheduleSheet(onDismiss: () -> Unit) {
 }
 
 /** Other Information*/
+
+fun convertTime(time: Int): String {
+    val hours = time / 100
+    val minutes = time % 100
+    val amPm = if (hours >= 12) "PM" else "AM"
+    val standardHour = when {
+        hours == 0 -> 12
+        hours > 12 -> hours - 12
+        else -> hours
+    }
+    return String.format(Locale.US, "%d:%02d%s", standardHour, minutes, amPm)
+}
 @Composable
 fun QuickInfo(location: CampusLocation) {
-    Text("Quick Info")
-    Text("Hours of Operation: 00:00AM - 00:00PM")
-    Text(
-        text = location.description
-    )
+    val displayHours = remember(location.hours) {
+        val dayOfWeek = LocalDate.now().dayOfWeek.name.lowercase()
+        val today = when (dayOfWeek) {
+            "monday" -> location.hours?.monday
+            "tuesday" -> location.hours?.tuesday
+            "wednesday" -> location.hours?.wednesday
+            "thursday" -> location.hours?.thursday
+            "friday" -> location.hours?.friday
+            "saturday" -> location.hours?.saturday
+            "sunday" -> location.hours?.sunday
+            else -> null
+        }
+        when {
+            today!!.open == 0 || today!!.isClosed -> "CLOSED"
+            else -> {
+                val open = convertTime(today.open)
+                val close = convertTime(today.close)
+                "$open - $close"
+            }
+        }
+    }
+    Column(modifier = Modifier.padding(2.dp)) {
+        Text(
+            "Quick Info",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "Hours of Operation: $displayHours",
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            softWrap = false
+        )
+        Text(
+            text = location.description,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
 }
 
 @Composable
 fun UpcomingClass(
     className: String = "UPCOMING CLASS"
-
 ) {
     Surface(
         shape = RoundedCornerShape(36.dp),
@@ -325,9 +419,9 @@ fun Preview() {
             onDismiss = {},
             onModeSelected = {},
             routeDurations = RouteDurations(
-                driving = "1 mins",
-                walking = "2 mins",
-                biking = "3 mins"
+                driving = "15 mins",
+                walking = "3.5 hrs",
+                biking = "33 mins"
             )
         )
         //BusScheduleSheet(onDismiss = {})

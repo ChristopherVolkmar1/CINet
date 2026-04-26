@@ -1,5 +1,6 @@
 package com.example.cinet.feature.map
 
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.firestore.GeoPoint
 
@@ -11,11 +12,37 @@ data class CampusLocation(
     val name: String = "",
     val category: String = "",
     val coordinates: GeoPoint = GeoPoint(0.0, 0.0),
-    val description: String = ""
+    val description: String = "",
+    val hours: WeeklyHours? = null
 ) {
     val latLng: LatLng
         get() = LatLng(coordinates.latitude, coordinates.longitude)
 }
+
+
+data class DayHours(
+    val open: Int = 0,
+    val close: Int = 0,
+    val isClosed: Boolean = false
+)
+
+data class WeeklyHours(
+    val monday: DayHours? = null,
+    val tuesday: DayHours? = null,
+    val wednesday: DayHours? = null,
+    val thursday: DayHours? = null,
+    val friday: DayHours? = null,
+    val saturday: DayHours? = null,
+    val sunday: DayHours? = null,
+)
+
+data class CampusIcons(
+    val academic: BitmapDescriptor?,
+    val transit: BitmapDescriptor?,
+    val parking: BitmapDescriptor?,
+    val dining: BitmapDescriptor?,
+    val default: BitmapDescriptor?
+)
 
 val csuciTransitStop = CampusLocation(
     name = "CSUCI Transit Stop",
