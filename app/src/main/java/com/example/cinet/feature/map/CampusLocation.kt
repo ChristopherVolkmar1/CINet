@@ -55,22 +55,24 @@ val csuciTransitStop = CampusLocation(
 /** Returns every location, alphabetically sorted, that matches the given category filter and search query. */
 fun getFilteredLocations(
     fullRegistry: Map<String, List<CampusLocation>>,
-    selectedCategory: String?, // null means "all"
+    activeFilters: Set<String>,
     searchQuery: String
 ): List<CampusLocation> {
     val allLocations = fullRegistry.values.flatten()
     return allLocations
-        .filter { matchesFilter(it, selectedCategory, searchQuery) }
+        .filter { matchesFilter(it, activeFilters, searchQuery) }
         .sortedBy { it.name }
 }
 
 /** Returns true when a location matches both the category filter and the search query. */
 private fun matchesFilter(
     location: CampusLocation,
-    selectedCategory: String?,
+    activeFilters: Set<String>,
     searchQuery: String
 ): Boolean {
-    val matchesCategory = selectedCategory == null || location.category.equals(selectedCategory, ignoreCase = true)
-    val matchesSearch = searchQuery.isEmpty() || location.name.contains(searchQuery, ignoreCase = true)
+    val matchesCategory = activeFilters.isEmpty() ||
+            activeFilters.contains(location.category.uppercase().trim())
+    val matchesSearch = searchQuery.isEmpty() ||
+            location.name.contains(searchQuery, ignoreCase = true)
     return matchesCategory && matchesSearch
 }

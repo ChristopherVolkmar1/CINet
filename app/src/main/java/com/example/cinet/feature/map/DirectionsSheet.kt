@@ -350,7 +350,8 @@ fun QuickInfo(location: CampusLocation) {
             else -> null
         }
         when {
-            today!!.open == 0 || today!!.isClosed -> "CLOSED"
+            today == null -> "HOURS UNKNOWN"
+            today.isClosed || today.open == 0 -> "CLOSED"
             else -> {
                 val open = convertTime(today.open)
                 val close = convertTime(today.close)
