@@ -1,5 +1,6 @@
 package com.example.cinet.feature.map
 
+import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -28,7 +30,10 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.cinet.ui.theme.CINetTheme
+import kotlin.String
 
 // Rounded search bar with inline dropdown suggestions for campus location search.
 // Includes input field, suggestion items, and result deduplication logic.
@@ -144,4 +149,17 @@ private fun SearchSuggestionItem(
             .fillMaxWidth()
             .clickable { onClick() }
     )
+}
+
+@Preview(showBackground = true, showSystemUi = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun PreviewSearch() {
+    CINetTheme(darkTheme = true) {
+        val textFieldState = rememberTextFieldState()
+        SearchLocationBar(
+            textFieldState = textFieldState,
+            searchResults = listOf("Aliso Hall", "Bell Tower", "Student Union"),
+            onSearch = {},
+        )
+    }
 }
