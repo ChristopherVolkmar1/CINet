@@ -9,6 +9,7 @@ import com.google.maps.model.DirectionsRoute
 import com.google.maps.model.TravelMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 // Fetches walking, driving, and biking routes from the Google Directions API.
 // Parses polyline points, human-readable duration, and arrival ETA.
@@ -73,7 +74,14 @@ private fun buildDirectionsResult(
     mode: TravelMode
 ): RouteResult {
     val leg = route?.legs?.getOrNull(0)
-    val duration = leg?.duration?.humanReadable ?: ""
+    val totalSeconds = leg?.duration?.inSeconds ?: 0L
+    val totalMinutes = (totalSeconds / 60).toInt()
+    val duration = if (totalMinutes >= 60) {
+        val decimalHours = totalMinutes / 60.0
+        String.format(Locale.US, "%.1f hrs", decimalHours)
+    } else {
+        "$totalMinutes mins"
+    }
     val points = route?.overviewPolyline?.decodePath()?.map { LatLng(it.lat, it.lng) }
         ?: listOf(start, end)
     val etaMillis = System.currentTimeMillis() + (leg?.duration?.inSeconds ?: 0) * 1000
