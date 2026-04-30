@@ -26,15 +26,17 @@ import java.time.LocalDate
 fun EventsSection(
     selectedDate: LocalDate?,
     eventsForSelectedDate: List<EventItem>,
-    onEventClick: (EventItem) -> Unit
+    onEventClick: (EventItem) -> Unit,
+    title: String = "Events",
+    emptyMessage: String = "No events for $selectedDate"
 ) {
     Spacer(modifier = Modifier.height(24.dp))
-    Text("Events", style = MaterialTheme.typography.titleMedium)
+    Text(title, style = MaterialTheme.typography.titleMedium)
     Spacer(modifier = Modifier.height(8.dp))
 
     when {
         selectedDate == null -> Text("Select a date to view events.")
-        eventsForSelectedDate.isEmpty() -> Text("No events for $selectedDate")
+        eventsForSelectedDate.isEmpty() -> Text(emptyMessage)
         else -> EventList(eventsForSelectedDate, onEventClick)
     }
 }

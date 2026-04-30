@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -13,6 +11,7 @@ import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
+import java.time.YearMonth
 import com.example.cinet.feature.settings.*
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.calendar.schedule.*
@@ -20,7 +19,6 @@ import com.example.cinet.feature.calendar.assignment.*
 import com.example.cinet.feature.calendar.classEvent.ClassDialog
 import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.calendar.classEvent.ClassReminderScheduler
-import com.example.cinet.feature.calendar.classEvent.ClassesSection
 import com.example.cinet.feature.calendar.event.*
 import com.example.cinet.feature.calendar.study.*
 import com.example.cinet.core.time.*
@@ -38,14 +36,31 @@ fun CalendarScreen(
     val classItems = viewModel.classItems
     val currentMonth = viewModel.currentMonth
     val selectedDate = viewModel.selectedDate
+    val activeDate = selectedDate ?: today
+    val calendarMode = viewModel.mode
+    var reminderRefreshKey by remember { mutableStateOf(0) }
+    val agendaCountByDate = remember(
+        classItems,
+        viewModel.studySessions,
+        viewModel.userEventItems,
+        viewModel.campusEventItems,
+        currentMonth,
+        reminderRefreshKey
+    ) {
+        buildAgendaActivityCountByDate(
+            context = context,
+            currentMonth = currentMonth,
+            classes = classItems,
+            studySessions = viewModel.studySessions,
+            customEvents = viewModel.userEventItems,
+            campusEvents = viewModel.campusEventItems
+        )
+    }
 
-    val itemsForSelectedDate = viewModel.getItemsForSelectedDate()
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
     val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
     val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
-    val markedDates = viewModel.getCalendarMarkedDates()
-
-    var reminderRefreshKey by remember { mutableStateOf(0) }
+    val customEventsForSelectedDate = viewModel.getCustomEventsForSelectedDate()
     val reminderEventsForSelectedDate = remember(eventsForSelectedDate, reminderRefreshKey) {
         buildReminderEventsForSelectedDate(context, eventsForSelectedDate)
     }
@@ -85,6 +100,7 @@ fun CalendarScreen(
     var eventName by remember { mutableStateOf("") }
     var eventTime by remember { mutableStateOf("") }
     var eventLocation by remember { mutableStateOf<CampusLocation?>(null) }
+    var selectedQuickAccessType by remember { mutableStateOf<CalendarQuickAccessType?>(null) }
 
     fun resetAssignmentForm() {
         editingAssignment = null
@@ -117,8 +133,57 @@ fun CalendarScreen(
         eventLocation = null
     }
 
+    fun openAssignmentEditor(item: ScheduleItem) {
+        editingAssignment = item
+        assignmentName = item.assignmentName
+        dueTime = item.dueTime
+        selectedClassId = item.classId
+        classDropdownExpanded = false
+        showAssignmentDialog = true
+    }
+
+    fun openClassEditor(classItem: ClassItem) {
+        editingClass = classItem
+        className = classItem.name
+        classStartTime = classItem.startTime
+        classEndTime = classItem.endTime
+        selectedMeetingDays = classItem.meetingDays.toSet()
+        showClassDialog = true
+    }
+
+    fun openStudySessionEditor(session: StudySession) {
+        editingSession = session
+        sessionClassName = session.className
+        sessionTopic = session.topic
+        sessionStartTime = session.startTime
+        sessionLocation = null
+        showStudySessionDialog = true
+    }
+
+    fun openEventEditor(event: EventItem) {
+        if (event.isCampusEvent) {
+            selectedCampusEvent = event
+            showCampusEventDialog = true
+        } else {
+            editingEvent = event
+            eventName = event.name
+            eventTime = event.time
+            eventLocation = null
+            showEventDialog = true
+        }
+    }
+
     fun formatDate(date: LocalDate): String =
         "%04d-%02d-%02d".format(date.year, date.monthValue, date.dayOfMonth)
+
+    fun handleDateClick(date: LocalDate) {
+        if (selectedDate == date) {
+            resetAssignmentForm()
+            showAssignmentDialog = true
+        } else {
+            viewModel.onDateSelected(date)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -126,103 +191,94 @@ fun CalendarScreen(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        CalendarHeader(
+        CalendarHeader(onBack = onBack)
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        CalendarModeTabs(
+            selectedMode = calendarMode,
+            onModeSelected = { viewModel.updateMode(it) }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        CalendarModeContent(
+            mode = calendarMode,
             currentMonth = currentMonth,
-            onBack = onBack,
+            selectedDate = activeDate,
+            activityCountByDate = agendaCountByDate,
+            onDateSelected = ::handleDateClick,
+            onPreviousDay = { viewModel.previousDay() },
+            onNextDay = { viewModel.nextDay() },
+            onPreviousWeek = { viewModel.previousWeek() },
+            onNextWeek = { viewModel.nextWeek() },
             onPreviousMonth = { viewModel.previousMonth() },
             onNextMonth = { viewModel.nextMonth() }
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(onClick = { resetClassForm(); showClassDialog = true }) {
-                Text("Classes")
-            }
-            OutlinedButton(onClick = { resetStudySessionForm(); showStudySessionDialog = true }) {
-                Text("Study")
-            }
-            OutlinedButton(onClick = { resetEventForm(); showEventDialog = true }) {
-                Text("Events")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        CalendarGrid(
-            currentMonth = currentMonth,
-            selectedDate = selectedDate,
-            today = today,
-            scheduleItems = viewModel.scheduleItems,
-            markedDates = markedDates,
-            onDateSelected = { day -> viewModel.selectDate(day) },
-            onSameDateClicked = {
-                resetAssignmentForm()
-                showAssignmentDialog = true
-            }
+        CalendarDailyAgendaCard(
+            selectedDate = activeDate,
+            classes = classesForSelectedDate,
+            studySessions = studySessionsForSelectedDate,
+            events = customEventsForSelectedDate,
+            reminderCampusEvents = reminderEventsForSelectedDate,
+            onTodayClick = { viewModel.onDateSelected(today) },
+            onClassClick = ::openClassEditor,
+            onStudySessionClick = ::openStudySessionEditor,
+            onEventClick = ::openEventEditor
         )
 
-        ScheduleSection(
-            selectedDate = selectedDate,
-            itemsForSelectedDate = itemsForSelectedDate,
-            reminderEventsForSelectedDate = reminderEventsForSelectedDate,
-            onItemClick = { item ->
-                editingAssignment = item
-                assignmentName = item.assignmentName
-                dueTime = item.dueTime
-                selectedClassId = item.classId
-                classDropdownExpanded = false
-                showAssignmentDialog = true
-            },
-            onReminderClick = { event ->
-                selectedCampusEvent = event
-                showCampusEventDialog = true
-            }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        CalendarQuickAccessCards(
+            onClassesClick = { selectedQuickAccessType = CalendarQuickAccessType.CLASSES },
+            onStudyClick = { selectedQuickAccessType = CalendarQuickAccessType.STUDY },
+            onEventsClick = { selectedQuickAccessType = CalendarQuickAccessType.EVENTS }
         )
 
-        ClassesSection(
-            selectedDate = selectedDate,
-            classesForSelectedDate = classesForSelectedDate,
-            onClassClick = { classItem ->
-                editingClass = classItem
-                className = classItem.name
-                classStartTime = classItem.startTime
-                classEndTime = classItem.endTime
-                selectedMeetingDays = classItem.meetingDays.toSet()
-                showClassDialog = true
-            }
-        )
 
-        StudySessionsSection(
-            selectedDate = selectedDate,
-            studySessionsForSelectedDate = studySessionsForSelectedDate,
-            onSessionClick = { session ->
-                editingSession = session
-                sessionClassName = session.className
-                sessionTopic = session.topic
-                sessionStartTime = session.startTime
-                sessionLocation = null
-                showStudySessionDialog = true
-            }
-        )
+    }
 
-        EventsSection(
-            selectedDate = selectedDate,
-            eventsForSelectedDate = eventsForSelectedDate,
-            onEventClick = { event ->
-                if (event.isCampusEvent) {
-                    selectedCampusEvent = event
-                    showCampusEventDialog = true
-                } else {
-                    editingEvent = event
-                    eventName = event.name
-                    eventTime = event.time
-                    eventLocation = null
-                    showEventDialog = true
+    selectedQuickAccessType?.let { quickAccessType ->
+        CalendarQuickAccessPopup(
+            type = quickAccessType,
+            selectedDate = activeDate,
+            classes = classesForSelectedDate,
+            studySessions = studySessionsForSelectedDate,
+            events = eventsForSelectedDate,
+            onDismiss = { selectedQuickAccessType = null },
+            onAddClick = {
+                selectedQuickAccessType = null
+                when (quickAccessType) {
+                    CalendarQuickAccessType.CLASSES -> {
+                        resetClassForm()
+                        showClassDialog = true
+                    }
+
+                    CalendarQuickAccessType.STUDY -> {
+                        resetStudySessionForm()
+                        showStudySessionDialog = true
+                    }
+
+                    CalendarQuickAccessType.EVENTS -> {
+                        resetEventForm()
+                        showEventDialog = true
+                    }
                 }
+            },
+            onClassClick = { classItem ->
+                selectedQuickAccessType = null
+                openClassEditor(classItem)
+            },
+            onStudySessionClick = { session ->
+                selectedQuickAccessType = null
+                openStudySessionEditor(session)
+            },
+            onEventClick = { event ->
+                selectedQuickAccessType = null
+                openEventEditor(event)
             }
         )
     }
@@ -475,6 +531,89 @@ fun CalendarScreen(
     }
 }
 
+
+/** Builds the day-dot map for the content shown in the main agenda card. */
+private fun buildAgendaActivityCountByDate(
+    context: android.content.Context,
+    currentMonth: YearMonth,
+    classes: List<ClassItem>,
+    studySessions: List<StudySession>,
+    customEvents: List<EventItem>,
+    campusEvents: List<EventItem>
+): Map<LocalDate, Int> {
+    val counts = mutableMapOf<LocalDate, Int>()
+
+    addDatesToAgendaCountMap(counts, studySessions.map { it.date })
+    addDatesToAgendaCountMap(counts, customEvents.map { it.date })
+    addDatesToAgendaCountMap(
+        counts,
+        campusEvents
+            .filter(isCampusEventWithReminderEnabled(context))
+            .map { it.date }
+    )
+    addClassDatesToAgendaCountMap(
+        counts = counts,
+        currentMonth = currentMonth,
+        classes = classes
+    )
+
+    return counts
+}
+
+/** Adds recurring class meetings to the dot map for the visible calendar window. */
+private fun addClassDatesToAgendaCountMap(
+    counts: MutableMap<LocalDate, Int>,
+    currentMonth: YearMonth,
+    classes: List<ClassItem>
+) {
+    val start = currentMonth.atDay(1).minusDays(7)
+    val end = currentMonth.atEndOfMonth().plusDays(7)
+    var date = start
+
+    while (!date.isAfter(end)) {
+        val dayName = dayNameForAgendaDate(date)
+        val classCount = classes.count { classItem -> classItem.meetingDays.contains(dayName) }
+        if (classCount > 0) {
+            counts[date] = (counts[date] ?: 0) + classCount
+        }
+        date = date.plusDays(1)
+    }
+}
+
+/** Adds parseable yyyy-MM-dd dates to the agenda dot count map. */
+private fun addDatesToAgendaCountMap(
+    counts: MutableMap<LocalDate, Int>,
+    dateStrings: List<String>
+) {
+    dateStrings.forEach { dateString ->
+        parseAgendaDateOrNull(dateString)?.let { date ->
+            counts[date] = (counts[date] ?: 0) + 1
+        }
+    }
+}
+
+/** Converts a LocalDate into the short weekday labels stored by ClassItem. */
+private fun dayNameForAgendaDate(date: LocalDate): String {
+    return when (date.dayOfWeek.value) {
+        1 -> "Mon"
+        2 -> "Tue"
+        3 -> "Wed"
+        4 -> "Thu"
+        5 -> "Fri"
+        6 -> "Sat"
+        7 -> "Sun"
+        else -> ""
+    }
+}
+
+/** Parses a date string without crashing the calendar UI. */
+private fun parseAgendaDateOrNull(dateString: String): LocalDate? {
+    return try {
+        LocalDate.parse(dateString)
+    } catch (_: Exception) {
+        null
+    }
+}
 /** Returns only the campus events on the selected day that currently have reminders enabled. */
 private fun buildReminderEventsForSelectedDate(
     context: android.content.Context,

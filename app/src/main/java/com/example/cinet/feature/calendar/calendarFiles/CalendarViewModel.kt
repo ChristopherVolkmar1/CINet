@@ -17,12 +17,16 @@ import java.time.YearMonth
 
 class CalendarViewModel : ViewModel() {
 
+    // Holds the calendar layout currently selected by the user.
+    var mode by mutableStateOf(CalendarMode.WEEK)
+        private set
+
     // Holds the month currently shown in the calendar header/grid.
     var currentMonth by mutableStateOf(YearMonth.now())
         private set
 
-    // Holds the day currently selected by the user.
-    var selectedDate by mutableStateOf<LocalDate?>(null)
+    // Holds the day currently selected by the user. Defaults to today so the day/week views have content immediately.
+    var selectedDate by mutableStateOf<LocalDate?>(LocalDate.now())
         private set
 
     // Stores the user's saved classes from Firestore.
@@ -57,19 +61,54 @@ class CalendarViewModel : ViewModel() {
         refreshCampusEvents()
     }
 
-    // Advances the visible month by one.
-    fun nextMonth() {
-        currentMonth = currentMonth.plusMonths(1)
+    // Changes between the Day, Week, and Month calendar layouts.
+    fun updateMode(newMode: CalendarMode) {
+        mode = newMode
     }
 
-    // Moves the visible month back by one.
+    // Advances the visible month by one and keeps the selected day inside the new month.
+    fun nextMonth() {
+        val next = currentMonth.plusMonths(1)
+        currentMonth = next
+        selectedDate = clampDateToMonth(selectedDate ?: LocalDate.now(), next)
+    }
+
+    // Moves the visible month back by one and keeps the selected day inside the new month.
     fun previousMonth() {
-        currentMonth = currentMonth.minusMonths(1)
+        val previous = currentMonth.minusMonths(1)
+        currentMonth = previous
+        selectedDate = clampDateToMonth(selectedDate ?: LocalDate.now(), previous)
+    }
+
+    // Moves the selected date back by one day.
+    fun previousDay() {
+        onDateSelected((selectedDate ?: LocalDate.now()).minusDays(1))
+    }
+
+    // Moves the selected date forward by one day.
+    fun nextDay() {
+        onDateSelected((selectedDate ?: LocalDate.now()).plusDays(1))
+    }
+
+    // Moves the selected date back by one week.
+    fun previousWeek() {
+        onDateSelected((selectedDate ?: LocalDate.now()).minusWeeks(1))
+    }
+
+    // Moves the selected date forward by one week.
+    fun nextWeek() {
+        onDateSelected((selectedDate ?: LocalDate.now()).plusWeeks(1))
+    }
+
+    // Selects a concrete date and moves the visible month if needed.
+    fun onDateSelected(date: LocalDate) {
+        selectedDate = date
+        currentMonth = YearMonth.from(date)
     }
 
     // Marks one day as selected inside the current month.
     fun selectDate(day: Int) {
-        selectedDate = currentMonth.atDay(day)
+        onDateSelected(currentMonth.atDay(day))
     }
 
     // Saves a new class for the current user.
@@ -334,12 +373,48 @@ class CalendarViewModel : ViewModel() {
             .sortedBy { parseTimeToSortableValue(it.time) }
     }
 
+    // Returns only user-created custom events for the selected day.
+    fun getCustomEventsForSelectedDate(): List<EventItem> {
+        val date = selectedDate ?: return emptyList()
+        val formattedDate = formatDate(date)
+        return userEventItems
+            .filter { it.date == formattedDate }
+            .sortedBy { parseTimeToSortableValue(it.time) }
+    }
+
+    // Counts user-created and live campus events for calendar dots.
+    fun getEventCountByDate(): Map<LocalDate, Int> {
+        val counts = mutableMapOf<LocalDate, Int>()
+        addDatedItemsToCountMap(counts, allEventItems().map { it.date })
+        return counts
+    }
+
+    // Returns only live campus events from the ICS feed for the selected day.
+    fun getCampusEventsForSelectedDate(): List<EventItem> {
+        val date = selectedDate ?: return emptyList()
+        val formattedDate = formatDate(date)
+        return campusEventItems
+            .filter { it.date == formattedDate }
+            .sortedBy { parseTimeToSortableValue(it.time) }
+    }
+
     // Returns every date string that should show an activity dot on the calendar grid.
     fun getCalendarMarkedDates(): Set<String> {
         return buildSet {
             addAll(scheduleItems.map { it.date })
             addAll(allEventItems().map { it.date })
         }
+    }
+
+
+    // Counts calendar content for each date shown in the day, week, and month views.
+    fun getActivityCountByDate(): Map<LocalDate, Int> {
+        val counts = mutableMapOf<LocalDate, Int>()
+        addDatedItemsToCountMap(counts, scheduleItems.map { it.date })
+        addDatedItemsToCountMap(counts, studySessions.map { it.date })
+        addDatedItemsToCountMap(counts, allEventItems().map { it.date })
+        addClassOccurrencesToCountMap(counts)
+        return counts
     }
 
     // Reloads the user's class list from Firestore.
@@ -401,6 +476,64 @@ class CalendarViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e("CampusEventFeed", "refreshCampusEvents failed", e)
             }
+        }
+    }
+
+    // Keeps a date inside the provided month, preserving the day number when possible.
+    private fun clampDateToMonth(date: LocalDate, month: YearMonth): LocalDate {
+        val safeDay = date.dayOfMonth.coerceAtMost(month.lengthOfMonth())
+        return month.atDay(safeDay)
+    }
+
+    // Adds one count for every stored date string that can be parsed.
+    private fun addDatedItemsToCountMap(
+        counts: MutableMap<LocalDate, Int>,
+        dates: List<String>
+    ) {
+        dates.forEach { dateString ->
+            parseDateOrNull(dateString)?.let { date ->
+                counts[date] = (counts[date] ?: 0) + 1
+            }
+        }
+    }
+
+    // Adds recurring class meetings to the count map for the currently visible calendar window.
+    private fun addClassOccurrencesToCountMap(counts: MutableMap<LocalDate, Int>) {
+        val start = currentMonth.atDay(1).minusDays(7)
+        val end = currentMonth.atEndOfMonth().plusDays(7)
+        val classItemsByDay = getClassesGroupedByDay()
+        var date = start
+
+        while (!date.isAfter(end)) {
+            val dayName = dayNameForDate(date)
+            val classCount = classItemsByDay[dayName]?.size ?: 0
+            if (classCount > 0) {
+                counts[date] = (counts[date] ?: 0) + classCount
+            }
+            date = date.plusDays(1)
+        }
+    }
+
+    // Converts a date into the short weekday labels already stored by ClassItem.
+    private fun dayNameForDate(date: LocalDate): String {
+        return when (date.dayOfWeek.value) {
+            1 -> "Mon"
+            2 -> "Tue"
+            3 -> "Wed"
+            4 -> "Thu"
+            5 -> "Fri"
+            6 -> "Sat"
+            7 -> "Sun"
+            else -> ""
+        }
+    }
+
+    // Parses the app's yyyy-MM-dd date strings safely.
+    private fun parseDateOrNull(dateString: String): LocalDate? {
+        return try {
+            LocalDate.parse(dateString)
+        } catch (_: Exception) {
+            null
         }
     }
 
