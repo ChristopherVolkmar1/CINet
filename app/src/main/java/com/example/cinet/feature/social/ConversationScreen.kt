@@ -6,6 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +43,7 @@ import com.example.cinet.feature.calendar.event.*
 fun ConversationScreen(
     conversation: Conversation,
     onBack: () -> Unit,
+    onNavigateToLocation: ((String) -> Unit)? = null,
 ) {
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
@@ -43,6 +52,8 @@ fun ConversationScreen(
     val listState = rememberLazyListState()
 
     var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
+    var conversationCount by remember { mutableIntStateOf(0) }
+    val entryTime = remember { System.currentTimeMillis() }
     var messageInput by remember { mutableStateOf("") }
     var showStudyInviteDialog by remember { mutableStateOf(false) }
     var showEventInviteDialog by remember { mutableStateOf(false) }
@@ -87,6 +98,23 @@ fun ConversationScreen(
                 if (snapshot != null) {
                     messages = snapshot.toObjects(Message::class.java)
                         .sortedBy { it.createdAt }
+                }
+            }
+        onDispose { listener.remove() }
+    }
+
+    // Real-time listener: keeps conversation count badge in sync
+    DisposableEffect(currentUid) {
+        val listener = FirebaseFirestore.getInstance()
+            .collection("conversations")
+            .whereArrayContains("participantIds", currentUid)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    conversationCount = snapshot.documents.count { doc ->
+                        val docId = doc.id
+                        val lastUpdated = doc.getTimestamp("lastUpdated")?.toDate()?.time ?: 0L
+                        docId != conversation.id && lastUpdated > entryTime
+                    }
                 }
             }
         onDispose { listener.remove() }
@@ -171,10 +199,34 @@ fun ConversationScreen(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(onClick = onBack) { Text("Back") }
+                // iOS-style back: bare chevron + conversation count pill
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable(onClick = onBack),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp),
+                    )
+                    if (conversationCount > 0) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        ) {
+                            Text(
+                                text = conversationCount.toString(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Avatar — group uses tertiaryContainer tint to distinguish visually
+                // Avatar — uses secondaryContainer for consistent green branding
                 val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() && !conversation.isGroup }
                 if (headerPhoto != null) {
                     AsyncImage(
@@ -194,12 +246,7 @@ fun ConversationScreen(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(
-                                if (conversation.isGroup)
-                                    MaterialTheme.colorScheme.tertiaryContainer
-                                else
-                                    MaterialTheme.colorScheme.secondaryContainer
-                            )
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
                             .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -292,6 +339,7 @@ fun ConversationScreen(
                         message = message,
                         isCurrentUser = message.senderId == currentUid,
                         currentUserPhotoUrl = currentUserPhotoUrl,
+                        onNavigateToLocation = onNavigateToLocation,
                         onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                             (message.type == "study_invite" || message.type == "event_invite")) {
                             {
@@ -387,6 +435,10 @@ fun ConversationScreen(
                             "location" to ""
                         )
                     )
+                    // Add to sender's calendar as a study session (distinct from the assignment entry)
+                    if (item.date.isNotBlank()) {
+                        calendarRepository.addStudySession(item.date, item.className, item.assignmentName, item.dueTime, "")
+                    }
                     showStudyInviteDialog = false
                 }
             },
@@ -405,18 +457,23 @@ fun ConversationScreen(
                             "location" to session.location
                         )
                     )
+                    // Session is already in sender's studySessions — no add needed
                     showStudyInviteDialog = false
                 }
             },
-            onSendNew = { cls, topic, date, time ->
+            onSendNew = { cls, topic, date, time, location ->
                 scope.launch {
                     val content = "Study invite: $cls — $topic on $date at $time"
                     repository.sendMessage(
                         conversationId = conversation.id,
                         content = content,
                         type = "study_invite",
-                        metadata = mapOf("className" to cls, "topic" to topic, "date" to date, "time" to time, "location" to "")
+                        metadata = mapOf("className" to cls, "topic" to topic, "date" to date, "time" to time, "location" to location)
                     )
+                    // New session — save to sender's calendar immediately
+                    if (date.isNotBlank()) {
+                        calendarRepository.addStudySession(date, cls, topic, time, location)
+                    }
                     showStudyInviteDialog = false
                 }
             }
@@ -436,6 +493,10 @@ fun ConversationScreen(
                         type = "event_invite",
                         metadata = mapOf("name" to name, "date" to date, "time" to time, "location" to location)
                     )
+                    // Save to sender's calendar so they don't have to accept their own invite
+                    if (date.isNotBlank()) {
+                        calendarRepository.addEvent(date, name, time, location)
+                    }
                     showEventInviteDialog = false
                 }
             }
@@ -449,6 +510,7 @@ fun MessageBubble(
     message: Message,
     isCurrentUser: Boolean,
     currentUserPhotoUrl: String = "",
+    onNavigateToLocation: ((String) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
 ) {
@@ -483,7 +545,8 @@ fun MessageBubble(
                 ) {
                     Text(
                         text = message.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
@@ -503,50 +566,39 @@ fun MessageBubble(
                 Spacer(modifier = Modifier.height(2.dp))
             }
 
-            val bubbleColor = if (isCurrentUser)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.secondaryContainer
-            val textColor = if (isCurrentUser)
-                MaterialTheme.colorScheme.onPrimary
-            else
-                MaterialTheme.colorScheme.onSecondaryContainer
+            if (message.type == "study_invite" || message.type == "event_invite") {
+                InviteBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onAccept = onAccept,
+                    onDecline = onDecline,
+                    onNavigateToLocation = onNavigateToLocation,
+                )
+            } else {
+                val bubbleColor = if (isCurrentUser)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+                val textColor = if (isCurrentUser)
+                    MaterialTheme.colorScheme.onPrimary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
 
-            Surface(
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(
-                    topStart = if (isCurrentUser) 16.dp else 4.dp,
-                    topEnd = if (isCurrentUser) 4.dp else 16.dp,
-                    bottomStart = 16.dp,
-                    bottomEnd = 16.dp
-                ),
-                color = bubbleColor,
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = textColor
-                    )
-
-                    val response = message.metadata["response"]
-                    when {
-                        response == "accepted" -> Text(
-                            text = "✓ Accepted",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = textColor.copy(alpha = 0.8f)
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = if (isCurrentUser) 16.dp else 4.dp,
+                        topEnd = if (isCurrentUser) 4.dp else 16.dp,
+                        bottomStart = 16.dp,
+                        bottomEnd = 16.dp
+                    ),
+                    color = bubbleColor,
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor
                         )
-                        response == "declined" -> Text(
-                            text = "✗ Declined",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = textColor.copy(alpha = 0.6f)
-                        )
-                        onAccept != null && onDecline != null -> {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = onAccept) { Text("Accept") }
-                                OutlinedButton(onClick = onDecline) { Text("Decline") }
-                            }
-                        }
                     }
                 }
             }
@@ -579,8 +631,181 @@ fun MessageBubble(
                 ) {
                     Text(
                         text = message.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Card-style bubble for study_invite and event_invite messages.
+ * Shows type icon, title, subtitle (study only), date/time/location rows,
+ * and either Accept/Decline buttons or the recorded response.
+ */
+@Composable
+fun InviteBubble(
+    message: Message,
+    isCurrentUser: Boolean,
+    onAccept: (() -> Unit)?,
+    onDecline: (() -> Unit)?,
+    onNavigateToLocation: ((String) -> Unit)? = null,
+) {
+    val isStudy = message.type == "study_invite"
+    val meta = message.metadata
+
+    val typeLabel  = if (isStudy) "Study Session" else "Event Invite"
+    val typeIcon   = if (isStudy) Icons.Default.School else Icons.Default.Event
+    val title      = if (isStudy) meta["className"] ?: "" else meta["name"] ?: ""
+    val subtitle   = if (isStudy) meta["topic"] ?: "" else ""
+    val date       = meta["date"] ?: ""
+    val time       = meta["time"] ?: ""
+    val location   = meta["location"] ?: ""
+    val response   = meta["response"]
+
+    val cardShape = RoundedCornerShape(
+        topStart = if (isCurrentUser) 16.dp else 4.dp,
+        topEnd   = if (isCurrentUser) 4.dp  else 16.dp,
+        bottomStart = 16.dp,
+        bottomEnd   = 16.dp,
+    )
+
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.widthIn(min = 220.dp, max = 280.dp),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+
+            // ── Header: type icon + label + optional map pin ────────
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(
+                    imageVector = typeIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = typeLabel.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                    modifier = Modifier.weight(1f),
+                )
+                // Map pin button — taps into Map tab directions for this location
+                if (location.isNotBlank() && onNavigateToLocation != null) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.18f),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable { onNavigateToLocation(location) },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "View on map",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                thickness = 0.5.dp,
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // ── Title + subtitle ─────────────────────────────────────
+            if (title.isNotBlank()) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // ── Detail rows: date / time / location ──────────────────
+            @Composable
+            fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+                if (text.isBlank()) return
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.65f),
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                    )
+                }
+            }
+
+            DetailRow(Icons.Default.CalendarToday, date)
+            DetailRow(Icons.Default.Schedule, time)
+            DetailRow(Icons.Default.LocationOn, location)
+
+            // ── Response status or Accept / Decline buttons ──────────
+            when {
+                response == "accepted" -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "✓ Accepted",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                    )
+                }
+                response == "declined" -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "✗ Declined",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
+                    )
+                }
+                onAccept != null && onDecline != null -> {
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onAccept,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Accept") }
+                        OutlinedButton(
+                            onClick = onDecline,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Decline") }
+                    }
                 }
             }
         }
