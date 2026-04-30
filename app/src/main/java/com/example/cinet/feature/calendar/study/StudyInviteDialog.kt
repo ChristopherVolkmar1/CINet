@@ -23,7 +23,7 @@ fun StudyInviteDialog(
     onDismiss: () -> Unit,
     onSendExisting: (ScheduleItem) -> Unit,
     onSendExistingSession: (StudySession) -> Unit = {},
-    onSendNew: (className: String, assignmentName: String, date: String, time: String) -> Unit,
+    onSendNew: (className: String, assignmentName: String, date: String, time: String, location: String) -> Unit,
 ) {
     val context = LocalContext.current
     // false = pick from existing, true = create new
@@ -32,6 +32,8 @@ fun StudyInviteDialog(
     var newAssignmentName by remember { mutableStateOf("") }
     var newDate by remember { mutableStateOf("") }
     var newTime by remember { mutableStateOf("") }
+    var newLocation by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
 
@@ -109,10 +111,26 @@ fun StudyInviteDialog(
                     ) {
                         Text("Pick Time")
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newLocation,
+                        onValueChange = { newLocation = it },
+                        label = { Text("Location (optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 } else {
                     // Option A — pick from existing calendar items
                     val hasAnyItems = existingItems.isNotEmpty() || existingStudySessions.isNotEmpty()
 
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     if (!hasAnyItems) {
                         Text(
                             "No items found — create a new invite below.",
@@ -120,8 +138,18 @@ fun StudyInviteDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
+                        val filteredItems = existingItems.filter {
+                            searchQuery.isBlank() ||
+                                    it.className.contains(searchQuery, ignoreCase = true) ||
+                                    it.assignmentName.contains(searchQuery, ignoreCase = true)
+                        }
+                        val filteredSessions = existingStudySessions.filter {
+                            searchQuery.isBlank() ||
+                                    it.className.contains(searchQuery, ignoreCase = true) ||
+                                    it.topic.contains(searchQuery, ignoreCase = true)
+                        }
                         LazyColumn {
-                            if (existingItems.isNotEmpty()) {
+                            if (filteredItems.isNotEmpty()) {
                                 item {
                                     Text(
                                         "Assignments",
@@ -129,7 +157,7 @@ fun StudyInviteDialog(
                                         modifier = Modifier.padding(vertical = 4.dp)
                                     )
                                 }
-                                items(existingItems) { item ->
+                                items(filteredItems) { item ->
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -151,7 +179,7 @@ fun StudyInviteDialog(
                                 }
                             }
 
-                            if (existingStudySessions.isNotEmpty()) {
+                            if (filteredSessions.isNotEmpty()) {
                                 item {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
@@ -160,7 +188,7 @@ fun StudyInviteDialog(
                                         modifier = Modifier.padding(vertical = 4.dp)
                                     )
                                 }
-                                items(existingStudySessions) { session ->
+                                items(filteredSessions) { session ->
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -196,7 +224,7 @@ fun StudyInviteDialog(
                         if (newClassName.isNotBlank() && newAssignmentName.isNotBlank()
                             && newDate.isNotBlank() && newTime.isNotBlank()
                         ) {
-                            onSendNew(newClassName, newAssignmentName, newDate, newTime)
+                            onSendNew(newClassName, newAssignmentName, newDate, newTime, newLocation)
                         }
                     }
                 ) { Text("Send") }

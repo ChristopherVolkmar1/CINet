@@ -31,6 +31,7 @@ fun EventInviteSenderDialog(
     var eventDate by remember { mutableStateOf("") }
     var eventTime by remember { mutableStateOf("") }
     var eventLocation by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
 
@@ -113,6 +114,14 @@ fun EventInviteSenderDialog(
                     }
                 } else {
                     // Pick from existing events
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     if (existingEvents.isEmpty()) {
                         Text(
                             "No events found — create a new invite below.",
@@ -120,8 +129,13 @@ fun EventInviteSenderDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
+                        val filteredEvents = existingEvents.filter {
+                            searchQuery.isBlank() ||
+                                    it.name.contains(searchQuery, ignoreCase = true) ||
+                                    it.location.contains(searchQuery, ignoreCase = true)
+                        }
                         LazyColumn {
-                            items(existingEvents) { event ->
+                            items(filteredEvents) { event ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()

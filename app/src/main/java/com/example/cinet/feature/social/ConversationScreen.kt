@@ -424,18 +424,18 @@ fun ConversationScreen(
                     showStudyInviteDialog = false
                 }
             },
-            onSendNew = { cls, topic, date, time ->
+            onSendNew = { cls, topic, date, time, location ->
                 scope.launch {
                     val content = "Study invite: $cls — $topic on $date at $time"
                     repository.sendMessage(
                         conversationId = conversation.id,
                         content = content,
                         type = "study_invite",
-                        metadata = mapOf("className" to cls, "topic" to topic, "date" to date, "time" to time, "location" to "")
+                        metadata = mapOf("className" to cls, "topic" to topic, "date" to date, "time" to time, "location" to location)
                     )
                     // New session — save to sender's calendar immediately
                     if (date.isNotBlank()) {
-                        calendarRepository.addStudySession(date, cls, topic, time, "")
+                        calendarRepository.addStudySession(date, cls, topic, time, location)
                     }
                     showStudyInviteDialog = false
                 }
