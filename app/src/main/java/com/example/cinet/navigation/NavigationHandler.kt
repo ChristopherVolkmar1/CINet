@@ -199,7 +199,9 @@ private fun MainScaffold(
                                 currentScreen = screen
                                 showCIView = false
                                 selectedNewsArticle = null
-                                if (screen != Screen.Social) {
+                                // Tapping Social from any other tab OR while already on Social
+                                // always returns to the Messages (ConversationsListScreen) root.
+                                if (screen == Screen.Social) {
                                     activeConversation = null
                                     selectedProfile = null
                                     showNewConversation = false

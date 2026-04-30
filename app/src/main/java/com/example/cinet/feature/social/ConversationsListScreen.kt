@@ -249,10 +249,8 @@ private fun ConversationAvatar(
     participantCount: Int,
 ) {
     val initial = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    val avatarColor = if (isGroup)
-        MaterialTheme.colorScheme.tertiaryContainer
-    else
-        MaterialTheme.colorScheme.secondaryContainer
+    // Both DM and group avatars use secondaryContainer for consistent green branding
+    val avatarColor = MaterialTheme.colorScheme.secondaryContainer
 
     if (!isGroup && photoUrl.isNotBlank()) {
         AsyncImage(

@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -171,10 +173,18 @@ fun ConversationScreen(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(onClick = onBack) { Text("Back") }
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Avatar — group uses tertiaryContainer tint to distinguish visually
+                // Avatar — uses secondaryContainer for consistent green branding
                 val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() && !conversation.isGroup }
                 if (headerPhoto != null) {
                     AsyncImage(
@@ -194,12 +204,7 @@ fun ConversationScreen(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(
-                                if (conversation.isGroup)
-                                    MaterialTheme.colorScheme.tertiaryContainer
-                                else
-                                    MaterialTheme.colorScheme.secondaryContainer
-                            )
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
                             .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -483,7 +488,8 @@ fun MessageBubble(
                 ) {
                     Text(
                         text = message.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
@@ -506,11 +512,11 @@ fun MessageBubble(
             val bubbleColor = if (isCurrentUser)
                 MaterialTheme.colorScheme.primary
             else
-                MaterialTheme.colorScheme.secondaryContainer
+                MaterialTheme.colorScheme.surfaceVariant
             val textColor = if (isCurrentUser)
                 MaterialTheme.colorScheme.onPrimary
             else
-                MaterialTheme.colorScheme.onSecondaryContainer
+                MaterialTheme.colorScheme.onSurfaceVariant
 
             Surface(
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(
@@ -579,7 +585,8 @@ fun MessageBubble(
                 ) {
                     Text(
                         text = message.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
