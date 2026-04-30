@@ -6,8 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -509,50 +515,38 @@ fun MessageBubble(
                 Spacer(modifier = Modifier.height(2.dp))
             }
 
-            val bubbleColor = if (isCurrentUser)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.surfaceVariant
-            val textColor = if (isCurrentUser)
-                MaterialTheme.colorScheme.onPrimary
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant
+            if (message.type == "study_invite" || message.type == "event_invite") {
+                InviteBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onAccept = onAccept,
+                    onDecline = onDecline,
+                )
+            } else {
+                val bubbleColor = if (isCurrentUser)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+                val textColor = if (isCurrentUser)
+                    MaterialTheme.colorScheme.onPrimary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
 
-            Surface(
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(
-                    topStart = if (isCurrentUser) 16.dp else 4.dp,
-                    topEnd = if (isCurrentUser) 4.dp else 16.dp,
-                    bottomStart = 16.dp,
-                    bottomEnd = 16.dp
-                ),
-                color = bubbleColor,
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = textColor
-                    )
-
-                    val response = message.metadata["response"]
-                    when {
-                        response == "accepted" -> Text(
-                            text = "✓ Accepted",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = textColor.copy(alpha = 0.8f)
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = if (isCurrentUser) 16.dp else 4.dp,
+                        topEnd = if (isCurrentUser) 4.dp else 16.dp,
+                        bottomStart = 16.dp,
+                        bottomEnd = 16.dp
+                    ),
+                    color = bubbleColor,
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = textColor
                         )
-                        response == "declined" -> Text(
-                            text = "✗ Declined",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = textColor.copy(alpha = 0.6f)
-                        )
-                        onAccept != null && onDecline != null -> {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = onAccept) { Text("Accept") }
-                                OutlinedButton(onClick = onDecline) { Text("Decline") }
-                            }
-                        }
                     }
                 }
             }
@@ -588,6 +582,154 @@ fun MessageBubble(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Card-style bubble for study_invite and event_invite messages.
+ * Shows type icon, title, subtitle (study only), date/time/location rows,
+ * and either Accept/Decline buttons or the recorded response.
+ */
+@Composable
+fun InviteBubble(
+    message: Message,
+    isCurrentUser: Boolean,
+    onAccept: (() -> Unit)?,
+    onDecline: (() -> Unit)?,
+) {
+    val isStudy = message.type == "study_invite"
+    val meta = message.metadata
+
+    val typeLabel  = if (isStudy) "Study Session" else "Event Invite"
+    val typeIcon   = if (isStudy) Icons.Default.School else Icons.Default.Event
+    val title      = if (isStudy) meta["className"] ?: "" else meta["name"] ?: ""
+    val subtitle   = if (isStudy) meta["topic"] ?: "" else ""
+    val date       = meta["date"] ?: ""
+    val time       = meta["time"] ?: ""
+    val location   = meta["location"] ?: ""
+    val response   = meta["response"]
+
+    val cardShape = RoundedCornerShape(
+        topStart = if (isCurrentUser) 16.dp else 4.dp,
+        topEnd   = if (isCurrentUser) 4.dp  else 16.dp,
+        bottomStart = 16.dp,
+        bottomEnd   = 16.dp,
+    )
+
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.widthIn(min = 220.dp, max = 280.dp),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+
+            // ── Header: icon + type label ────────────────────────────
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = typeIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = typeLabel.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                )
+            }
+
+            Spacer(Modifier.height(6.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                thickness = 0.5.dp,
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // ── Title + subtitle ─────────────────────────────────────
+            if (title.isNotBlank()) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // ── Detail rows: date / time / location ──────────────────
+            @Composable
+            fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+                if (text.isBlank()) return
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.65f),
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+                    )
+                }
+            }
+
+            DetailRow(Icons.Default.CalendarToday, date)
+            DetailRow(Icons.Default.Schedule, time)
+            DetailRow(Icons.Default.LocationOn, location)
+
+            // ── Response status or Accept / Decline buttons ──────────
+            when {
+                response == "accepted" -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "✓ Accepted",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                    )
+                }
+                response == "declined" -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "✗ Declined",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
+                    )
+                }
+                onAccept != null && onDecline != null -> {
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onAccept,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Accept") }
+                        OutlinedButton(
+                            onClick = onDecline,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Decline") }
+                    }
                 }
             }
         }
