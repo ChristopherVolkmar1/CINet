@@ -1,6 +1,8 @@
 package com.example.cinet.feature.calendar.study
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.example.cinet.feature.map.CampusLocation
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import androidx.compose.ui.unit.dp
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.example.cinet.core.time.openTimePicker
@@ -34,8 +39,24 @@ fun StudyInviteDialog(
     var newTime by remember { mutableStateOf("") }
     var newLocation by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
+    var locationsByCategory by remember { mutableStateOf<Map<String, List<CampusLocation>>>(emptyMap()) }
+    var locationCategory by remember { mutableStateOf("academic") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
+
+    // Fetch campus locations once when the dialog opens
+    LaunchedEffect(Unit) {
+        try {
+            val db = FirebaseFirestore.getInstance()
+            val result = mutableMapOf<String, List<CampusLocation>>()
+            for (col in listOf("academic", "dining", "commuter_parking")) {
+                result[col] = db.collection(col).get().await()
+                    .toObjects(CampusLocation::class.java)
+                    .sortedBy { it.name }
+            }
+            locationsByCategory = result
+        } catch (_: Exception) { }
+    }
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -119,6 +140,45 @@ fun StudyInviteDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    if (locationsByCategory.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Campus locations",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        // Category filter chips
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            listOf("academic" to "Academic", "dining" to "Dining", "commuter_parking" to "Parking")
+                                .forEach { (key, label) ->
+                                    FilterChip(
+                                        selected = locationCategory == key,
+                                        onClick = { locationCategory = key },
+                                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                    )
+                                }
+                        }
+                        val categoryLocations = locationsByCategory[locationCategory] ?: emptyList()
+                        if (categoryLocations.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            // Tapping a suggestion fills the location field
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                categoryLocations.forEach { loc ->
+                                    SuggestionChip(
+                                        onClick = { newLocation = loc.name },
+                                        label = { Text(loc.name, style = MaterialTheme.typography.labelSmall) },
+                                    )
+                                }
+                            }
+                        }
+                    }
                 } else {
                     // Option A — pick from existing calendar items
                     val hasAnyItems = existingItems.isNotEmpty() || existingStudySessions.isNotEmpty()

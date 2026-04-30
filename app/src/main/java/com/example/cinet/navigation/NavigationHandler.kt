@@ -294,7 +294,14 @@ private fun MainScaffold(
                     Screen.Social -> when {
                         activeConversation != null -> ConversationScreen(
                             conversation = activeConversation!!,
-                            onBack = { activeConversation = null }
+                            onBack = { activeConversation = null },
+                            onNavigateToLocation = { locationName ->
+                                // Search all categories so any campus location works
+                                val location = campusRegistry.values.flatten()
+                                    .find { it.name.equals(locationName, ignoreCase = true) }
+                                preSelectedMapLocation = location
+                                currentScreen = Screen.Map
+                            }
                         )
                         selectedProfile != null -> ProfileScreen(
                             user = selectedProfile!!,

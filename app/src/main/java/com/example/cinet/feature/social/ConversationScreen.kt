@@ -43,6 +43,7 @@ import com.example.cinet.feature.calendar.event.*
 fun ConversationScreen(
     conversation: Conversation,
     onBack: () -> Unit,
+    onNavigateToLocation: ((String) -> Unit)? = null,
 ) {
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
@@ -303,6 +304,7 @@ fun ConversationScreen(
                         message = message,
                         isCurrentUser = message.senderId == currentUid,
                         currentUserPhotoUrl = currentUserPhotoUrl,
+                        onNavigateToLocation = onNavigateToLocation,
                         onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                             (message.type == "study_invite" || message.type == "event_invite")) {
                             {
@@ -473,6 +475,7 @@ fun MessageBubble(
     message: Message,
     isCurrentUser: Boolean,
     currentUserPhotoUrl: String = "",
+    onNavigateToLocation: ((String) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
 ) {
@@ -534,6 +537,7 @@ fun MessageBubble(
                     isCurrentUser = isCurrentUser,
                     onAccept = onAccept,
                     onDecline = onDecline,
+                    onNavigateToLocation = onNavigateToLocation,
                 )
             } else {
                 val bubbleColor = if (isCurrentUser)
@@ -612,6 +616,7 @@ fun InviteBubble(
     isCurrentUser: Boolean,
     onAccept: (() -> Unit)?,
     onDecline: (() -> Unit)?,
+    onNavigateToLocation: ((String) -> Unit)? = null,
 ) {
     val isStudy = message.type == "study_invite"
     val meta = message.metadata
@@ -642,8 +647,11 @@ fun InviteBubble(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
 
-            // ── Header: icon + type label ────────────────────────────
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // ── Header: type icon + label + optional map pin ────────
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Icon(
                     imageVector = typeIcon,
                     contentDescription = null,
@@ -656,7 +664,27 @@ fun InviteBubble(
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                    modifier = Modifier.weight(1f),
                 )
+                // Map pin button — taps into Map tab directions for this location
+                if (location.isNotBlank() && onNavigateToLocation != null) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.18f),
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clickable { onNavigateToLocation(location) },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "View on map",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(Modifier.height(6.dp))
