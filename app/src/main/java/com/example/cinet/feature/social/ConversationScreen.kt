@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
@@ -52,6 +52,8 @@ fun ConversationScreen(
     val listState = rememberLazyListState()
 
     var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
+    var conversationCount by remember { mutableIntStateOf(0) }
+    val entryTime = remember { System.currentTimeMillis() }
     var messageInput by remember { mutableStateOf("") }
     var showStudyInviteDialog by remember { mutableStateOf(false) }
     var showEventInviteDialog by remember { mutableStateOf(false) }
@@ -96,6 +98,23 @@ fun ConversationScreen(
                 if (snapshot != null) {
                     messages = snapshot.toObjects(Message::class.java)
                         .sortedBy { it.createdAt }
+                }
+            }
+        onDispose { listener.remove() }
+    }
+
+    // Real-time listener: keeps conversation count badge in sync
+    DisposableEffect(currentUid) {
+        val listener = FirebaseFirestore.getInstance()
+            .collection("conversations")
+            .whereArrayContains("participantIds", currentUid)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    conversationCount = snapshot.documents.count { doc ->
+                        val docId = doc.id
+                        val lastUpdated = doc.getTimestamp("lastUpdated")?.toDate()?.time ?: 0L
+                        docId != conversation.id && lastUpdated > entryTime
+                    }
                 }
             }
         onDispose { listener.remove() }
@@ -180,14 +199,30 @@ fun ConversationScreen(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                FilledTonalIconButton(
-                    onClick = onBack,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                // iOS-style back: bare chevron + conversation count pill
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable(onClick = onBack),
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp),
+                    )
+                    if (conversationCount > 0) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        ) {
+                            Text(
+                                text = conversationCount.toString(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
 
