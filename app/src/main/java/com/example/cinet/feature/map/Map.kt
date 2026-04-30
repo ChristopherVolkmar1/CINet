@@ -1,28 +1,35 @@
 package com.example.cinet.feature.map
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.util.Log
-import com.example.cinet.R
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.example.cinet.R
+import com.example.cinet.core.permissions.PermissionManager
 import com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.ui.theme.CINetTheme
+import com.example.cinet.feature.settings.AppSettings
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.Dot
+import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -31,11 +38,10 @@ import com.google.maps.model.TravelMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import com.example.cinet.core.permissions.PermissionManager
-import com.example.cinet.feature.settings.AppSettings
+
 
 // Main campus map screen. Wires together state, side-effects, permissions,
-// user location tracking, and all map overlay composables.
+// user location tracking, and all map overlay composable.
 // -------------------- Main screen --------------------
 
 /** Top-level campus map screen: wires together state, side-effects, the map layer, and overlay controls. */
@@ -61,7 +67,7 @@ fun CampusMapScreen(
     val campusRegistry by viewModel.campusRegistry.collectAsState()
     var selectedLocation by remember { mutableStateOf<CampusLocation?>(null) }
     var routeLocation by remember { mutableStateOf<CampusLocation?>(null) }
-    var activeFilter by remember { mutableStateOf<String?>(null) }
+    var activeFilters by remember { mutableStateOf(setOf<String>()) }
     var polylinePoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     var durations by remember { mutableStateOf(RouteDurations()) }
     var activeTravelMode by remember { mutableStateOf(TravelMode.WALKING) }
@@ -74,16 +80,20 @@ fun CampusMapScreen(
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
     }
 
-    val filteredNames = remember(textFieldState.text, activeFilter, campusRegistry) {
-        getFilteredLocations(campusRegistry, activeFilter, textFieldState.text.toString()).map { it.name }
+    val filteredNames = remember(textFieldState.text, campusRegistry) {
+        getFilteredLocations(
+            fullRegistry = campusRegistry,
+            activeFilters = emptySet(),
+            searchQuery = textFieldState.text.toString()
+        ).map { it.name }
     }
 
     val markersToDraw = remember(
-        activeFilter, textFieldState.text, campusRegistry, selectedLocation, showRemoveRoute
+        activeFilters, textFieldState.text, campusRegistry, selectedLocation, showRemoveRoute
     ) {
         computeMarkersToDraw(
             registry = campusRegistry,
-            activeFilter = activeFilter,
+            activeFilters = activeFilters,
             searchQuery = textFieldState.text.toString(),
             selectedLocation = selectedLocation,
             routeLocation = routeLocation,
@@ -169,10 +179,13 @@ fun CampusMapScreen(
             polylinePoints = polylinePoints,
             coroutineScope = coroutineScope,
             onMarkerSelected = { selectedLocation = it },
-            onRouteVisible = { showRemoveRoute = true }
+            onRouteVisible = { showRemoveRoute = true },
+            mode = activeTravelMode
         )
 
-        Box(modifier = Modifier.fillMaxSize().align(Alignment.BottomCenter)) {
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .align(Alignment.BottomCenter)) {
             if (showRemoveRoute) {
                 RemoveRoute(
                     onDismiss = {
@@ -191,7 +204,8 @@ fun CampusMapScreen(
         MapControls(
             campusRegistry = campusRegistry,
             searchState = searchState,
-            onFilterChange = { activeFilter = it },
+            onFiltersChanged = { activeFilters = it },
+            activeFilters = activeFilters,
             selectedLocation = selectedLocation,
             onDismissPopup = { selectedLocation = null },
             onModeSelected = requestRoute,
@@ -245,17 +259,16 @@ private fun rememberCampusMapProperties(
 /** Decides which campus-location markers should be drawn given filter, search, selection, and route state. */
 private fun computeMarkersToDraw(
     registry: Map<String, List<CampusLocation>>,
-    activeFilter: String?,
+    activeFilters: Set<String>,
     searchQuery: String,
     selectedLocation: CampusLocation?,
     routeLocation: CampusLocation?,
     showRemoveRoute: Boolean
 ): List<CampusLocation> {
-    val filtered = getFilteredLocations(registry, activeFilter, searchQuery)
+    val allLocations = getFilteredLocations(registry, activeFilters, searchQuery)
     return when {
-        showRemoveRoute -> filtered.filter { it.name == routeLocation?.name }
-        selectedLocation != null -> filtered.filter { it.name == selectedLocation.name }
-        else -> filtered
+        activeFilters.isEmpty() -> allLocations
+        else -> allLocations.filter { activeFilters.contains(it.category) }
     }
 }
 
@@ -273,7 +286,8 @@ private fun InitializeCampusState(
 ) {
     LaunchedEffect(Unit) {
         textFieldState.edit { replace(0, length, "") }
-        onPolylinePoints(emptyList())
+        // This is where the route gets deleted when the map is reloaded, delete the comment to have it be removed again
+        //onPolylinePoints(emptyList())
         onSelectedLocation(null)
 
         if (hasPermission) {
@@ -471,7 +485,8 @@ private fun CampusMapLayer(
     polylinePoints: List<LatLng>,
     coroutineScope: CoroutineScope,
     onMarkerSelected: (CampusLocation) -> Unit,
-    onRouteVisible: () -> Unit
+    onRouteVisible: () -> Unit,
+    mode: TravelMode
 ) {
     GoogleMap(
         modifier = Modifier.fillMaxSize(),
@@ -492,12 +507,25 @@ private fun CampusMapLayer(
             )
         }
         if (polylinePoints.isNotEmpty()) {
-            Polyline(
-                points = polylinePoints,
-                color = Color(0xFF4285F4),
-                width = 12f,
-                jointType = JointType.ROUND
-            )
+            if(mode == TravelMode.DRIVING || mode == TravelMode.BICYCLING) {
+                Polyline(
+                    points = polylinePoints,
+                    color = Color(0xFF4285F4),
+                    width = 12f,
+                    jointType = JointType.ROUND
+                )
+            } else if(mode == TravelMode.WALKING) {
+                val dottedPattern = listOf(
+                    Dot(), Gap(20f)
+                )
+                Polyline(
+                    points = polylinePoints,
+                    color = Color(0xFF4285F4),
+                    width = 12f,
+                    jointType = JointType.ROUND,
+                    pattern = dottedPattern
+                )
+            }
             onRouteVisible()
         }
     }
@@ -511,12 +539,27 @@ private fun CampusMarker(
     coroutineScope: CoroutineScope,
     onSelected: (CampusLocation) -> Unit
 ) {
+    val context = LocalContext.current
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val customIcon = remember(location.category, secondaryColor) {
+        try {
+            customMarker(context, when (location.category) {
+                "ACADEMIC" -> R.drawable.school
+                "TRANSIT" -> R.drawable.bus_stop
+                "COMMUTER_PARKING" -> R.drawable.parking
+                "DINING" -> R.drawable.dining
+                else -> R.drawable.unlisted
+            }, secondaryColor)
+        } catch (_: Exception) {
+            null
+        }
+    }
     val markerState = remember(location.name) { MarkerState(position = location.latLng) }
     Marker(
         state = markerState,
         title = location.name,
         snippet = "Category: ${location.category.lowercase()}",
-        icon = BitmapDescriptorFactory.defaultMarker(markerHueFor(location.category)),
+        icon = customIcon ?: BitmapDescriptorFactory.defaultMarker(),
         onClick = {
             onSelected(location)
             coroutineScope.launch {
@@ -530,13 +573,29 @@ private fun CampusMarker(
     )
 }
 
-/** Returns the default-marker hue used for a given campus category. */
-private fun markerHueFor(category: String): Float = when (category) {
-    "ACADEMIC" -> BitmapDescriptorFactory.HUE_RED
-    "COMMUTER_PARKING" -> BitmapDescriptorFactory.HUE_AZURE
-    "DINING" -> BitmapDescriptorFactory.HUE_VIOLET
-    "TRANSIT" -> BitmapDescriptorFactory.HUE_ROSE
-    else -> BitmapDescriptorFactory.HUE_VIOLET
+/** Returns the default-marker hue used for a given campus category OR desired icon*/
+fun customMarker(context: Context, iconResId: Int, backgroundColor: Color): BitmapDescriptor? {
+    val pinDrawable = ContextCompat.getDrawable(context, R.drawable.pin)
+    val iconDrawable = ContextCompat.getDrawable(context, iconResId)
+    val size = 105
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    pinDrawable?.let {
+        it.setTint(backgroundColor.toArgb())
+        it.setBounds(0, 0, size, size)
+        it.draw(canvas)
+    }
+    iconDrawable?.let {
+        it.setTint(android.graphics.Color.WHITE)
+        val iconSize = (size * 0.5).toInt()
+        val left = (size - iconSize) / 2
+        val top = size / 10
+
+        it.setBounds(left, top, left + iconSize, top + iconSize)
+        it.draw(canvas)
+    }
+    return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
 
 // -------------------- Previews --------------------

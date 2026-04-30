@@ -315,7 +315,8 @@ fun UserRow(
             ) {
                 Text(
                     text = user.nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
         }

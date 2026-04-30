@@ -7,6 +7,7 @@ data class UserProfile(
     val uid: String = "",
     val email: String = "",
     val nickname: String = "",
+    val nicknameLower: String = "",  // lowercase copy used for case-insensitive search
     val major: String = "",
     val pronouns: String = "",
     val photoUrl: String = "",
