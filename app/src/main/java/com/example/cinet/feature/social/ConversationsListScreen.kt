@@ -36,6 +36,8 @@ fun ConversationsListScreen(
     onOpenConversation: (Conversation) -> Unit,
     onNewConversation: () -> Unit,
     onOpenFriends: () -> Unit,
+    sessionStartTime: Long = 0L,
+    openedConversationIds: Set<String> = emptySet(),
 ) {
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val repository = remember { SocialRepository() }
@@ -150,9 +152,13 @@ fun ConversationsListScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(conversations, key = { it.id }) { conversation ->
+                        val hasUnread = conversation.id !in openedConversationIds &&
+                                (conversation.lastUpdated?.time ?: 0L) > sessionStartTime &&
+                                conversation.lastMessage.isNotBlank()
                         ConversationListItem(
                             conversation = conversation,
                             currentUid = currentUid,
+                            hasUnread = hasUnread,
                             onClick = { onOpenConversation(conversation) }
                         )
                         HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
@@ -168,6 +174,7 @@ private fun ConversationListItem(
     conversation: Conversation,
     currentUid: String,
     onClick: () -> Unit,
+    hasUnread: Boolean = false,
 ) {
     val displayName = if (conversation.isGroup) {
         conversation.groupName.ifBlank { "Group Chat" }
@@ -199,6 +206,17 @@ private fun ConversationListItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Unread indicator dot
+        Box(
+            modifier = Modifier
+                .size(if (hasUnread) 9.dp else 9.dp)
+                .clip(CircleShape)
+                .background(
+                    if (hasUnread) MaterialTheme.colorScheme.primary
+                    else androidx.compose.ui.graphics.Color.Transparent
+                )
+        )
+        Spacer(modifier = Modifier.width(8.dp))
         // Avatar
         ConversationAvatar(
             isGroup = conversation.isGroup,

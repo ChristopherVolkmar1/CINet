@@ -146,6 +146,9 @@ private fun MainScaffold(
 
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
+    // Persisted: last time the user had the conversations list visible
+    var lastConversationsVisit by remember { mutableStateOf(sharedPrefs.getLong("last_conversations_visit", 0L)) }
+    var openedConversationIds by remember { mutableStateOf(setOf<String>()) }
 
     fun loadItems(key: String): List<Pair<String, String>> {
         val saved = sharedPrefs.getString(key, null) ?: return emptyList()
@@ -334,11 +337,25 @@ private fun MainScaffold(
                                 }
                             }
                         )
-                        else -> ConversationsListScreen(
-                            onOpenConversation = { activeConversation = it },
-                            onNewConversation = { showNewConversation = true },
-                            onOpenFriends = { showSocialScreen = true }
-                        )
+                        else -> {
+                            // Write visit time to prefs for next session — do NOT update
+                            // lastConversationsVisit state so dots stay visible this session
+                            LaunchedEffect(Unit) {
+                                sharedPrefs.edit()
+                                    .putLong("last_conversations_visit", System.currentTimeMillis())
+                                    .apply()
+                            }
+                            ConversationsListScreen(
+                                onOpenConversation = {
+                                    openedConversationIds = openedConversationIds + it.id
+                                    activeConversation = it
+                                },
+                                onNewConversation = { showNewConversation = true },
+                                onOpenFriends = { showSocialScreen = true },
+                                sessionStartTime = lastConversationsVisit,
+                                openedConversationIds = openedConversationIds,
+                            )
+                        }
                     }
 
                     Screen.Map -> CampusMapScreen(
