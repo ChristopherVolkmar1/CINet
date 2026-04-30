@@ -398,6 +398,10 @@ fun ConversationScreen(
                             "location" to ""
                         )
                     )
+                    // Add to sender's calendar as a study session (distinct from the assignment entry)
+                    if (item.date.isNotBlank()) {
+                        calendarRepository.addStudySession(item.date, item.className, item.assignmentName, item.dueTime, "")
+                    }
                     showStudyInviteDialog = false
                 }
             },
@@ -416,6 +420,7 @@ fun ConversationScreen(
                             "location" to session.location
                         )
                     )
+                    // Session is already in sender's studySessions — no add needed
                     showStudyInviteDialog = false
                 }
             },
@@ -428,6 +433,10 @@ fun ConversationScreen(
                         type = "study_invite",
                         metadata = mapOf("className" to cls, "topic" to topic, "date" to date, "time" to time, "location" to "")
                     )
+                    // New session — save to sender's calendar immediately
+                    if (date.isNotBlank()) {
+                        calendarRepository.addStudySession(date, cls, topic, time, "")
+                    }
                     showStudyInviteDialog = false
                 }
             }
@@ -447,6 +456,10 @@ fun ConversationScreen(
                         type = "event_invite",
                         metadata = mapOf("name" to name, "date" to date, "time" to time, "location" to location)
                     )
+                    // Save to sender's calendar so they don't have to accept their own invite
+                    if (date.isNotBlank()) {
+                        calendarRepository.addEvent(date, name, time, location)
+                    }
                     showEventInviteDialog = false
                 }
             }
