@@ -4,7 +4,6 @@ import androidx.compose.ui.graphics.Color
 
 
 val CINetBlue = Color(0xFF0D8654)   // make it all greeeeen
-val CINetMaroon = Color(0xFF4A1414)
 val CINetBackground = Color(0xFFE0E0E0)
 
 val CINetPrimaryLight = CINetBlue
