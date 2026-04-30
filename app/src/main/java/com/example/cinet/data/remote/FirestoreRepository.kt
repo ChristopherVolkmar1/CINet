@@ -33,6 +33,16 @@ class FirestoreRepository(
                 docRef.update("createdAt", FieldValue.serverTimestamp()).await()
             }
 
+            // Backfill nicknameLower for existing users who pre-date the case-insensitive
+            // search field. Runs once per user (skipped as soon as the field is present).
+            val existingNickname = snapshot.getString("nickname") ?: ""
+            if (existingNickname.isNotEmpty() && snapshot.getString("nicknameLower").isNullOrEmpty()) {
+                docRef.set(
+                    mapOf("nicknameLower" to existingNickname.lowercase()),
+                    SetOptions.merge()
+                ).await()
+            }
+
             var profile = snapshot.toObject(UserProfile::class.java)
                 ?: return Result.failure(Exception("Failed to parse UserProfile"))
 
@@ -64,9 +74,10 @@ class FirestoreRepository(
             val docRef = db.collection(FirestoreCollections.USERS).document(user.uid)
 
             val profileUpdate = mapOf(
-                "nickname" to nickname,
-                "major"    to major,
-                "pronouns" to pronouns,
+                "nickname"      to nickname,
+                "nicknameLower" to nickname.lowercase(),
+                "major"         to major,
+                "pronouns"      to pronouns,
             )
 
             docRef.set(profileUpdate, SetOptions.merge()).await()

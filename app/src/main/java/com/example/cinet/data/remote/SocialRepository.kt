@@ -24,16 +24,44 @@ class SocialRepository(
     private val currentUid: String
         get() = auth.currentUser?.uid ?: error("No signed-in user.")
 
-    /** Searches for users whose nickname matches the typed query. */
+    /** Searches for users whose nickname matches the typed query (case-insensitive). */
+    /**
+     * Searches for users whose nickname starts with [query], case-insensitively.
+     *
+     * Two parallel server queries are merged to handle both new and legacy documents:
+     *  1. nicknameLower range — hits users whose nicknameLower field has been populated
+     *     (written on every profile save / backfilled at login post-deploy).
+     *  2. Capitalised nickname range — hits legacy users whose nickname is Title Case
+     *     (the most common format) and whose nicknameLower hasn\'t been written yet.
+     *     A client-side toLowerCase check ensures only genuine prefix matches surface.
+     *
+     * Once all users have logged in at least once after the deploy, query 2 becomes
+     * redundant and can be removed.
+     */
     suspend fun searchUsersByNickname(query: String): Result<List<UserProfile>> {
         return try {
-            val snapshot = db.collection("users")
-                .whereGreaterThanOrEqualTo("nickname", query)
-                .whereLessThanOrEqualTo("nickname", query + "\uf8ff")
+            val lowerQuery = query.lowercase()
+            val capitalisedQuery = lowerQuery.replaceFirstChar { it.uppercaseChar() }
+
+            // Query 1: users with nicknameLower populated (new / backfilled)
+            val byLower = db.collection("users")
+                .whereGreaterThanOrEqualTo("nicknameLower", lowerQuery)
+                .whereLessThanOrEqualTo("nicknameLower", lowerQuery + "\uf8ff")
                 .get()
                 .await()
+                .toObjects(UserProfile::class.java)
 
-            val users = snapshot.toObjects(UserProfile::class.java)
+            // Query 2: Title Case legacy fallback — client-side filter confirms the match
+            val byNickname = db.collection("users")
+                .whereGreaterThanOrEqualTo("nickname", capitalisedQuery)
+                .whereLessThanOrEqualTo("nickname", capitalisedQuery + "\uf8ff")
+                .get()
+                .await()
+                .toObjects(UserProfile::class.java)
+                .filter { it.nickname.lowercase().startsWith(lowerQuery) }
+
+            val users = (byLower + byNickname)
+                .distinctBy { it.uid }
                 .filter { it.uid != currentUid }
 
             Result.success(users)
