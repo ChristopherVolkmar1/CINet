@@ -13,7 +13,7 @@ class CampusEventFeedRepository(
     private val parser: CampusEventFeedParser = CampusEventFeedParser()
 ) {
     private val feedUrls = listOf(
-        "https://www.trumba.com/calendars/student-marketing.ics",
+
         "https://25livepub.collegenet.com/calendars/csuci-calendar-of-events.ics"
     )
 
