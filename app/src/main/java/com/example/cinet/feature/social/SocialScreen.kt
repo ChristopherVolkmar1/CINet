@@ -1,29 +1,32 @@
 package com.example.cinet.feature.social
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.cinet.data.model.FriendRequest
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.SocialRepository
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.foundation.layout.size
 import com.example.cinet.core.designsystem.PullToRefreshContainer
 
 @Composable
@@ -44,7 +47,6 @@ fun SocialScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     var refreshKey by remember { mutableIntStateOf(0) }
 
-    // Load friends/requests whenever refreshKey changes
     LaunchedEffect(refreshKey) {
         if (refreshKey > 0) isRefreshing = true
         repository.getFriends().onSuccess { friends = it }
@@ -61,7 +63,6 @@ fun SocialScreen(
         isRefreshing = false
     }
 
-    // Auto-search when query changes; clear results when field is emptied
     LaunchedEffect(searchQuery) {
         if (searchQuery.isBlank()) {
             searchResults = emptyList()
@@ -74,16 +75,9 @@ fun SocialScreen(
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         if (isLoading) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else {
@@ -92,181 +86,215 @@ fun SocialScreen(
                 onRefresh = { refreshKey++ },
                 modifier = Modifier.fillMaxSize()
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    item {
-                        Text("Social", style = MaterialTheme.typography.headlineMedium)
-                        Spacer(modifier = Modifier.height(16.dp))
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
 
+                    // ── Header ────────────────────────────────────────────
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "People",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // ── Search bar ────────────────────────────────────────
+                    item {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            label = { Text("Search by nickname") },
+                            placeholder = { Text("Search by nickname") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(28.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
+                    // ── Search results ────────────────────────────────────
                     if (searchResults.isNotEmpty()) {
                         item {
-                            Text("Search Results", style = MaterialTheme.typography.titleMedium)
-                            Spacer(modifier = Modifier.height(8.dp))
+                            SectionHeader("Search Results")
                         }
                         items(searchResults) { user ->
-                            // Search results are not tappable — Add button only
                             UserRow(
                                 user = user,
                                 onClick = {},
                                 trailingContent = {
-                                    OutlinedButton(onClick = {
-                                        scope.launch {
-                                            repository.sendFriendRequest(user)
-                                            searchResults = searchResults - user
-                                            repository.getSentRequests().onSuccess { requests ->
-                                                sentRequests = requests
-                                                val nicknames = mutableMapOf<String, String>()
-                                                requests.forEach { request ->
-                                                    nicknames[request.receiverId] =
-                                                        repository.getUserNickname(request.receiverId)
+                                    FilledTonalButton(
+                                        onClick = {
+                                            scope.launch {
+                                                repository.sendFriendRequest(user)
+                                                searchResults = searchResults - user
+                                                repository.getSentRequests().onSuccess { requests ->
+                                                    sentRequests = requests
+                                                    val nicknames = mutableMapOf<String, String>()
+                                                    requests.forEach { req ->
+                                                        nicknames[req.receiverId] =
+                                                            repository.getUserNickname(req.receiverId)
+                                                    }
+                                                    sentRequestNicknames = nicknames
                                                 }
-                                                sentRequestNicknames = nicknames
                                             }
                                         }
-                                    }) {
+                                    ) {
+                                        Icon(Icons.Default.PersonAdd, contentDescription = null,
+                                            modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
                                         Text("Add")
                                     }
                                 }
                             )
-                            HorizontalDivider()
                         }
-                        item { Spacer(modifier = Modifier.height(16.dp)) }
+                        item { Spacer(modifier = Modifier.height(8.dp)) }
                     }
 
+                    // ── Pending requests ──────────────────────────────────
                     if (pendingRequests.isNotEmpty()) {
-                        item {
-                            Text("Friend Requests", style = MaterialTheme.typography.titleMedium)
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
+                        item { SectionHeader("Friend Requests") }
                         items(pendingRequests) { request ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = request.senderNickname,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = request.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(request.senderNickname,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold)
+                                    Text("Wants to connect",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        repository.declineFriendRequest(request)
+                                        pendingRequests = pendingRequests - request
+                                    }
+                                }) { Text("Decline", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                Spacer(Modifier.width(4.dp))
                                 Button(onClick = {
                                     scope.launch {
                                         repository.acceptFriendRequest(request)
                                         pendingRequests = pendingRequests - request
                                         repository.getFriends().onSuccess { friends = it }
                                     }
-                                }) {
-                                    Text("Accept")
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                OutlinedButton(onClick = {
-                                    scope.launch {
-                                        repository.declineFriendRequest(request)
-                                        pendingRequests = pendingRequests - request
-                                    }
-                                }) {
-                                    Text("Decline")
-                                }
+                                }) { Text("Accept") }
                             }
-                            HorizontalDivider()
                         }
-                        item { Spacer(modifier = Modifier.height(16.dp)) }
+                        item { Spacer(Modifier.height(8.dp)) }
                     }
 
-                    item {
-                        Text("Friends", style = MaterialTheme.typography.titleMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+                    // ── Friends ───────────────────────────────────────────
+                    item { SectionHeader("Friends") }
                     if (friends.isEmpty()) {
                         item {
                             Text(
-                                "No friends yet — search for someone above",
+                                "No friends yet — search above to connect",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
                     } else {
                         items(friends) { friend ->
-                            // Friends tap straight to conversation
                             UserRow(
                                 user = friend,
                                 onClick = { onOpenConversation(friend) }
                             )
-                            HorizontalDivider()
                         }
                     }
 
+                    // ── Sent requests ─────────────────────────────────────
                     if (sentRequests.isNotEmpty()) {
                         item {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Pending Sent Requests", style = MaterialTheme.typography.titleMedium)
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(Modifier.height(8.dp))
+                            SectionHeader("Pending Sent Requests")
                         }
                         items(sentRequests) { request ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Initials fallback only — sent requests don't carry photoUrl
                                 Box(
                                     modifier = Modifier
-                                        .size(44.dp)
+                                        .size(48.dp)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.secondaryContainer)
-                                        .border(
-                                            width = 1.5.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            shape = CircleShape
-                                        ),
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     val nickname = sentRequestNicknames[request.receiverId] ?: "?"
                                     Text(
                                         text = nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                        style = MaterialTheme.typography.titleMedium
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
                                     Text(
-                                        text = sentRequestNicknames[request.receiverId] ?: request.receiverId,
-                                        style = MaterialTheme.typography.bodyLarge
+                                        sentRequestNicknames[request.receiverId] ?: request.receiverId,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold
                                     )
-                                    Text(
-                                        text = "Request pending",
+                                    Text("Request pending",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            HorizontalDivider()
                         }
                     }
+
+                    item { Spacer(Modifier.height(24.dp)) }
                 }
             }
         }
     }
 }
 
-// Frontend: restyle this row however you want
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+    )
+}
+
 @Composable
 fun UserRow(
     user: UserProfile,
@@ -277,40 +305,28 @@ fun UserRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .padding(vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Profile avatar — shows Google photo or initials fallback
         val photoUrl = user.photoUrl.takeIf { it.isNotBlank() }
         if (photoUrl != null) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(photoUrl)
-                    .crossfade(true)
-                    .build(),
+                    .data(photoUrl).crossfade(true).build(),
                 contentDescription = "Profile photo",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
-                    .border(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = CircleShape
-                    )
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
             )
         } else {
-            // Fallback: circle with first letter of nickname
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .border(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = CircleShape
-                    ),
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -324,12 +340,22 @@ fun UserRow(
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = user.nickname, style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = "${user.major} · ${user.pronouns}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = user.nickname,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
             )
+            val subtitle = listOfNotNull(
+                user.major.takeIf { it.isNotBlank() },
+                user.pronouns.takeIf { it.isNotBlank() }
+            ).joinToString(" · ")
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         trailingContent?.invoke()
     }
