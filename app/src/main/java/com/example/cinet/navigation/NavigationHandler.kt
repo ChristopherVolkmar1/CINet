@@ -75,6 +75,12 @@ fun NavigationHandler(
     onRetry: () -> Unit,
     onSaveProfile: (String, String, String) -> Unit
 ) {
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Authenticated) {
+            AppSettings.selectedTheme = authState.userProfile.selectedTheme
+            AppSettings.isDarkMode = authState.userProfile.isDarkMode
+        }
+    }
     when (authState) {
         is AuthState.Loading -> LoadingScreen()
         is AuthState.Unauthenticated -> LoginScreen()
@@ -382,8 +388,9 @@ private fun MainScaffold(
                             onSignOut = onSignOut,
                             isDarkMode = userProfile.isDarkMode,
                             notificationsEnabled = userProfile.notificationsEnabled,
-                            onSettingsChange = { dark, notify ->
-                                authViewModel.updateSettings(dark, notify)
+                            selectedTheme = AppSettings.selectedTheme,
+                            onSettingsChange = { dark, notify, theme ->
+                                authViewModel.updateSettings(dark, notify, theme)
                             }
                         )
                     }

@@ -11,12 +11,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.cinet.ui.theme.AppThemeColor
+import com.example.cinet.ui.theme.ThemeSelector
 
 object AppSettings {
     var isDarkMode by mutableStateOf(false)
     var notificationsEnabled by mutableStateOf(true)
     var classReminderMinutesBefore: Long = 10L
     var assignmentReminderMinutesBefore: Long = 60L
+    var selectedTheme by mutableStateOf(AppThemeColor.Green)
 }
 
 // settings stuff - Zack
@@ -29,7 +32,8 @@ fun SettingScreen(
     onSignOut: () -> Unit,
     isDarkMode: Boolean,
     notificationsEnabled: Boolean,
-    onSettingsChange: (Boolean, Boolean) -> Unit
+    selectedTheme: AppThemeColor,
+    onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -57,6 +61,15 @@ fun SettingScreen(
             )
         }
 
+        ThemeSelector(
+            selectedTheme = selectedTheme,
+            onThemeChange = { newTheme ->
+                onSettingsChange(isDarkMode, notificationsEnabled, newTheme)
+            }
+        )
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
         // dark mode on / off
         Row(
             modifier = Modifier
@@ -75,7 +88,9 @@ fun SettingScreen(
             }
             Switch(
                 checked = isDarkMode,
-                onCheckedChange = { onSettingsChange(it, notificationsEnabled) }
+                onCheckedChange = { newValue ->
+                    onSettingsChange(newValue, notificationsEnabled, selectedTheme)
+                }
             )
         }
 
@@ -99,7 +114,9 @@ fun SettingScreen(
             }
             Switch(
                 checked = notificationsEnabled,
-                onCheckedChange = { onSettingsChange(isDarkMode, it) }
+                onCheckedChange = { newValue ->
+                    onSettingsChange(newValue, notificationsEnabled, selectedTheme)
+                }
             )
         }
 

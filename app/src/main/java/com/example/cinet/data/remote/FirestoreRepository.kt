@@ -3,6 +3,7 @@ package com.example.cinet.data.remote
 import android.util.Log
 import com.example.cinet.data.model.CampusEvent
 import com.example.cinet.data.model.UserProfile
+import com.example.cinet.ui.theme.AppThemeColor
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -55,7 +56,13 @@ class FirestoreRepository(
             if (settingsSnapshot.exists()) {
                 val isDarkMode = settingsSnapshot.getBoolean("isDarkMode") ?: profile.isDarkMode
                 val notificationsEnabled = settingsSnapshot.getBoolean("notificationsEnabled") ?: profile.notificationsEnabled
-                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled)
+                val themeName = settingsSnapshot.getString("selectedTheme") ?: profile.selectedTheme.name
+                val selectedTheme = try {
+                    AppThemeColor.valueOf(themeName)
+                } catch (_: Exception) {
+                    AppThemeColor.Green
+                }
+                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled, selectedTheme = selectedTheme)
             }
 
             Result.success(profile)
@@ -91,7 +98,8 @@ class FirestoreRepository(
 
     suspend fun updateUserSettings(
         isDarkMode: Boolean,
-        notificationsEnabled: Boolean
+        notificationsEnabled: Boolean,
+        selectedTheme: AppThemeColor
     ): Result<Unit> {
         return try {
             val uid = auth.currentUser?.uid ?: error("No signed-in user.")
@@ -101,7 +109,8 @@ class FirestoreRepository(
                 .set(
                     mapOf(
                         "isDarkMode" to isDarkMode,
-                        "notificationsEnabled" to notificationsEnabled
+                        "notificationsEnabled" to notificationsEnabled,
+                        "selectedTheme" to selectedTheme.name
                     ),
                     SetOptions.merge()
                 )

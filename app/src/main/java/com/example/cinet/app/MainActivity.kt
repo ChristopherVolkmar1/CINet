@@ -46,12 +46,22 @@ class MainActivity : ComponentActivity() {
                 else -> AppSettings.isDarkMode // Fallback to local default if not logged in
             }
 
+            val currentTheme = when (val state = authState) {
+                is AuthState.Authenticated -> state.userProfile.selectedTheme
+                is AuthState.ProfileSetup -> state.userProfile.selectedTheme
+                else -> AppSettings.selectedTheme
+            }
+
             // Sync global AppSettings for other components (like the Map) - Zack
             LaunchedEffect(isDarkMode) {
                 AppSettings.isDarkMode = isDarkMode
+                AppSettings.selectedTheme = currentTheme
             }
 
-            CINetTheme(darkTheme = isDarkMode) {
+            CINetTheme(
+                darkTheme = isDarkMode,
+                selectedColor = currentTheme
+            ) {
                 NavigationHandler(
                     authState = authState,
                     onSignOut = { authViewModel.signOut() },

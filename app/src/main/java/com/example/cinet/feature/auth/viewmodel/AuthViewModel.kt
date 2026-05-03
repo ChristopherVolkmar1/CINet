@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.FirestoreRepository
 import com.example.cinet.feature.auth.AuthState
+import com.example.cinet.ui.theme.AppThemeColor
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
@@ -62,7 +63,7 @@ class AuthViewModel(
      * Updates user settings in Firestore and local state.
      * Local state is updated immediately (optimistic update) for responsiveness.
      */
-    fun updateSettings(isDarkMode: Boolean, notificationsEnabled: Boolean) {
+    fun updateSettings(isDarkMode: Boolean, notificationsEnabled: Boolean, selectedTheme: AppThemeColor) {
         val currentState = _authState.value
         
         // Optimistic update of local state
@@ -70,20 +71,22 @@ class AuthViewModel(
             _authState.value = AuthState.Authenticated(
                 currentState.userProfile.copy(
                     isDarkMode = isDarkMode,
-                    notificationsEnabled = notificationsEnabled
+                    notificationsEnabled = notificationsEnabled,
+                    selectedTheme = selectedTheme
                 )
             )
         } else if (currentState is AuthState.ProfileSetup) {
             _authState.value = AuthState.ProfileSetup(
                 currentState.userProfile.copy(
                     isDarkMode = isDarkMode,
-                    notificationsEnabled = notificationsEnabled
+                    notificationsEnabled = notificationsEnabled,
+                    selectedTheme = selectedTheme
                 )
             )
         }
 
         viewModelScope.launch {
-            repository.updateUserSettings(isDarkMode, notificationsEnabled)
+            repository.updateUserSettings(isDarkMode, notificationsEnabled, selectedTheme)
                 .onFailure { e ->
                     android.util.Log.e(TAG, "Failed to update settings in Firestore: ${e.message}")
                     // Rollback could be implemented here if necessary
