@@ -1,16 +1,14 @@
 package com.example.cinet.feature.calendar.event
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.map.CampusLocation
@@ -31,13 +29,19 @@ fun EventItemDialog(
     onDelete: (() -> Unit)?,
     viewModel: CampusRegistry = viewModel<CampusRegistry>()
 ) {
-    val academic by viewModel.academic.collectAsState(initial = emptyList())
+    val campusRegistry by viewModel.campusRegistry.collectAsState()
     val textFieldState = rememberTextFieldState()
-    val academicNames = remember(textFieldState.text, academic) {
-        academic
+    var locationCategory by remember { mutableStateOf("academic") }
+
+    val categoryLocations = remember(campusRegistry, locationCategory) {
+        campusRegistry[locationCategory] ?: emptyList()
+    }
+    val searchResults = remember(textFieldState.text, categoryLocations) {
+        categoryLocations
             .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
             .map { it.name }
     }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editingEvent == null) "Add Event" else "Edit Event") },
@@ -61,12 +65,36 @@ fun EventItemDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = onPickTime) { Text("Pick Time") }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Category picker
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        "academic" to "Academic",
+                        "dining" to "Dining",
+                        "commuter_parking" to "Parking"
+                    ).forEach { (key, label) ->
+                        FilterChip(
+                            selected = locationCategory == key,
+                            onClick = {
+                                locationCategory = key
+                                textFieldState.edit { replace(0, length, "") }
+                                onLocationChange(null)
+                            },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+
                 SearchLocationBar(
                     textFieldState = textFieldState,
-                    searchResults = academicNames,
+                    searchResults = searchResults,
                     onSearch = { query ->
-                        val found = academic.find { it.name.equals(query, ignoreCase = true) }
+                        val found = categoryLocations.find { it.name.equals(query, ignoreCase = true) }
                         onLocationChange(found)
                         textFieldState.edit { replace(0, length, query) }
                     }

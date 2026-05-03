@@ -6,20 +6,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.example.cinet.feature.map.CampusLocation
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.tasks.await
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cinet.core.time.openTimePicker
+import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.feature.map.SearchLocationBar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-import com.example.cinet.core.time.openTimePicker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +28,7 @@ fun EventInviteSenderDialog(
     existingEvents: List<EventItem> = emptyList(),
     onDismiss: () -> Unit,
     onSend: (name: String, date: String, time: String, location: String) -> Unit,
+    campusRegistry: CampusRegistry = viewModel<CampusRegistry>()
 ) {
     val context = LocalContext.current
     // false = pick from existing, true = create new manually
@@ -34,24 +36,21 @@ fun EventInviteSenderDialog(
     var eventName by remember { mutableStateOf("") }
     var eventDate by remember { mutableStateOf("") }
     var eventTime by remember { mutableStateOf("") }
-    var eventLocation by remember { mutableStateOf("") }
     var searchQuery by remember { mutableStateOf("") }
-    var locationsByCategory by remember { mutableStateOf<Map<String, List<CampusLocation>>>(emptyMap()) }
     var locationCategory by remember { mutableStateOf("academic") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
 
-    LaunchedEffect(Unit) {
-        try {
-            val db = FirebaseFirestore.getInstance()
-            val result = mutableMapOf<String, List<CampusLocation>>()
-            for (col in listOf("academic", "dining", "commuter_parking")) {
-                result[col] = db.collection(col).get().await()
-                    .toObjects(CampusLocation::class.java)
-                    .sortedBy { it.name }
-            }
-            locationsByCategory = result
-        } catch (_: Exception) { }
+    val registryMap by campusRegistry.campusRegistry.collectAsState()
+    val locationTextFieldState = rememberTextFieldState()
+
+    val categoryLocations = remember(registryMap, locationCategory) {
+        registryMap[locationCategory] ?: emptyList()
+    }
+    val locationSearchResults = remember(locationTextFieldState.text, categoryLocations) {
+        categoryLocations
+            .filter { it.name.contains(locationTextFieldState.text.toString(), ignoreCase = true) }
+            .map { it.name }
     }
 
     if (showDatePicker) {
@@ -60,7 +59,6 @@ fun EventInviteSenderDialog(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        // Format to yyyy-MM-dd to match CalendarFirestoreRepository date format
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         sdf.timeZone = TimeZone.getTimeZone("UTC")
                         eventDate = sdf.format(Date(millis))
@@ -123,51 +121,37 @@ fun EventInviteSenderDialog(
                         ) {
                             Text("Pick Time")
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = eventLocation,
-                            onValueChange = { eventLocation = it },
-                            label = { Text("Location (optional)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (locationsByCategory.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Campus locations",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                listOf("academic" to "Academic", "dining" to "Dining", "commuter_parking" to "Parking")
-                                    .forEach { (key, label) ->
-                                        FilterChip(
-                                            selected = locationCategory == key,
-                                            onClick = { locationCategory = key },
-                                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                                        )
-                                    }
-                            }
-                            val categoryLocations = locationsByCategory[locationCategory] ?: emptyList()
-                            if (categoryLocations.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    categoryLocations.forEach { loc ->
-                                        SuggestionChip(
-                                            onClick = { eventLocation = loc.name },
-                                            label = { Text(loc.name, style = MaterialTheme.typography.labelSmall) },
-                                        )
-                                    }
-                                }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Category filter chips above location search bar
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(
+                                "academic" to "Academic",
+                                "dining" to "Dining",
+                                "commuter_parking" to "Parking"
+                            ).forEach { (key, label) ->
+                                FilterChip(
+                                    selected = locationCategory == key,
+                                    onClick = {
+                                        locationCategory = key
+                                        locationTextFieldState.edit { replace(0, length, "") }
+                                    },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                )
                             }
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        SearchLocationBar(
+                            textFieldState = locationTextFieldState,
+                            searchResults = locationSearchResults,
+                            onSearch = { query ->
+                                locationTextFieldState.edit { replace(0, length, query) }
+                            }
+                        )
                     }
                 } else {
                     // Pick from existing events
@@ -197,7 +181,6 @@ fun EventInviteSenderDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp)
-                                        // Tapping sends immediately
                                         .clickable {
                                             onSend(event.name, event.date, event.time, event.location)
                                         }
@@ -233,7 +216,7 @@ fun EventInviteSenderDialog(
             if (isCreatingNew) {
                 Button(onClick = {
                     if (eventName.isNotBlank() && eventDate.isNotBlank() && eventTime.isNotBlank()) {
-                        onSend(eventName, eventDate, eventTime, eventLocation)
+                        onSend(eventName, eventDate, eventTime, locationTextFieldState.text.toString())
                     }
                 }) { Text("Send") }
             }
