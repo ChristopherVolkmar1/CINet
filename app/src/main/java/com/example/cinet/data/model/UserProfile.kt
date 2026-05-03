@@ -1,5 +1,6 @@
 package com.example.cinet.data.model
 
+import com.example.cinet.ui.theme.AppThemeColor
 import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date
 
@@ -14,6 +15,7 @@ data class UserProfile(
     val fcmToken: String? = null, // used to send push notifications to this user's device
     val isDarkMode: Boolean = false,
     val notificationsEnabled: Boolean = true,
+    val selectedTheme: AppThemeColor = AppThemeColor.Green,
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val lastLoginAt: Date? = null,
 )
