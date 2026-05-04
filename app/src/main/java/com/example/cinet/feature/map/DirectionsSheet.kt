@@ -1,6 +1,7 @@
 package com.example.cinet.feature.map
 
 import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,13 +10,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
@@ -25,6 +29,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DirectionsTransit
 import androidx.compose.material.icons.filled.LocalParking
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ButtonDefaults
@@ -39,12 +44,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +59,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.ui.theme.CINetTheme
 import com.google.maps.model.TravelMode
 import java.time.LocalDate
@@ -78,9 +86,10 @@ fun DirectionsPopup(
     onDismiss: () -> Unit,
     onModeSelected: (TravelMode) -> Unit,
     routeDurations: RouteDurations,
-    onShowBusSchedule: () -> Unit = {}
+    onShowBusSchedule: () -> Unit = {},
+    friends: List<UserProfile>
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     if (location == null) return
 
     ModalBottomSheet(
@@ -132,14 +141,17 @@ fun DirectionsPopup(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-            Spacer(modifier = Modifier.height(16.dp))
+            if (location.category != "COMMUTER_PARKING") {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surface)
+                Spacer(modifier = Modifier.height(16.dp))
 
-            QuickInfo(location)
+                QuickInfo(location)
 
-            Spacer(modifier = Modifier.height(16.dp))
-            UpcomingClass()
+                Spacer(modifier = Modifier.height(16.dp))
+                ShareLocation(friends = friends, location = location)
+                Spacer(modifier = Modifier.height(4.dp))
+            }
         }
     }
 }
@@ -182,7 +194,7 @@ fun getStatusForLocation(weeklyHours: WeeklyHours?): String {
     }
 }
 @Composable
-private fun StatusBox(status: String) {
+private fun StatusBox(status: String, modifier: Modifier = Modifier) {
     val backgroundColor = when (status) {
         "OPEN" -> MaterialTheme.colorScheme.secondaryContainer
         "CLOSED" -> MaterialTheme.colorScheme.error
@@ -193,10 +205,9 @@ private fun StatusBox(status: String) {
         color = backgroundColor,
         tonalElevation = 4.dp,
         shadowElevation = 2.dp,
-        modifier = Modifier
+        modifier = modifier
             .widthIn(min = 50.dp)
             .height(32.dp)
-            .offset(y = (-24).dp)
     ) {
         Box (
             contentAlignment = Alignment.Center,
@@ -216,35 +227,50 @@ private fun StatusBox(status: String) {
 @Composable
 private fun LocationHeader(location: CampusLocation, onShowBusSchedule: () -> Unit = {}) {
     val status = getStatusForLocation(location.hours)
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            categoryIcon(location.category),
-            contentDescription = null,
-            modifier = Modifier.size(50.dp)
-        )
-        Spacer(modifier = Modifier.width(24.dp))
-        Column {
-            Text(
-                text = location.name,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSecondary
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+        ) {
+            Icon(
+                categoryIcon(location.category),
+                contentDescription = null,
+                modifier = Modifier.size(50.dp)
             )
-            if (location.category == "TRANSIT") {
-                TextButton(onClick = onShowBusSchedule) {
-                    Text("View Bus Schedule", color = MaterialTheme.colorScheme.onSecondary)
-                }
-            } else {
-                if (location.description.isNotBlank()) {
-                    Text(
-                        text = location.category.lowercase().replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSecondary
-                    )
+            Spacer(modifier = Modifier.width(24.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = location.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSecondary,
+                    maxLines = 1,
+                )
+                if (location.category == "TRANSIT") {
+                    TextButton(onClick = onShowBusSchedule) {
+                        Text("View Bus Schedule", color = MaterialTheme.colorScheme.onSecondary)
+                    }
+                } else {
+                    if (location.description.isNotBlank()) {
+                        Text(
+                            text = location.category.lowercase()
+                                .replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSecondary
+                        )
+                    }
                 }
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
-        StatusBox(status)
+        if (location.category != "COMMUTER_PARKING") {
+            StatusBox(
+                status,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(y = -24.dp)
+            )
+        }
     }
 }
 
@@ -262,8 +288,14 @@ private fun TravelModeButton(
             containerColor = MaterialTheme.colorScheme.secondaryContainer, // Background
             contentColor = MaterialTheme.colorScheme.onSecondary    // Text/Icon
         ),
+        border = BorderStroke(
+            width = 2.dp,
+            color = Color.White.copy(alpha = 0.6f)
+        ),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 1.dp),
-        modifier = modifier.height(48.dp).width(110.dp)
+        modifier = modifier
+            .height(48.dp)
+            .width(110.dp)
     ) {
         Icon(
             imageVector = icon,
@@ -283,7 +315,7 @@ private fun TravelModeButton(
 fun BusScheduleSheet(onDismiss: () -> Unit) {
     val arrival = listOf<String>("7:25am", "8:45am", "10:05am", "11:25am", "1:00pm", "2:20pm", "3:40pm", "5:00pm")
     val departure = listOf<String>("7:50am", "9:10am", "10:30am", "11:50am", "1:25pm", "2:45pm", "4:05pm", "5:30pm")
-    var selectedTab by remember { mutableIntStateOf(0) }
+
     AlertDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
         modifier = Modifier
@@ -337,6 +369,8 @@ fun convertTime(time: Int): String {
 }
 @Composable
 fun QuickInfo(location: CampusLocation) {
+    val mainScrollState = rememberScrollState()
+    val descriptionScrollState = rememberScrollState()
     val displayHours = remember(location.hours) {
         val dayOfWeek = LocalDate.now().dayOfWeek.name.lowercase()
         val today = when (dayOfWeek) {
@@ -359,71 +393,72 @@ fun QuickInfo(location: CampusLocation) {
             }
         }
     }
-    Column(modifier = Modifier.padding(2.dp)) {
+    Column(
+        modifier = Modifier.padding(2.dp).verticalScroll(mainScrollState)
+    ) {
         Text(
             "Quick Info",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold
         )
+        Spacer(modifier = Modifier.padding(bottom = 4.dp))
         Text(
             text = "Hours of Operation: $displayHours",
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             softWrap = false
         )
-        Text(
-            text = location.description,
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
-}
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .heightIn(max = 100.dp)
+                .verticalScroll(descriptionScrollState)
+                .drawWithContent {
+                    drawContent()
+                    if (descriptionScrollState.maxValue > 0) {
+                        val scrollbarWidth = 4.dp.toPx()
+                        val viewportHeight = size.height
+                        val totalContentHeight = size.height + descriptionScrollState.maxValue
+                        val scrollbarHeight = viewportHeight * (viewportHeight / totalContentHeight)
+                        val scrollbarOffsetY = descriptionScrollState.value * (viewportHeight / totalContentHeight)
 
-@Composable
-fun UpcomingClass(
-    className: String = "UPCOMING CLASS"
-) {
-    Surface(
-        shape = RoundedCornerShape(36.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 2.dp, vertical = 2.dp)
-            .height(48.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+                        drawRoundRect(
+                            color = Color.White.copy(alpha = 0.3f),
+                            topLeft = Offset(size.width - scrollbarWidth, scrollbarOffsetY),
+                            size = Size(scrollbarWidth, scrollbarHeight),
+                            cornerRadius = CornerRadius(2.dp.toPx())
+                        )
+                    }
+                }
         ) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.Default.AccessTime,
-                contentDescription = null,
-                modifier = Modifier.size(30.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = className.lowercase().replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.headlineSmall,
-                letterSpacing = 1.sp,
-                fontWeight = FontWeight.Bold
+                text = location.description,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(end = 8.dp)
             )
         }
     }
 }
 
+
 @Preview(showBackground = true, showSystemUi = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun Preview() {
     CINetTheme(darkTheme = true) {
+        val mockFriends = listOf(
+            UserProfile(uid = "1", nickname = "Ian", major = "Computer Science", pronouns = "he/him"),
+            UserProfile(uid = "2", nickname = "Maddi", major = "Computer Science", pronouns = "she/they")
+        )
         DirectionsPopup(
-            location = CampusLocation("Aliso Hall", "ACADEMIC", description = "description from firebase"),
+            location = CampusLocation("CSUCI Transit Stop", "TRANSIT", description = "How to Ride: Activate bus pass onto your school ID card for free at Transportation and Parking Services in Placer Hall. College Ride program is free for CI students, staff, and faculty with a valid DolphinOne I.D. card! If you have activated your school ID card with TPS, you can now self-activate your card by selecting the VCTC Bus Activation service tile when you log into myCI. If you have a new card, you must activate in-person for the first time."),
             onDismiss = {},
             onModeSelected = {},
             routeDurations = RouteDurations(
                 driving = "15 mins",
                 walking = "3.5 hrs",
                 biking = "33 mins"
-            )
+            ),
+            friends = mockFriends
         )
         //BusScheduleSheet(onDismiss = {})
     }

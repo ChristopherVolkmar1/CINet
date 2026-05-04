@@ -574,6 +574,12 @@ fun MessageBubble(
                     onDecline = onDecline,
                     onNavigateToLocation = onNavigateToLocation,
                 )
+            } else if (message.type == "location_share") {
+                LocationShareBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onNavigateToLocation = onNavigateToLocation
+                )
             } else {
                 val bubbleColor = if (isCurrentUser)
                     MaterialTheme.colorScheme.primary
@@ -806,6 +812,68 @@ fun InviteBubble(
                             modifier = Modifier.weight(1f),
                         ) { Text("Decline") }
                     }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun LocationShareBubble(
+    message: Message,
+    isCurrentUser: Boolean,
+    onNavigateToLocation: ((String) -> Unit)? = null
+) {
+    val locationName = message.metadata["locationName"] ?: ""
+    val cardShape = RoundedCornerShape(
+        topStart = if (isCurrentUser) 16.dp else 4.dp,
+        topEnd = if (isCurrentUser) 4.dp else 16.dp,
+        bottomStart = 16.dp,
+        bottomEnd = 16.dp
+    )
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.widthIn(min = 220.dp, max = 280.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "LOCATION SHARE",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                thickness = 0.5.dp
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = locationName,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            if (locationName.isNotBlank() && onNavigateToLocation != null) {
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { onNavigateToLocation(locationName) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("View on Map")
                 }
             }
         }

@@ -299,7 +299,7 @@ fun NewConversationScreen(
 }
 
 @Composable
-private fun FriendSelectRow(
+fun FriendSelectRow(
     friend: UserProfile,
     isSelected: Boolean,
     onToggle: () -> Unit,

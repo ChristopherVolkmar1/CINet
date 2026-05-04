@@ -1,6 +1,7 @@
 package com.example.cinet.feature.map
 
 import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.ui.theme.CINetTheme
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
@@ -70,7 +72,8 @@ fun MapControls(
     onDismissPopup: () -> Unit,
     onModeSelected: (TravelMode) -> Unit,
     routeDurations: RouteDurations,
-    onShowBusSchedule: () -> Unit = {}
+    onShowBusSchedule: () -> Unit = {},
+    friends: List<UserProfile>
 ) {
     Row(
         modifier = Modifier
@@ -99,7 +102,8 @@ fun MapControls(
             onDismiss = onDismissPopup,
             onModeSelected = onModeSelected,
             routeDurations = routeDurations,
-            onShowBusSchedule = onShowBusSchedule
+            onShowBusSchedule = onShowBusSchedule,
+            friends = friends
         )
     }
 }
@@ -162,7 +166,11 @@ fun FilterMenu(
                             contentPadding = PaddingValues(horizontal = 12.dp),
                             colors = ButtonDefaults.elevatedButtonColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            )
+                            ),
+                            border = BorderStroke(
+                                width = 2.dp,
+                                color = Color.White.copy(alpha = 0.6f)
+                            ),
                         ) {
                             Text(
                                 text = "Clear",
