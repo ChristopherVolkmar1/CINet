@@ -141,17 +141,15 @@ fun DirectionsPopup(
                 )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surface)
             if (location.category != "COMMUTER_PARKING") {
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-                Spacer(modifier = Modifier.height(16.dp))
-
                 QuickInfo(location)
-
-                Spacer(modifier = Modifier.height(16.dp))
-                ShareLocation(friends = friends, location = location)
-                Spacer(modifier = Modifier.height(4.dp))
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            ShareLocation(friends = friends, location = location)
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }
