@@ -115,7 +115,7 @@ fun SettingScreen(
             Switch(
                 checked = notificationsEnabled,
                 onCheckedChange = { newValue ->
-                    onSettingsChange(newValue, notificationsEnabled, selectedTheme)
+                    onSettingsChange(isDarkMode, newValue, selectedTheme)
                 }
             )
         }

@@ -712,6 +712,7 @@ class SocialRepository(
                 mapOf(
                     "lastMessage" to content,
                     "lastUpdated" to FieldValue.serverTimestamp(),
+                    "lastSenderId" to currentUid,
                     // Re-activates the conversation if it was hidden after an unfriend.
                     // This means sending a message after re-adding a friend restores
                     // the conversation in the list automatically.

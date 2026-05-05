@@ -37,7 +37,9 @@ fun ConversationsListScreen(
     onNewConversation: () -> Unit,
     onOpenFriends: () -> Unit,
     sessionStartTime: Long = 0L,
-    openedConversationIds: Set<String> = emptySet(),
+    // Maps conversationId -> timestamp when it was last opened this session.
+    // A message arriving AFTER that timestamp shows a dot even for opened convos.
+    openedConversationTimestamps: Map<String, Long> = emptyMap(),
 ) {
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val repository = remember { SocialRepository() }
@@ -54,7 +56,6 @@ fun ConversationsListScreen(
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     conversations = snapshot.toObjects(Conversation::class.java)
-                        .filter { it.active }  // hide deactivated (unfriended) conversations
                         .sortedByDescending { it.lastUpdated?.time ?: 0L }
                     isLoading = false
                 }
@@ -153,9 +154,13 @@ fun ConversationsListScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(conversations, key = { it.id }) { conversation ->
-                        val hasUnread = conversation.id !in openedConversationIds &&
-                                (conversation.lastUpdated?.time ?: 0L) > sessionStartTime &&
-                                conversation.lastMessage.isNotBlank()
+                        // Baseline: the later of sessionStartTime or when this convo
+                        // was last opened. A message after that timestamp = unread.
+                        val openedAt = openedConversationTimestamps[conversation.id] ?: 0L
+                        val baseline = maxOf(sessionStartTime, openedAt)
+                        val hasUnread = (conversation.lastUpdated?.time ?: 0L) > baseline &&
+                                conversation.lastMessage.isNotBlank() &&
+                                conversation.lastSenderId != currentUid
                         ConversationListItem(
                             conversation = conversation,
                             currentUid = currentUid,

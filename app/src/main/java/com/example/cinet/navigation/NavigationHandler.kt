@@ -57,6 +57,7 @@ import com.example.cinet.feature.social.ConversationsListScreen
 import com.example.cinet.feature.social.NewConversationScreen
 import com.example.cinet.feature.social.SocialScreen
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.Locale
 
@@ -73,7 +74,9 @@ fun NavigationHandler(
     authState: AuthState,
     onSignOut: () -> Unit,
     onRetry: () -> Unit,
-    onSaveProfile: (String, String, String) -> Unit
+    onSaveProfile: (String, String, String) -> Unit,
+    initialConversationId: String? = null,
+    onConversationOpened: () -> Unit = {},
 ) {
     LaunchedEffect(authState) {
         if (authState is AuthState.Authenticated) {
@@ -93,7 +96,9 @@ fun NavigationHandler(
         )
         is AuthState.Authenticated -> MainScaffold(
             userProfile = authState.userProfile,
-            onSignOut = onSignOut
+            onSignOut = onSignOut,
+            initialConversationId = initialConversationId,
+            onConversationOpened = onConversationOpened,
         )
     }
 }
@@ -101,7 +106,9 @@ fun NavigationHandler(
 @Composable
 private fun MainScaffold(
     userProfile: UserProfile,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    initialConversationId: String? = null,
+    onConversationOpened: () -> Unit = {},
 ) {
     val authViewModel: AuthViewModel = viewModel()
     val calendarViewModel: CalendarViewModel = viewModel()
@@ -146,15 +153,45 @@ private fun MainScaffold(
     var showNewConversation by remember { mutableStateOf(false) }
     var showSocialScreen by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
+    // Persisted: last time the user had the conversations list visible.
+    // Default to currentTimeMillis on first launch so existing conversations
+    // don't all appear as unread.
+    var lastConversationsVisit by remember {
+        mutableStateOf(
+            sharedPrefs.getLong("last_conversations_visit", 0L).let { saved ->
+                if (saved == 0L) System.currentTimeMillis() else saved
+            }
+        )
+    }
+    // Maps conversationId -> timestamp when opened; dot shows if new message arrived after
+    var openedConversationTimestamps by remember { mutableStateOf(mapOf<String, Long>()) }
+
+    // When the user taps a push notification, open the referenced conversation directly.
+    LaunchedEffect(initialConversationId) {
+        val id = initialConversationId ?: return@LaunchedEffect
+        try {
+            val snap = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("conversations")
+                .document(id)
+                .get()
+                .await()
+            val conversation = snap.toObject(Conversation::class.java)
+            if (conversation != null) {
+                currentScreen = Screen.Social
+                openedConversationTimestamps = openedConversationTimestamps + (conversation.id to System.currentTimeMillis())
+                activeConversation = conversation
+                onConversationOpened()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NavigationHandler", "Failed to open conversation from notification: ${e.message}")
+        }
+    }
+
     // News / CIView state
     var showCIView by remember { mutableStateOf(false) }
     var selectedNewsArticle by remember { mutableStateOf<NewsArticle?>(null) }
-
-    val context = LocalContext.current
-    val sharedPrefs = remember { context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE) }
-    // Persisted: last time the user had the conversations list visible
-    var lastConversationsVisit by remember { mutableStateOf(sharedPrefs.getLong("last_conversations_visit", 0L)) }
-    var openedConversationIds by remember { mutableStateOf(setOf<String>()) }
 
     fun loadItems(key: String): List<Pair<String, String>> {
         val saved = sharedPrefs.getString(key, null) ?: return emptyList()
@@ -353,13 +390,13 @@ private fun MainScaffold(
                             }
                             ConversationsListScreen(
                                 onOpenConversation = {
-                                    openedConversationIds = openedConversationIds + it.id
+                                    openedConversationTimestamps = openedConversationTimestamps + (it.id to System.currentTimeMillis())
                                     activeConversation = it
                                 },
                                 onNewConversation = { showNewConversation = true },
                                 onOpenFriends = { showSocialScreen = true },
                                 sessionStartTime = lastConversationsVisit,
-                                openedConversationIds = openedConversationIds,
+                                openedConversationTimestamps = openedConversationTimestamps,
                             )
                         }
                     }

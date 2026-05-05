@@ -15,6 +15,7 @@ data class Conversation(
     var isGroup: Boolean = false,
     val groupName: String = "",
     @ServerTimestamp val lastUpdated: Date? = null,
+    val lastSenderId: String = "",
     // false = hidden (e.g. after unfriend). Defaults to true so legacy docs
     // without this field are treated as active.
     val active: Boolean = true,
