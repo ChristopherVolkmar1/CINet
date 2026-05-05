@@ -37,7 +37,6 @@ fun SocialScreen(
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var pendingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var sentRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
-    var sentRequestNicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -49,14 +48,7 @@ fun SocialScreen(
         if (refreshKey > 0) isRefreshing = true
         repository.getFriends().onSuccess { friends = it }
         repository.getPendingRequests().onSuccess { pendingRequests = it }
-        repository.getSentRequests().onSuccess { requests ->
-            sentRequests = requests
-            val nicknames = mutableMapOf<String, String>()
-            requests.forEach { request ->
-                nicknames[request.receiverId] = repository.getUserNickname(request.receiverId)
-            }
-            sentRequestNicknames = nicknames
-        }
+        repository.getSentRequests().onSuccess { sentRequests = it }
         isLoading = false
         isRefreshing = false
     }
@@ -124,16 +116,10 @@ fun SocialScreen(
                                 trailingContent = {
                                     OutlinedButton(onClick = {
                                         scope.launch {
-                                            repository.sendFriendRequest(user)
-                                            searchResults = searchResults - user
-                                            repository.getSentRequests().onSuccess { requests ->
-                                                sentRequests = requests
-                                                val nicknames = mutableMapOf<String, String>()
-                                                requests.forEach { request ->
-                                                    nicknames[request.receiverId] =
-                                                        repository.getUserNickname(request.receiverId)
-                                                }
-                                                sentRequestNicknames = nicknames
+                                            val result = repository.sendFriendRequest(user)
+                                            if (result.isSuccess) {
+                                                searchResults = searchResults - user
+                                                repository.getSentRequests().onSuccess { sentRequests = it }
                                             }
                                         }
                                     }) {
@@ -236,7 +222,7 @@ fun SocialScreen(
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    val nickname = sentRequestNicknames[request.receiverId] ?: "?"
+                                    val nickname = request.receiverNickname.ifBlank { "?" }
                                     Text(
                                         text = nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
                                         style = MaterialTheme.typography.titleMedium
@@ -247,7 +233,7 @@ fun SocialScreen(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = sentRequestNicknames[request.receiverId] ?: request.receiverId,
+                                        text = request.receiverNickname.ifBlank { request.receiverId },
                                         style = MaterialTheme.typography.bodyLarge
                                     )
                                     Text(

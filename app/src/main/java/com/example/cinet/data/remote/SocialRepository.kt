@@ -74,6 +74,7 @@ class SocialRepository(
     suspend fun sendFriendRequest(receiver: UserProfile): Result<Unit> {
         return try {
             if (!canSendFriendRequest(receiver.uid)) {
+                Log.d("SocialRepository", "sendFriendRequest blocked for ${receiver.uid}")
                 return Result.success(Unit)
             }
 
@@ -82,11 +83,14 @@ class SocialRepository(
                 senderId = currentUid,
                 senderNickname = currentUser.nickname,
                 receiverId = receiver.uid,
+                receiverNickname = receiver.nickname,
             )
 
             saveFriendRequest(request)
+            Log.d("SocialRepository", "sendFriendRequest: sent to ${receiver.uid}")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("SocialRepository", "sendFriendRequest failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -110,15 +114,29 @@ class SocialRepository(
         }
     }
 
-    /** Gets outgoing pending friend requests sent by the current user. */
+    /** Gets outgoing pending friend requests sent by the current user.
+     *  For legacy docs that pre-date the receiverNickname field, the nickname
+     *  is fetched on the fly so the UI never shows a raw UID.
+     */
     suspend fun getSentRequests(): Result<List<FriendRequest>> {
         return try {
             val requests = loadPendingRequestsForSender(currentUid)
                 .sortedByDescending { it.createdAt?.time ?: 0L }
                 .distinctBy { it.receiverId }
 
-            Result.success(requests)
+            // Back-fill receiverNickname for any legacy docs that are missing it
+            val enriched = requests.map { request ->
+                if (request.receiverNickname.isBlank()) {
+                    request.copy(receiverNickname = getUserNickname(request.receiverId))
+                } else {
+                    request
+                }
+            }
+
+            Log.d("SocialRepository", "getSentRequests: found ${enriched.size} for uid $currentUid")
+            Result.success(enriched)
         } catch (e: Exception) {
+            Log.e("SocialRepository", "getSentRequests failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -387,9 +405,25 @@ class SocialRepository(
     /** Checks whether a new friend request is allowed to be sent. */
     private suspend fun canSendFriendRequest(receiverUid: String): Boolean {
         if (receiverUid == currentUid) return false
-        if (areAlreadyFriends(receiverUid)) return false
-        if (hasPendingRequest(currentUid, receiverUid)) return false
-        if (hasPendingRequest(receiverUid, currentUid)) return false
+        try {
+            if (areAlreadyFriends(receiverUid)) {
+                Log.d("SocialRepository", "canSendFriendRequest: already friends with $receiverUid")
+                return false
+            }
+            if (hasPendingRequest(currentUid, receiverUid)) {
+                Log.d("SocialRepository", "canSendFriendRequest: pending request already sent to $receiverUid")
+                return false
+            }
+            if (hasPendingRequest(receiverUid, currentUid)) {
+                Log.d("SocialRepository", "canSendFriendRequest: $receiverUid already sent us a request")
+                return false
+            }
+        } catch (e: Exception) {
+            // If the index query fails (e.g. missing composite index), log clearly and
+            // allow the send rather than silently blocking it. The saveFriendRequest
+            // document ID is deterministic so a duplicate write is harmless.
+            Log.e("SocialRepository", "canSendFriendRequest check failed — allowing send. Error: ${e.message}")
+        }
         return true
     }
 
@@ -403,6 +437,7 @@ class SocialRepository(
         senderId: String,
         senderNickname: String,
         receiverId: String,
+        receiverNickname: String,
     ): FriendRequest {
         val requestId = friendRequestDocumentId(senderId, receiverId)
 
@@ -411,16 +446,20 @@ class SocialRepository(
             senderId = senderId,
             senderNickname = senderNickname,
             receiverId = receiverId,
+            receiverNickname = receiverNickname,
             status = "pending",
         )
     }
 
-    /** Saves a friend request to Firestore. */
+    /**
+     * Saves a friend request to Firestore.
+     * Deletes any stale doc first (e.g. a previously declined request) so the
+     * write is always a `create` -- which the sender is permitted to do.
+     */
     private suspend fun saveFriendRequest(request: FriendRequest) {
-        db.collection("friendRequests")
-            .document(request.id)
-            .set(request)
-            .await()
+        val docRef = db.collection("friendRequests").document(request.id)
+        try { docRef.delete().await() } catch (_: Exception) { }
+        docRef.set(request).await()
     }
 
     /** Loads the current user's full profile from Firestore. */
