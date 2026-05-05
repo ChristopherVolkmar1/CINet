@@ -54,6 +54,7 @@ fun ConversationsListScreen(
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     conversations = snapshot.toObjects(Conversation::class.java)
+                        .filter { it.active }  // hide deactivated (unfriended) conversations
                         .sortedByDescending { it.lastUpdated?.time ?: 0L }
                     isLoading = false
                 }

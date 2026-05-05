@@ -177,23 +177,61 @@ class SocialRepository(
         }
     }
 
-    /** Removes a friend by deleting the friend doc from both users' subcollections. */
+    /**
+     * Removes a friend atomically via a WriteBatch:
+     *  1. Deletes both users' friend subcollection docs.
+     *  2. Finds the shared DM conversation (client-side isGroup check to handle
+     *     docs where the field was never written) and sets active = false so it
+     *     disappears from ConversationsListScreen without losing message history.
+     *  3. Deletes both possible friendRequest docs.
+     *
+     * Sending a new message after re-adding calls updateConversationLastMessage
+     * which sets active = true, restoring the conversation automatically.
+     */
     suspend fun removeFriend(friendUid: String): Result<Unit> {
         return try {
-            db.collection("users")
-                .document(currentUid)
-                .collection("friends")
-                .document(friendUid)
-                .delete()
+            val batch = db.batch()
+
+            // 1. Delete both friend subcollection docs
+            batch.delete(
+                db.collection("users").document(currentUid)
+                    .collection("friends").document(friendUid)
+            )
+            batch.delete(
+                db.collection("users").document(friendUid)
+                    .collection("friends").document(currentUid)
+            )
+
+            // 2. Find the shared DM conversation and deactivate it.
+            //    Query by participantIds contains currentUid, then filter client-side
+            //    because whereEqualTo("isGroup", false) misses docs where the field
+            //    was never set.
+            val conversationsSnapshot = db.collection("conversations")
+                .whereArrayContains("participantIds", currentUid)
+                .get()
                 .await()
 
-            db.collection("users")
-                .document(friendUid)
-                .collection("friends")
-                .document(currentUid)
-                .delete()
-                .await()
+            conversationsSnapshot.documents
+                .filter { doc ->
+                    val isGroup = doc.getBoolean("isGroup") ?: false
+                    @Suppress("UNCHECKED_CAST")
+                    val participants = doc.get("participantIds") as? List<String> ?: emptyList()
+                    !isGroup && participants.contains(friendUid)
+                }
+                .forEach { doc ->
+                    batch.update(doc.reference, "active", false)
+                }
 
+            // 3. Delete both possible friendRequest docs (either direction)
+            batch.delete(
+                db.collection("friendRequests").document("${currentUid}_${friendUid}")
+            )
+            batch.delete(
+                db.collection("friendRequests").document("${friendUid}_${currentUid}")
+            )
+
+            batch.commit().await()
+            Log.d("SocialRepository", "removeFriend: removed $friendUid, conversation deactivated")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SocialRepository", "removeFriend failed: ${e.message}")
@@ -668,7 +706,11 @@ class SocialRepository(
             .set(
                 mapOf(
                     "lastMessage" to content,
-                    "lastUpdated" to FieldValue.serverTimestamp()
+                    "lastUpdated" to FieldValue.serverTimestamp(),
+                    // Re-activates the conversation if it was hidden after an unfriend.
+                    // This means sending a message after re-adding a friend restores
+                    // the conversation in the list automatically.
+                    "active" to true
                 ),
                 SetOptions.merge()
             )
