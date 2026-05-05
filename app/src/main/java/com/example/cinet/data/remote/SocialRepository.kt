@@ -222,16 +222,21 @@ class SocialRepository(
                     batch.update(doc.reference, "active", false)
                 }
 
-            // 3. Delete both possible friendRequest docs (either direction)
-            batch.delete(
-                db.collection("friendRequests").document("${currentUid}_${friendUid}")
-            )
-            batch.delete(
-                db.collection("friendRequests").document("${friendUid}_${currentUid}")
-            )
-
             batch.commit().await()
-            Log.d("SocialRepository", "removeFriend: removed $friendUid, conversation deactivated")
+            Log.d("SocialRepository", "removeFriend: friend docs deleted, conversation deactivated")
+
+            // 3. Delete both possible friendRequest docs outside the batch.
+            //    A batch delete on a non-existent doc causes PERMISSION_DENIED
+            //    and fails the whole batch, so each is done individually.
+            for (docId in listOf("${currentUid}_${friendUid}", "${friendUid}_${currentUid}")) {
+                try {
+                    db.collection("friendRequests").document(docId).delete().await()
+                } catch (e: Exception) {
+                    Log.d("SocialRepository", "friendRequest $docId skipped: ${e.message}")
+                }
+            }
+
+            Log.d("SocialRepository", "removeFriend: complete for $friendUid")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SocialRepository", "removeFriend failed: ${e.message}")
