@@ -44,10 +44,27 @@ data class CampusIcons(
     val default: BitmapDescriptor?
 )
 
+val transitDayHours = DayHours(open = 725, close = 1730, isClosed = false)
+
+val csuciWeeklyHours = WeeklyHours(
+    monday = transitDayHours,
+    tuesday = transitDayHours,
+    wednesday = transitDayHours,
+    thursday = transitDayHours,
+    friday = transitDayHours,
+    saturday = DayHours(isClosed = true),
+    sunday = DayHours(isClosed = true)
+)
 val csuciTransitStop = CampusLocation(
     name = "CSUCI Transit Stop",
     category = "TRANSIT",
-    coordinates = GeoPoint(34.16546748540989, -119.04402834425024)
+    coordinates = GeoPoint(34.16546748540989, -119.04402834425024),
+    hours = csuciWeeklyHours,
+    description = "How to Ride: Activate bus pass onto your school ID card for free at Transportation " +
+            "and Parking Services in Placer Hall. College Ride program is free for CI students, " +
+            "staff, and faculty with a valid DolphinOne I.D. card! If you have activated your school ID card with TPS, " +
+            "you can now self-activate your card by selecting the VCTC Bus Activation service tile when you log into myCI. " +
+            "If you have a new card, you must activate in-person for the first time."
 )
 
 // -------------------- Location filtering --------------------
