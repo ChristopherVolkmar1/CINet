@@ -49,6 +49,21 @@ class AuthViewModel(
         }
     }
 
+    /**
+     * Silently reloads the user profile from Firestore without flashing a
+     * Loading state. Called after ProfileEditScreen saves so the UI updates
+     * immediately without a full re-auth cycle.
+     */
+    fun silentReloadProfile() {
+        viewModelScope.launch {
+            repository.createOrLoadUserProfile()
+                .onSuccess { resolveState(it) }
+                .onFailure { e ->
+                    android.util.Log.e(TAG, "silentReloadProfile failed: ${e.message}")
+                }
+        }
+    }
+
     // Saves the user's profile details to Firestore and updates state
     fun saveProfile(nickname: String, major: String, pronouns: String) {
         viewModelScope.launch {
@@ -65,7 +80,7 @@ class AuthViewModel(
      */
     fun updateSettings(isDarkMode: Boolean, notificationsEnabled: Boolean, selectedTheme: AppThemeColor) {
         val currentState = _authState.value
-        
+
         // Optimistic update of local state
         if (currentState is AuthState.Authenticated) {
             _authState.value = AuthState.Authenticated(

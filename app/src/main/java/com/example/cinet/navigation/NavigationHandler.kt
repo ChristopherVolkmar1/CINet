@@ -217,7 +217,7 @@ private fun MainScaffold(
             (activeConversation != null || selectedProfile != null ||
                     showNewConversation || showSocialScreen)
 
-    BackHandler(enabled = currentScreen != Screen.Home || socialBackStackActive || showProfileEdit || isShowingNews) {
+    BackHandler(enabled = currentScreen != Screen.Home || socialBackStackActive || showProfileEdit || isShowingNews || selectedProfile != null) {
         when {
             selectedNewsArticle != null -> {
                 selectedNewsArticle = null
@@ -350,10 +350,11 @@ private fun MainScaffold(
                             }
                         )
                         selectedProfile != null -> ProfileScreen(
-                            user = selectedProfile!!,
+                            user = if (selectedProfile!!.uid == userProfile.uid) userProfile else selectedProfile!!,
                             currentUserProfile = userProfile,
                             onOpenConversation = { activeConversation = it },
-                            onBack = { selectedProfile = null }
+                            onBack = { selectedProfile = null },
+                            onEditProfile = { showProfileEdit = true },
                         )
                         showNewConversation -> NewConversationScreen(
                             currentUserProfile = userProfile,
@@ -417,7 +418,20 @@ private fun MainScaffold(
 
                     Screen.Settings -> if (showProfileEdit) {
                         ProfileEditScreen(
-                            onBack = { showProfileEdit = false }
+                            onBack = { showProfileEdit = false },
+                            onSaved = { authViewModel.silentReloadProfile() },
+                        )
+                    } else if (selectedProfile != null) {
+                        // For own profile, pass userProfile (live) so saved changes
+                        // are reflected immediately without needing a refresh.
+                        val displayProfile = if (selectedProfile!!.uid == userProfile.uid)
+                            userProfile else selectedProfile!!
+                        ProfileScreen(
+                            user = displayProfile,
+                            currentUserProfile = userProfile,
+                            onOpenConversation = { activeConversation = it; currentScreen = Screen.Social },
+                            onBack = { selectedProfile = null },
+                            onEditProfile = { showProfileEdit = true },
                         )
                     } else {
                         SettingScreen(
@@ -428,7 +442,9 @@ private fun MainScaffold(
                             selectedTheme = AppSettings.selectedTheme,
                             onSettingsChange = { dark, notify, theme ->
                                 authViewModel.updateSettings(dark, notify, theme)
-                            }
+                            },
+                            userProfile = userProfile,
+                            onViewProfile = { selectedProfile = userProfile },
                         )
                     }
                 }

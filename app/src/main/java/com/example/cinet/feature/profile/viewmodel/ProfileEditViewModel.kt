@@ -35,11 +35,18 @@ class ProfileEditViewModel(
         }
     }
 
-    fun saveProfile(nickname: String, major: String, pronouns: String) {
+    fun saveProfile(
+        nickname: String,
+        major: String,
+        pronouns: String,
+        year: String = "",
+        bio: String = "",
+        interests: List<String> = emptyList(),
+    ) {
         _state.value = ProfileEditState.Loading
         viewModelScope.launch {
             try {
-                val result = repo.saveProfileDetails(nickname, major, pronouns)
+                val result = repo.saveProfileDetails(nickname, major, pronouns, year, bio, interests)
                 result.onFailure {
                     _state.value = ProfileEditState.Error(it.message ?: "Save failed")
                     return@launch

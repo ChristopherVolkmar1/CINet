@@ -189,10 +189,10 @@ fun SocialScreen(
                         }
                     } else {
                         items(friends) { friend ->
-                            // Friends tap straight to conversation
+                            // Tap opens profile; message button is on the profile screen
                             UserRow(
                                 user = friend,
-                                onClick = { onOpenConversation(friend) }
+                                onClick = { onOpenProfile(friend) }
                             )
                             HorizontalDivider()
                         }
