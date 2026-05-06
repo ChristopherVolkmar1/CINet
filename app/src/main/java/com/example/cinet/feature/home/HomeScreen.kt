@@ -18,9 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cinet.NewsArticle
-import com.example.cinet.NewsRepository
-import com.example.cinet.NewsSection
+import com.example.cinet.feature.home.news.NewsArticle
+import com.example.cinet.feature.home.news.NewsRepository
+import com.example.cinet.feature.home.news.NewsSection
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.ui.theme.CINetTheme
 import com.example.cinet.feature.map.*

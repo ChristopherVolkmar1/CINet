@@ -86,8 +86,8 @@ private fun CalendarQuickAccessCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val green = MaterialTheme.colorScheme.secondaryContainer
-    val softGreen = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
+    val green = MaterialTheme.colorScheme.onSecondary
+    val softGreen = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.12f)
 
     Card(
         modifier = modifier
@@ -95,16 +95,17 @@ private fun CalendarQuickAccessCard(
             .clickable { onClick() },
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.primary
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.18f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
@@ -125,7 +126,7 @@ private fun CalendarQuickAccessCard(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

@@ -30,8 +30,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cinet.CIViewScreen
-import com.example.cinet.NewsArticle
+import com.example.cinet.feature.home.news.CIViewScreen
+import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile

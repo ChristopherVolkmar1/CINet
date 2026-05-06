@@ -52,7 +52,7 @@ fun CalendarModeTabs(
             .fillMaxWidth()
             .clip(RoundedCornerShape(32.dp))
             // This changes the outside selector background to green
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(MaterialTheme.colorScheme.primary)
             .border(
                 width = 1.dp,
                 // This changes the border to white
@@ -81,7 +81,7 @@ private fun CalendarModeButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val green = MaterialTheme.colorScheme.secondaryContainer
+    val green = MaterialTheme.colorScheme.primary
 
     // Selected button becomes white.
     // Unselected buttons stay transparent so the green parent background shows through.
@@ -182,7 +182,7 @@ private fun DayCalendarView(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(22.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.10f))
+                .background(MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.10f))
                 .padding(vertical = 20.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -191,12 +191,12 @@ private fun DayCalendarView(
                     modifier = Modifier
                         .size(70.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                        .background(MaterialTheme.colorScheme.onSecondary),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = selectedDate.dayOfMonth.toString(),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -207,7 +207,7 @@ private fun DayCalendarView(
                 Text(
                     text = buildItemCountText(itemCount),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSecondary,
                     textAlign = TextAlign.Center
                 )
             }
@@ -301,11 +301,11 @@ private fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         border = BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.10f)
+            MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.10f)
         )
     ) {
         Column(
@@ -337,7 +337,7 @@ private fun HeaderWithArrows(
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSecondary
         )
 
         NavigationButton(symbol = "›", onClick = onNext)
@@ -359,7 +359,7 @@ private fun NavigationButton(
     ) {
         Text(
             text = symbol,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSecondary,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -383,7 +383,7 @@ private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSecondary,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -399,10 +399,9 @@ private fun WeekStripDate(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val green = MaterialTheme.colorScheme.secondaryContainer
-    val weekdayColor = if (isSelected) green else MaterialTheme.colorScheme.onSurfaceVariant
-    val dayColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
-
+    val green = MaterialTheme.colorScheme.onSecondary
+    val weekdayColor = if (isSelected) green else MaterialTheme.colorScheme.onSecondary
+    val dayColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSecondary
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -424,7 +423,12 @@ private fun WeekStripDate(
             modifier = Modifier
                 .size(if (isSelected) 44.dp else 40.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) green else Color.Transparent),
+                .border(
+                    width = 2.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.55f) else MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -496,10 +500,10 @@ private fun MonthDateCell(
         modifier = modifier
             .height(58.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)
+            .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary)
             .border(
-                width = 1.dp,
-                color = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                width = 2.dp,
+                color = if (isSelected) MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.55f) else MaterialTheme.colorScheme.primary,
                 shape = RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onClick)
@@ -510,7 +514,7 @@ private fun MonthDateCell(
         Text(
             text = date.dayOfMonth.toString(),
             style = MaterialTheme.typography.bodyLarge,
-            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSecondary,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
         )
 
@@ -525,7 +529,7 @@ private fun ActivityDots(
     itemCount: Int,
     isSelected: Boolean
 ) {
-    val dotColor = if (isSelected) Color.White else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
+    val dotColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.65f)
 
     Box(
         modifier = Modifier.height(5.dp),

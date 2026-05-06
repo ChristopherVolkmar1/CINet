@@ -87,11 +87,11 @@ fun CalendarDailyAgendaCard(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
             border = BorderStroke(
                 1.dp,
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.10f)
+                MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.10f)
             )
         ) {
             if (agendaItems.isEmpty()) {
@@ -125,7 +125,7 @@ private fun AgendaDateHeader(
     onTodayClick: () -> Unit
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, d MMMM") }
-    val green = MaterialTheme.colorScheme.secondaryContainer
+    val green = MaterialTheme.colorScheme.onSecondary
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -188,7 +188,7 @@ private fun EmptyAgendaMessage(selectedDate: LocalDate) {
             text = if (isToday) "No saved calendar items for today yet" else "No saved calendar items for this day yet",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSecondary
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -196,7 +196,7 @@ private fun EmptyAgendaMessage(selectedDate: LocalDate) {
         Text(
             text = "Use Classes, Study, or Events below to add and view today's items.",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSecondary
         )
     }
 }
@@ -208,7 +208,7 @@ private fun AgendaTimelineRow(
     isFirst: Boolean,
     isLast: Boolean
 ) {
-    val green = MaterialTheme.colorScheme.secondaryContainer
+    val green = MaterialTheme.colorScheme.onSecondary
 
     Row(
         modifier = Modifier
@@ -221,7 +221,7 @@ private fun AgendaTimelineRow(
             text = item.timeText,
             modifier = Modifier.width(66.dp),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSecondary,
             fontWeight = FontWeight.Medium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -260,7 +260,7 @@ private fun AgendaTimelineRow(
                 text = item.title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -270,7 +270,7 @@ private fun AgendaTimelineRow(
             Text(
                 text = item.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -293,7 +293,7 @@ private fun AgendaTimelineRow(
                 Text(
                     text = item.location,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

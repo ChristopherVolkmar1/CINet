@@ -85,7 +85,7 @@ fun getDynamicColorScheme(selectedTheme: AppThemeColor, isDark: Boolean): ColorS
     return if (isDark) {
         darkColorScheme(
             primary = selectedTheme.dark,
-            secondary = selectedTheme.dark,
+            secondary = selectedTheme.darkButton,
             tertiary = CINetTertiaryDark,
             secondaryContainer = selectedTheme.darkButton,
             background = Color(0xFF121212),
@@ -99,7 +99,7 @@ fun getDynamicColorScheme(selectedTheme: AppThemeColor, isDark: Boolean): ColorS
     } else {
         lightColorScheme(
             primary = selectedTheme.light,
-            secondary = selectedTheme.light,
+            secondary = selectedTheme.lightButton,
             tertiary = CINetTertiaryLight,
             secondaryContainer = selectedTheme.lightButton,
             background = CINetBackground,
