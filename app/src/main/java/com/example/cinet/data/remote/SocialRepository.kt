@@ -418,7 +418,7 @@ class SocialRepository(
 
             val items = snapshot.documents.mapNotNull { doc ->
                 mapDocumentToStudySession(doc.id, doc.data ?: emptyMap())
-            }
+            }.distinctBy { Triple(it.className, it.date, it.startTime) }
 
             Result.success(items)
         } catch (e: Exception) {
@@ -437,7 +437,7 @@ class SocialRepository(
 
             val items = snapshot.documents.mapNotNull { doc ->
                 mapDocumentToEventItem(doc.id, doc.data ?: emptyMap())
-            }
+            }.distinctBy { Triple(it.name, it.date, it.time) }
 
             Result.success(items)
         } catch (e: Exception) {

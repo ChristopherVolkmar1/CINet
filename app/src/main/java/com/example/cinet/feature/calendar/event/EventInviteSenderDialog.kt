@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -168,6 +169,17 @@ fun EventInviteSenderDialog(
 
                 } else {
                     // ── Pick from existing events ─────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Your Events", style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { isCreatingNew = true }) {
+                            Text("Create new")
+                        }
+                    }
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -184,11 +196,13 @@ fun EventInviteSenderDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        val filteredEvents = existingEvents.filter {
-                            searchQuery.isBlank() ||
-                                    it.name.contains(searchQuery, ignoreCase = true) ||
-                                    it.location.contains(searchQuery, ignoreCase = true)
-                        }
+                        val filteredEvents = existingEvents
+                            .distinctBy { it.id }
+                            .filter {
+                                searchQuery.isBlank() ||
+                                        it.name.contains(searchQuery, ignoreCase = true) ||
+                                        it.location.contains(searchQuery, ignoreCase = true)
+                            }
                         LazyColumn {
                             items(filteredEvents) { event ->
                                 Card(
@@ -226,11 +240,6 @@ fun EventInviteSenderDialog(
                                 HorizontalDivider()
                             }
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { isCreatingNew = true }) {
-                        Text("Create new instead")
                     }
                 }
             }

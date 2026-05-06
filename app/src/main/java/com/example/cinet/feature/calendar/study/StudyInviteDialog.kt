@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -181,6 +182,17 @@ fun StudyInviteDialog(
                     val hasAnyItems =
                         existingItems.isNotEmpty() || existingStudySessions.isNotEmpty()
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Your Sessions", style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { isCreatingNew = true }) {
+                            Text("Create new")
+                        }
+                    }
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -275,10 +287,6 @@ fun StudyInviteDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { isCreatingNew = true }) {
-                        Text("Create new instead")
-                    }
                 }
             }
         },
