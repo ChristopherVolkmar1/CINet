@@ -52,13 +52,7 @@ fun CalendarModeTabs(
             .fillMaxWidth()
             .clip(RoundedCornerShape(32.dp))
             // This changes the outside selector background to green
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .border(
-                width = 1.dp,
-                // This changes the border to white
-                color = Color.White.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(32.dp)
-            )
+            .background(MaterialTheme.colorScheme.secondary)
             .padding(6.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -207,7 +201,7 @@ private fun DayCalendarView(
                 Text(
                     text = buildItemCountText(itemCount),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSecondary,
                     textAlign = TextAlign.Center
                 )
             }
@@ -301,7 +295,7 @@ private fun SectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         border = BorderStroke(
             1.dp,
@@ -337,7 +331,7 @@ private fun HeaderWithArrows(
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSecondary
         )
 
         NavigationButton(symbol = "›", onClick = onNext)
@@ -359,7 +353,7 @@ private fun NavigationButton(
     ) {
         Text(
             text = symbol,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.colorScheme.onSecondary,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
@@ -383,7 +377,7 @@ private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSecondary,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -510,7 +504,7 @@ private fun MonthDateCell(
         Text(
             text = date.dayOfMonth.toString(),
             style = MaterialTheme.typography.bodyLarge,
-            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSecondary,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
         )
 

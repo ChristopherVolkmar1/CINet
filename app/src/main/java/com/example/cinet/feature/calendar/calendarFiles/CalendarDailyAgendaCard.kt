@@ -87,7 +87,7 @@ fun CalendarDailyAgendaCard(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary),
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
             border = BorderStroke(
                 1.dp,
@@ -152,8 +152,7 @@ private fun AgendaDateHeader(
             text = selectedDate.format(formatter),
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            fontWeight = FontWeight.Bold
         )
 
         OutlinedButton(
@@ -187,16 +186,14 @@ private fun EmptyAgendaMessage(selectedDate: LocalDate) {
         Text(
             text = if (isToday) "No saved calendar items for today yet" else "No saved calendar items for this day yet",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
             text = "Use Classes, Study, or Events below to add and view today's items.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }
@@ -221,7 +218,6 @@ private fun AgendaTimelineRow(
             text = item.timeText,
             modifier = Modifier.width(66.dp),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -260,7 +256,6 @@ private fun AgendaTimelineRow(
                 text = item.title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -270,7 +265,6 @@ private fun AgendaTimelineRow(
             Text(
                 text = item.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -293,7 +287,6 @@ private fun AgendaTimelineRow(
                 Text(
                     text = item.location,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

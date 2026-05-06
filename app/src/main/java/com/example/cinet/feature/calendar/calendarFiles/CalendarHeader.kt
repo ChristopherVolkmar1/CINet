@@ -40,7 +40,7 @@ fun CalendarHeader(
             text = "Calendar",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSecondary
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -48,7 +48,7 @@ fun CalendarHeader(
         Text(
             text = "Stay on top of your classes and events",
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSecondary
         )
     }
 }

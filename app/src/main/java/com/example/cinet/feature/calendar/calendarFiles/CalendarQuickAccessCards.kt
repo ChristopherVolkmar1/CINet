@@ -44,8 +44,7 @@ fun CalendarQuickAccessCards(
         Text(
             text = "Quick Access",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
+            fontWeight = FontWeight.SemiBold
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -86,7 +85,7 @@ private fun CalendarQuickAccessCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val green = MaterialTheme.colorScheme.secondaryContainer
+    val green = MaterialTheme.colorScheme.onSecondary
     val softGreen = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
 
     Card(
@@ -95,7 +94,7 @@ private fun CalendarQuickAccessCard(
             .clickable { onClick() },
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.secondary
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f))
@@ -104,7 +103,8 @@ private fun CalendarQuickAccessCard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
@@ -116,7 +116,6 @@ private fun CalendarQuickAccessCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = green,
                     modifier = Modifier.size(26.dp)
                 )
             }
@@ -125,7 +124,6 @@ private fun CalendarQuickAccessCard(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
