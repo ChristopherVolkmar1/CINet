@@ -125,7 +125,7 @@ private fun AgendaDateHeader(
     onTodayClick: () -> Unit
 ) {
     val formatter = remember { DateTimeFormatter.ofPattern("EEEE, d MMMM") }
-    val green = MaterialTheme.colorScheme.onSecondary
+    val green = MaterialTheme.colorScheme.primary
 
     Row(
         modifier = Modifier.fillMaxWidth(),
