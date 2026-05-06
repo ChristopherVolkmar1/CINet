@@ -25,6 +25,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.foundation.layout.size
 import com.example.cinet.core.designsystem.PullToRefreshContainer
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun SocialScreen(
@@ -37,7 +39,6 @@ fun SocialScreen(
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var pendingRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
     var sentRequests by remember { mutableStateOf<List<FriendRequest>>(emptyList()) }
-    var sentRequestNicknames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -49,14 +50,7 @@ fun SocialScreen(
         if (refreshKey > 0) isRefreshing = true
         repository.getFriends().onSuccess { friends = it }
         repository.getPendingRequests().onSuccess { pendingRequests = it }
-        repository.getSentRequests().onSuccess { requests ->
-            sentRequests = requests
-            val nicknames = mutableMapOf<String, String>()
-            requests.forEach { request ->
-                nicknames[request.receiverId] = repository.getUserNickname(request.receiverId)
-            }
-            sentRequestNicknames = nicknames
-        }
+        repository.getSentRequests().onSuccess { sentRequests = it }
         isLoading = false
         isRefreshing = false
     }
@@ -124,16 +118,10 @@ fun SocialScreen(
                                 trailingContent = {
                                     OutlinedButton(onClick = {
                                         scope.launch {
-                                            repository.sendFriendRequest(user)
-                                            searchResults = searchResults - user
-                                            repository.getSentRequests().onSuccess { requests ->
-                                                sentRequests = requests
-                                                val nicknames = mutableMapOf<String, String>()
-                                                requests.forEach { request ->
-                                                    nicknames[request.receiverId] =
-                                                        repository.getUserNickname(request.receiverId)
-                                                }
-                                                sentRequestNicknames = nicknames
+                                            val result = repository.sendFriendRequest(user)
+                                            if (result.isSuccess) {
+                                                searchResults = searchResults - user
+                                                repository.getSentRequests().onSuccess { sentRequests = it }
                                             }
                                         }
                                     }) {
@@ -201,10 +189,10 @@ fun SocialScreen(
                         }
                     } else {
                         items(friends) { friend ->
-                            // Friends tap straight to conversation
+                            // Tap opens profile; message button is on the profile screen
                             UserRow(
                                 user = friend,
-                                onClick = { onOpenConversation(friend) }
+                                onClick = { onOpenProfile(friend) }
                             )
                             HorizontalDivider()
                         }
@@ -217,51 +205,80 @@ fun SocialScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                         items(sentRequests) { request ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Initials fallback only — sent requests don't carry photoUrl
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                                        .border(
-                                            width = 1.5.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val nickname = sentRequestNicknames[request.receiverId] ?: "?"
-                                    Text(
-                                        text = nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = sentRequestNicknames[request.receiverId] ?: request.receiverId,
-                                        style = MaterialTheme.typography.bodyLarge
-                                    )
-                                    Text(
-                                        text = "Request pending",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
+                            SentRequestRow(request = request)
                             HorizontalDivider()
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+// Fetches the receiver's photo from Firestore on first render.
+@Composable
+private fun SentRequestRow(request: com.example.cinet.data.model.FriendRequest) {
+    var receiverPhotoUrl by remember(request.receiverId) { mutableStateOf("") }
+
+    LaunchedEffect(request.receiverId) {
+        try {
+            val snap = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(request.receiverId)
+                .get()
+                .await()
+            receiverPhotoUrl = snap.getString("photoUrl") ?: ""
+        } catch (_: Exception) {}
+    }
+
+    val nickname = request.receiverNickname.ifBlank { "?" }
+    val initial = nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val photoUrl = receiverPhotoUrl.takeIf { it.isNotBlank() }
+        if (photoUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Profile photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = initial, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = request.receiverNickname.ifBlank { request.receiverId },
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "Request pending",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

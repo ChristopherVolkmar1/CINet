@@ -35,15 +35,25 @@ class ProfileEditViewModel(
         }
     }
 
-    fun saveProfile(nickname: String, major: String, pronouns: String) {
+    fun saveProfile(
+        nickname: String,
+        major: String,
+        pronouns: String,
+        year: String = "",
+        bio: String = "",
+        interests: List<String> = emptyList(),
+    ) {
         _state.value = ProfileEditState.Loading
         viewModelScope.launch {
             try {
-                val result = repo.saveProfileDetails(nickname, major, pronouns)
+                val result = repo.saveProfileDetails(nickname, major, pronouns, year, bio, interests)
                 result.onFailure {
                     _state.value = ProfileEditState.Error(it.message ?: "Save failed")
                     return@launch
                 }
+                // Reload so the next edit session shows fresh data rather than
+                // the pre-save snapshot the ViewModel was holding in memory.
+                _profile.value = repo.loadCurrentUserProfile()
                 _state.value = ProfileEditState.Success
             } catch (e: Exception) {
                 _state.value = ProfileEditState.Error(e.message ?: "Save failed")

@@ -1,5 +1,6 @@
 package com.example.cinet.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,6 +9,8 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.example.cinet.core.notifications.NotificationHelper
 import com.example.cinet.core.permissions.PermissionManager
 import com.example.cinet.data.remote.FirestoreRepository
@@ -26,24 +29,30 @@ class MainActivity : ComponentActivity() {
         AuthViewModelFactory(repository)
     }
 
+    // Conversation to open immediately — set from notification tap intent.
+    // Using mutableStateOf so Compose recomposes when onNewIntent updates it.
+    private var pendingConversationId by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NotificationHelper.createChannel(this)
-        
+
         if (!PermissionManager.hasAllPermissions(this)) {
             PermissionManager.requestAllPermissions(this)
         }
-        
+
+        // Read conversationId from a notification tap (cold start or task not running)
+        pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
+
         enableEdgeToEdge()
-        
+
         setContent {
             val authState by authViewModel.authState.collectAsState()
-            
-            // Derive dark mode from the current authenticated user profile
+
             val isDarkMode = when (val state = authState) {
                 is AuthState.Authenticated -> state.userProfile.isDarkMode
                 is AuthState.ProfileSetup -> state.userProfile.isDarkMode
-                else -> AppSettings.isDarkMode // Fallback to local default if not logged in
+                else -> AppSettings.isDarkMode
             }
 
             val currentTheme = when (val state = authState) {
@@ -52,7 +61,6 @@ class MainActivity : ComponentActivity() {
                 else -> AppSettings.selectedTheme
             }
 
-            // Sync global AppSettings for other components (like the Map) - Zack
             LaunchedEffect(isDarkMode) {
                 AppSettings.isDarkMode = isDarkMode
                 AppSettings.selectedTheme = currentTheme
@@ -68,14 +76,24 @@ class MainActivity : ComponentActivity() {
                     onRetry = { authViewModel.retryProfileLoad() },
                     onSaveProfile = { nickname, major, pronouns ->
                         authViewModel.saveProfile(nickname, major, pronouns)
-                    }
+                    },
+                    initialConversationId = pendingConversationId,
+                    onConversationOpened = { pendingConversationId = null },
                 )
             }
         }
     }
 
+    // Called when the app is already running and the user taps a notification.
+    // FLAG_ACTIVITY_SINGLE_TOP ensures this is called instead of a new onCreate.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
+    }
+
     companion object {
-        // map location key - Zack
+        const val EXTRA_CONVERSATION_ID = "conversationId"
         const val EXTRA_OPEN_MAP_FOR_LOCATION = "extra_open_map_for_location"
     }
 }

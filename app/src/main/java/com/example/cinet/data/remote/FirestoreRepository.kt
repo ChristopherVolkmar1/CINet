@@ -75,6 +75,9 @@ class FirestoreRepository(
         nickname: String,
         major: String,
         pronouns: String,
+        year: String = "",
+        bio: String = "",
+        interests: List<String> = emptyList(),
     ): Result<UserProfile> {
         return try {
             val user = auth.currentUser ?: error("No signed-in user.")
@@ -85,6 +88,9 @@ class FirestoreRepository(
                 "nicknameLower" to nickname.lowercase(),
                 "major"         to major,
                 "pronouns"      to pronouns,
+                "year"          to year,
+                "bio"           to bio,
+                "interests"     to interests,
             )
 
             docRef.set(profileUpdate, SetOptions.merge()).await()
