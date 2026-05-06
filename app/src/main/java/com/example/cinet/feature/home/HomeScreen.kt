@@ -1,5 +1,6 @@
 package com.example.cinet.feature.home
 
+import android.R
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -114,10 +115,9 @@ private fun HomeScreenContent(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
-            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 12.dp)
-            .padding(top = 0.dp, bottom = 4.dp)
+            .padding(top = 15.dp, bottom = 4.dp)
     ) {
         HomeTopBar(
             onProfileClick = onProfileClick,
@@ -217,7 +217,7 @@ private fun HeaderIconButton(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(30.dp)
             )
         }
     }
@@ -233,7 +233,7 @@ private fun HomeMainCard(
     Surface(
         modifier = Modifier.fillMaxWidth()
             .fillMaxWidth()
-            .height(600.dp),
+            .height(650.dp),
         shape = RoundedCornerShape(38.dp),
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 10.dp
@@ -386,7 +386,7 @@ private fun LatestNewsHeader(
     ) {
         Text(
             text = "CI View - Latest News",
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.ExtraBold,
             fontSize = 18.sp,
             maxLines = 1,
@@ -396,7 +396,7 @@ private fun LatestNewsHeader(
 
         Text(
             text = "See all",
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.ExtraBold,
             fontSize = 13.sp,
             modifier = Modifier.clickable(onClick = onSeeAllClick)
@@ -541,18 +541,21 @@ private fun QuickActionGrid(
         ) {
             QuickActionCircleButton(
                 icon = Icons.Default.Map,
+                label = "Map",
                 contentDescription = "Open campus map",
                 onClick = onMapClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.CalendarMonth,
+                label = "Calendar",
                 contentDescription = "Open calendar",
                 onClick = onCalendarClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.Groups,
+                label = "Social",
                 contentDescription = "Open social",
                 onClick = onSocialClick
             )
@@ -564,18 +567,21 @@ private fun QuickActionGrid(
         ) {
             QuickActionCircleButton(
                 icon = Icons.Default.MenuBook,
+                label = "Study Rooms",
                 contentDescription = "Open study rooms",
                 onClick = onStudyRoomsClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.Person,
+                label = "Profile",
                 contentDescription = "Open profile",
                 onClick = onProfileClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.Notifications,
+                label = "Notifications",
                 contentDescription = "Open notifications",
                 onClick = onNotificationClick
             )
@@ -589,25 +595,43 @@ private fun QuickActionGrid(
 @Composable
 private fun QuickActionCircleButton(
     icon: ImageVector,
+    label: String,
     contentDescription: String,
     onClick: () -> Unit
 ) {
-    Surface(
+    Column(
         modifier = Modifier
-            .size(75.dp)
+            .width(92.dp)
             .clickable(onClick = onClick),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary,
-        shadowElevation = 5.dp
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(25.dp)
-            )
+        Surface(
+            modifier = Modifier.size(75.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            shadowElevation = 5.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(25.dp)
+                )
+            }
         }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
