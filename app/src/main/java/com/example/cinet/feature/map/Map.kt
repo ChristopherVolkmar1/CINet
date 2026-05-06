@@ -21,6 +21,8 @@ import androidx.core.content.ContextCompat
 import com.example.cinet.R
 import com.example.cinet.core.permissions.PermissionManager
 import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.data.model.UserProfile
+import com.example.cinet.data.remote.SocialRepository
 import com.example.cinet.feature.settings.AppSettings
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
@@ -137,6 +139,15 @@ fun CampusMapScreen(
         }
     )
 
+    val repository = remember { SocialRepository() }
+    var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        repository.getFriends().onSuccess {
+            friends = it
+        }
+    }
+
     InitializeCampusState(
         hasPermission = hasPermission,
         fusedLocationClient = fusedLocationClient,
@@ -210,7 +221,8 @@ fun CampusMapScreen(
             onDismissPopup = { selectedLocation = null },
             onModeSelected = requestRoute,
             routeDurations = durations,
-            onShowBusSchedule = { showBusSheet = true }
+            onShowBusSchedule = { showBusSheet = true },
+            friends = friends
         )
 
         userLatLng?.let { user ->
@@ -220,7 +232,7 @@ fun CampusMapScreen(
                     .navigationBarsPadding()
                     .padding(end = 11.dp, bottom = 86.dp)
             ) {
-                CenterSelf(user = user, cameraPositionState = cameraPositionState)
+                CenterCamera(location = user, cameraPositionState = cameraPositionState)
             }
         }
 
@@ -540,8 +552,8 @@ private fun CampusMarker(
     onSelected: (CampusLocation) -> Unit
 ) {
     val context = LocalContext.current
-    val secondaryColor = MaterialTheme.colorScheme.secondary
-    val customIcon = remember(location.category, secondaryColor) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val customIcon = remember(location.category, primaryColor) {
         try {
             customMarker(context, when (location.category) {
                 "ACADEMIC" -> R.drawable.school
@@ -549,7 +561,7 @@ private fun CampusMarker(
                 "COMMUTER_PARKING" -> R.drawable.parking
                 "DINING" -> R.drawable.dining
                 else -> R.drawable.unlisted
-            }, secondaryColor)
+            }, primaryColor)
         } catch (_: Exception) {
             null
         }
@@ -597,29 +609,3 @@ fun customMarker(context: Context, iconResId: Int, backgroundColor: Color): Bitm
     }
     return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
-
-// -------------------- Previews --------------------
-
-/** Design-time preview of the remove-route card on a dark background. */
-/*@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun DirectionsPopupPreview() {
-    CINetTheme {
-        Box(
-            modifier = Modifier.fillMaxSize().background(Color(0xFF1C1B1F)),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            RemoveRoute(
-                onDismiss = {},
-                routeDurations = RouteDurations(
-                    driving = "1 mins",
-                    walking = "2 mins",
-                    biking = "3 mins"
-                ),
-                location = CampusLocation("Aliso Hall", "ACADEMIC"),
-                travelMode = TravelMode.DRIVING,
-                eta = "12:00AM"
-            )
-        }
-    }
-}*/
