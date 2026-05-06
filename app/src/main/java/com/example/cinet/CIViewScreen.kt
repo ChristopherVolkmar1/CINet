@@ -20,6 +20,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 @Composable
 fun CIViewScreen(
     selectedArticleUrl: String? = null,
+    selectedArticleTitle: String? = null,
     onArticleClick: (NewsArticle) -> Unit,
     onBack: () -> Unit
 ) {
@@ -36,7 +37,13 @@ fun CIViewScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Article") },
+                    title = { 
+                        Text(
+                            text = selectedArticleTitle ?: "CI View",
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        ) 
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

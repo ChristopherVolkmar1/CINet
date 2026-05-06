@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -238,6 +240,29 @@ fun HomeScreen(
                     temp = weatherInfo.temp,
                     condition = weatherInfo.condition + " - Camarillo, CA"
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Quick Actions Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Button(
+                onClick = { 
+                    val studyRoomsLink = "https://csuci.libcal.com/allspaces"
+                    onArticleClick(NewsArticle("Study Rooms", "", "", studyRoomsLink))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                Icon(Icons.Default.Language, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Study Rooms")
             }
         }
 

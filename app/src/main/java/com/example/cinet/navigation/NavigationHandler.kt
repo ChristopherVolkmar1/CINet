@@ -220,8 +220,13 @@ private fun MainScaffold(
     BackHandler(enabled = currentScreen != Screen.Home || socialBackStackActive || showProfileEdit || isShowingNews || selectedProfile != null) {
         when {
             selectedNewsArticle != null -> {
-                selectedNewsArticle = null
-                showCIView = true
+                if (selectedNewsArticle?.title == "Study Rooms") {
+                    selectedNewsArticle = null
+                    showCIView = false
+                } else {
+                    selectedNewsArticle = null
+                    showCIView = true
+                }
             }
             showCIView -> showCIView = false
             activeConversation != null -> activeConversation = null
@@ -291,9 +296,13 @@ private fun MainScaffold(
             if (isShowingNews) {
                 CIViewScreen(
                     selectedArticleUrl = selectedNewsArticle?.url,
+                    selectedArticleTitle = selectedNewsArticle?.title,
                     onArticleClick = { selectedNewsArticle = it },
                     onBack = {
-                        if (selectedNewsArticle != null) {
+                        if (selectedNewsArticle?.title == "Study Rooms") {
+                            selectedNewsArticle = null
+                            showCIView = false
+                        } else if (selectedNewsArticle != null) {
                             selectedNewsArticle = null
                             showCIView = true
                         } else {
