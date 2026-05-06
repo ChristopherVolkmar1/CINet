@@ -18,13 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -35,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.study.StudySession
@@ -124,52 +123,43 @@ private fun AgendaDateHeader(
     selectedDate: LocalDate,
     onTodayClick: () -> Unit
 ) {
-    val formatter = remember { DateTimeFormatter.ofPattern("EEEE, d MMMM") }
-    val green = MaterialTheme.colorScheme.primary
+    val formatter = remember { DateTimeFormatter.ofPattern("EEEE, MMMM d") }
+    val accentColor = MaterialTheme.colorScheme.primary
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(green.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.CalendarMonth,
-                contentDescription = null,
-                tint = green,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+        Icon(
+            imageVector = Icons.Default.CalendarMonth,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(30.dp)
+        )
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Text(
             text = selectedDate.format(formatter),
             modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 18.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Text(
+            text = "Today",
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .clickable(onClick = onTodayClick)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-
-        OutlinedButton(
-            onClick = onTodayClick,
-            shape = RoundedCornerShape(22.dp),
-            border = BorderStroke(1.dp, green.copy(alpha = 0.30f)),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = green,
-                containerColor = Color.Transparent
-            )
-        ) {
-            Text(
-                text = "Today",
-                fontWeight = FontWeight.Bold
-            )
-        }
     }
 }
 

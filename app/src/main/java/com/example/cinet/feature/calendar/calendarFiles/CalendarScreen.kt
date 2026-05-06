@@ -1,14 +1,29 @@
 package com.example.cinet.feature.calendar.calendarFiles
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
 import java.time.YearMonth
@@ -27,7 +42,9 @@ import com.example.cinet.core.time.*
 @Composable
 fun CalendarScreen(
     onBack: () -> Unit,
-    initialShowClassDialog: Boolean = false
+    initialShowClassDialog: Boolean = false,
+    onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {}
 ) {
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
@@ -188,57 +205,66 @@ fun CalendarScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
             .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp)
+            .padding(top = 15.dp, bottom = 4.dp)
     ) {
-        CalendarHeader(onBack = onBack)
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        CalendarModeTabs(
-            selectedMode = calendarMode,
-            onModeSelected = { viewModel.updateMode(it) }
+        CalendarTopBar(
+            onProfileClick = onProfileClick,
+            onSettingsClick = onSettingsClick
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        CalendarModeContent(
-            mode = calendarMode,
-            currentMonth = currentMonth,
-            selectedDate = activeDate,
-            activityCountByDate = agendaCountByDate,
-            onDateSelected = ::handleDateClick,
-            onPreviousDay = { viewModel.previousDay() },
-            onNextDay = { viewModel.nextDay() },
-            onPreviousWeek = { viewModel.previousWeek() },
-            onNextWeek = { viewModel.nextWeek() },
-            onPreviousMonth = { viewModel.previousMonth() },
-            onNextMonth = { viewModel.nextMonth() }
-        )
+        CalendarMainCard {
+            CalendarHeader(onBack = onBack)
 
-        Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-        CalendarDailyAgendaCard(
-            selectedDate = activeDate,
-            classes = classesForSelectedDate,
-            studySessions = studySessionsForSelectedDate,
-            events = customEventsForSelectedDate,
-            reminderCampusEvents = reminderEventsForSelectedDate,
-            onTodayClick = { viewModel.onDateSelected(today) },
-            onClassClick = ::openClassEditor,
-            onStudySessionClick = ::openStudySessionEditor,
-            onEventClick = ::openEventEditor
-        )
+            CalendarModeTabs(
+                selectedMode = calendarMode,
+                onModeSelected = { viewModel.updateMode(it) }
+            )
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-        CalendarQuickAccessCards(
-            onClassesClick = { selectedQuickAccessType = CalendarQuickAccessType.CLASSES },
-            onStudyClick = { selectedQuickAccessType = CalendarQuickAccessType.STUDY },
-            onEventsClick = { selectedQuickAccessType = CalendarQuickAccessType.EVENTS }
-        )
+            CalendarModeContent(
+                mode = calendarMode,
+                currentMonth = currentMonth,
+                selectedDate = activeDate,
+                activityCountByDate = agendaCountByDate,
+                onDateSelected = ::handleDateClick,
+                onPreviousDay = { viewModel.previousDay() },
+                onNextDay = { viewModel.nextDay() },
+                onPreviousWeek = { viewModel.previousWeek() },
+                onNextWeek = { viewModel.nextWeek() },
+                onPreviousMonth = { viewModel.previousMonth() },
+                onNextMonth = { viewModel.nextMonth() }
+            )
 
+            Spacer(modifier = Modifier.height(20.dp))
 
+            CalendarDailyAgendaCard(
+                selectedDate = activeDate,
+                classes = classesForSelectedDate,
+                studySessions = studySessionsForSelectedDate,
+                events = customEventsForSelectedDate,
+                reminderCampusEvents = reminderEventsForSelectedDate,
+                onTodayClick = { viewModel.onDateSelected(today) },
+                onClassClick = ::openClassEditor,
+                onStudySessionClick = ::openStudySessionEditor,
+                onEventClick = ::openEventEditor
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            CalendarQuickAccessCards(
+                onClassesClick = { selectedQuickAccessType = CalendarQuickAccessType.CLASSES },
+                onStudyClick = { selectedQuickAccessType = CalendarQuickAccessType.STUDY },
+                onEventsClick = { selectedQuickAccessType = CalendarQuickAccessType.EVENTS }
+            )
+        }
     }
 
     selectedQuickAccessType?.let { quickAccessType ->
@@ -533,6 +559,90 @@ fun CalendarScreen(
 
 
 /** Builds the day-dot map for the content shown in the main agenda card. */
+
+/** Displays the top CINET title and the two circular action buttons. */
+@Composable
+private fun CalendarTopBar(
+    onProfileClick: () -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "CINET",
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 26.sp,
+            letterSpacing = 0.3.sp
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        CalendarHeaderIconButton(
+            icon = Icons.Default.Person,
+            contentDescription = "Open profile",
+            onClick = onProfileClick
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        CalendarHeaderIconButton(
+            icon = Icons.Default.MoreVert,
+            contentDescription = "Open settings",
+            onClick = onSettingsClick
+        )
+    }
+}
+
+/** Draws one circular button in the CINET header. */
+@Composable
+private fun CalendarHeaderIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .size(44.dp)
+            .clickable(onClick = onClick),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+        shadowElevation = 0.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}
+
+/** Holds the calendar content inside the large rounded white card. */
+@Composable
+private fun CalendarMainCard(
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(38.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 10.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 24.dp)
+        ) {
+            content()
+        }
+    }
+}
+
 private fun buildAgendaActivityCountByDate(
     context: android.content.Context,
     currentMonth: YearMonth,

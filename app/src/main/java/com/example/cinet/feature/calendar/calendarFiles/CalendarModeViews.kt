@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,6 +51,11 @@ fun CalendarModeTabs(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(28.dp),
+                clip = false
+            )
             .clip(RoundedCornerShape(32.dp))
             // This changes the outside selector background to green
             .background(MaterialTheme.colorScheme.primary)
@@ -245,7 +251,6 @@ private fun WeekCalendarView(
                     WeekStripDate(
                         date = date,
                         isSelected = date == selectedDate,
-                        itemCount = activityCountByDate[date] ?: 0,
                         onClick = { onDateSelected(date) },
                         modifier = Modifier.weight(1f)
                     )
@@ -302,7 +307,7 @@ private fun SectionCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         border = BorderStroke(
             1.dp,
             MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.10f)
@@ -395,7 +400,6 @@ private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
 private fun WeekStripDate(
     date: LocalDate,
     isSelected: Boolean,
-    itemCount: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -426,9 +430,9 @@ private fun WeekStripDate(
                 .border(
                     width = 2.dp,
                     color = if (isSelected) MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.55f) else MaterialTheme.colorScheme.primary,
-                    shape = RoundedCornerShape(16.dp)
+                    shape = CircleShape
                 )
-                .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent),
+                .background(if (isSelected) Color.Transparent else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -441,7 +445,29 @@ private fun WeekStripDate(
         }
 
         Spacer(modifier = Modifier.height(6.dp))
-        ActivityDots(itemCount = itemCount, isSelected = isSelected)
+        WeekStripDot(isSelected = isSelected)
+    }
+}
+
+/** Shows the always-visible dot under each date in the week strip. */
+@Composable
+private fun WeekStripDot(isSelected: Boolean) {
+    val dotColor = if (isSelected) {
+        Color.White
+    } else {
+        Color.White.copy(alpha = 0.48f)
+    }
+
+    Box(
+        modifier = Modifier.height(5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
     }
 }
 
@@ -453,7 +479,7 @@ private fun MonthGrid(
     activityCountByDate: Map<LocalDate, Int>,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         monthCells.chunked(7).forEach { week ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -482,8 +508,8 @@ private fun MonthGrid(
 private fun EmptyDateCell(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .height(58.dp)
-            .padding(2.dp)
+            .height(46.dp)
+            .padding(1.dp)
     )
 }
 
@@ -498,7 +524,7 @@ private fun MonthDateCell(
 ) {
     Column(
         modifier = modifier
-            .height(58.dp)
+            .height(46.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary)
             .border(
@@ -507,7 +533,7 @@ private fun MonthDateCell(
                 shape = RoundedCornerShape(16.dp)
             )
             .clickable(onClick = onClick)
-            .padding(vertical = 7.dp),
+            .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
