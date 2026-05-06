@@ -51,6 +51,9 @@ class ProfileEditViewModel(
                     _state.value = ProfileEditState.Error(it.message ?: "Save failed")
                     return@launch
                 }
+                // Reload so the next edit session shows fresh data rather than
+                // the pre-save snapshot the ViewModel was holding in memory.
+                _profile.value = repo.loadCurrentUserProfile()
                 _state.value = ProfileEditState.Success
             } catch (e: Exception) {
                 _state.value = ProfileEditState.Error(e.message ?: "Save failed")
