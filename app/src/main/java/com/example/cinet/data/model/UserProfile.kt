@@ -11,8 +11,11 @@ data class UserProfile(
     val nicknameLower: String = "",  // lowercase copy used for case-insensitive search
     val major: String = "",
     val pronouns: String = "",
+    val year: String = "",           // Freshman / Sophomore / Junior / Senior / Graduate / Transfer
+    val bio: String = "",            // short free-text blurb
+    val interests: List<String> = emptyList(), // e.g. ["Gaming", "Hiking", "Music"]
     val photoUrl: String = "",
-    val fcmToken: String? = null, // used to send push notifications to this user's device
+    val fcmToken: String? = null,    // used to send push notifications to this user's device
     val isDarkMode: Boolean = false,
     val notificationsEnabled: Boolean = true,
     val selectedTheme: AppThemeColor = AppThemeColor.Green,
