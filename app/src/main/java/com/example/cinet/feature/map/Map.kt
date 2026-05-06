@@ -232,7 +232,7 @@ fun CampusMapScreen(
                     .navigationBarsPadding()
                     .padding(end = 11.dp, bottom = 86.dp)
             ) {
-                CenterSelf(user = user, cameraPositionState = cameraPositionState)
+                CenterCamera(location = user, cameraPositionState = cameraPositionState)
             }
         }
 
@@ -552,8 +552,8 @@ private fun CampusMarker(
     onSelected: (CampusLocation) -> Unit
 ) {
     val context = LocalContext.current
-    val secondaryColor = MaterialTheme.colorScheme.secondary
-    val customIcon = remember(location.category, secondaryColor) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val customIcon = remember(location.category, primaryColor) {
         try {
             customMarker(context, when (location.category) {
                 "ACADEMIC" -> R.drawable.school
@@ -561,7 +561,7 @@ private fun CampusMarker(
                 "COMMUTER_PARKING" -> R.drawable.parking
                 "DINING" -> R.drawable.dining
                 else -> R.drawable.unlisted
-            }, secondaryColor)
+            }, primaryColor)
         } catch (_: Exception) {
             null
         }

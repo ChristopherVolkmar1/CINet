@@ -2,11 +2,13 @@ package com.example.cinet.feature.map
 
 import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -15,8 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.BasicAlertDialog
@@ -25,6 +31,7 @@ import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SliderDefaults.Thumb
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -80,7 +87,7 @@ fun ShareLocation( friends: List<UserProfile>, location: CampusLocation ) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Share Location",
+                text = "Quick Share",
                 style = MaterialTheme.typography.headlineSmall,
                 letterSpacing = 1.sp,
                 fontWeight = FontWeight.Bold,
@@ -100,6 +107,7 @@ fun Share(friends: List<UserProfile>, location: CampusLocation, onDismiss: () ->
     val repository = remember { SocialRepository() }
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
+    val lazyListState = rememberLazyListState()
     BasicAlertDialog(
         onDismissRequest = onDismiss
     ) {
@@ -125,7 +133,7 @@ fun Share(friends: List<UserProfile>, location: CampusLocation, onDismiss: () ->
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                LazyColumn(state = lazyListState, modifier = Modifier.heightIn(max = 400.dp)) {
                     items(friends) { friend ->
                         FriendSelectRow(
                             friend = friend,

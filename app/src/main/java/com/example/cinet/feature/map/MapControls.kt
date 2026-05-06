@@ -35,7 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.UserProfile
@@ -141,7 +139,7 @@ fun FilterMenu(
         ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.secondary,
+                //color = MaterialTheme.colorScheme.secondary,
                 tonalElevation = 6.dp,
             ) {
                 Column(
@@ -164,12 +162,13 @@ fun FilterMenu(
                         ElevatedButton(
                             onClick = { onFiltersChanged(emptySet()) },
                             contentPadding = PaddingValues(horizontal = 12.dp),
+                            enabled = activeFilters.isNotEmpty(),
                             colors = ButtonDefaults.elevatedButtonColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             ),
                             border = BorderStroke(
                                 width = 2.dp,
-                                color = Color.White.copy(alpha = 0.6f)
+                                if (activeFilters.isNotEmpty()) Color.White.copy(alpha = 0.6f) else Color.Transparent
                             ),
                         ) {
                             Text(
@@ -243,8 +242,8 @@ private fun categoryIconMap(): Map<String, ImageVector> = mapOf(
 
 /** Floating button that smoothly re-centers the camera on the user's current position. */
 @Composable
-fun CenterSelf(
-    user: LatLng,
+fun CenterCamera(
+    location: LatLng,
     cameraPositionState: CameraPositionState
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -259,7 +258,7 @@ fun CenterSelf(
                 onClick = {
                     coroutineScope.launch {
                         cameraPositionState.animate(
-                            update = CameraUpdateFactory.newLatLngZoom(user, 18f),
+                            update = CameraUpdateFactory.newLatLngZoom(location, 18f),
                             durationMs = 1000
                         )
                     }
