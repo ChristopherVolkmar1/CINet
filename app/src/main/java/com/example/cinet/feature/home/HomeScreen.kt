@@ -1,10 +1,21 @@
 package com.example.cinet.feature.home
 
-import android.R
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -14,8 +25,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -92,9 +113,7 @@ fun HomeScreen(
     )
 }
 
-/**
- * Arranges the full home screen from top to bottom.
- */
+/** Arranges the home screen from top to bottom. */
 @Composable
 private fun HomeScreenContent(
     nickname: String,
@@ -114,53 +133,53 @@ private fun HomeScreenContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp)
-            .padding(top = 15.dp, bottom = 4.dp)
+            .padding(horizontal = 24.dp)
+            .padding(top = 18.dp, bottom = 24.dp)
     ) {
         HomeTopBar(
             onProfileClick = onProfileClick,
             onSettingsClick = onSettingsClick
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
-        HomeMainCard {
-            WelcomeHeader(nickname = nickname)
+        WelcomeHeader(nickname = nickname)
 
-            Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-            HomeWeatherBanner(
-                temp = weatherInfo.temp,
-                condition = weatherInfo.condition
-            )
+        HomeWeatherBanner(
+            temp = weatherInfo.temp,
+            condition = weatherInfo.condition
+        )
 
-            Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-            LatestNewsCarousel(
-                articles = newsArticles,
-                onSeeAllClick = onSeeAllNewsClick,
-                onArticleClick = onArticleClick
-            )
+        LatestNewsCarousel(
+            articles = newsArticles,
+            onSeeAllClick = onSeeAllNewsClick,
+            onArticleClick = onArticleClick
+        )
 
-            Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-            QuickActionGrid(
-                onMapClick = onMapClick,
-                onCalendarClick = onCalendarClick,
-                onSocialClick = onSocialClick,
-                onStudyRoomsClick = onStudyRoomsClick,
-                onProfileClick = onProfileClick,
-                onNotificationClick = onNotificationClick
-            )
-        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        QuickActionGrid(
+            onMapClick = onMapClick,
+            onCalendarClick = onCalendarClick,
+            onSocialClick = onSocialClick,
+            onStudyRoomsClick = onStudyRoomsClick,
+            onProfileClick = onProfileClick,
+            onNotificationClick = onNotificationClick
+        )
     }
 }
 
-/**
- * Displays the top CINET title and action buttons.
- */
+/** Displays the top CINET title and action buttons. */
 @Composable
 private fun HomeTopBar(
     onProfileClick: () -> Unit,
@@ -174,8 +193,8 @@ private fun HomeTopBar(
             text = "CINET",
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.ExtraBold,
-            fontSize = 26.sp,
-            letterSpacing = 0.3.sp
+            fontSize = 34.sp,
+            letterSpacing = 0.4.sp
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -196,9 +215,7 @@ private fun HomeTopBar(
     }
 }
 
-/**
- * Displays one circular icon button in the top header.
- */
+/** Displays one soft circular icon button in the top header. */
 @Composable
 private fun HeaderIconButton(
     icon: ImageVector,
@@ -207,68 +224,52 @@ private fun HeaderIconButton(
 ) {
     Surface(
         modifier = Modifier
-            .size(44.dp)
+            .size(54.dp)
             .clickable(onClick = onClick),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+        shadowElevation = 0.dp
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(30.dp)
+                modifier = Modifier.size(28.dp)
             )
         }
     }
 }
 
-/**
- * Holds all main home page content inside one large rounded card.
- */
-@Composable
-private fun HomeMainCard(
-    content: @Composable () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth()
-            .fillMaxWidth()
-            .height(650.dp),
-        shape = RoundedCornerShape(38.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 10.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 24.dp)
-        ){
-            content()
-        }
-    }
-}
-
-/**
- * Displays the greeting at the top of the main card.
- */
+/** Displays the greeting and subtitle at the top of the home page. */
 @Composable
 private fun WelcomeHeader(nickname: String) {
     val displayName = nickname.ifBlank { "there" }
 
-    Text(
-        text = "Welcome back, $displayName 👋",
-        color = MaterialTheme.colorScheme.onSurface,
-        fontWeight = FontWeight.ExtraBold,
-        fontSize = 22.sp,
-        lineHeight = 26.sp,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis
-    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Welcome back, $displayName 👋",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 28.sp,
+            lineHeight = 34.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = "Here’s what’s happening on campus",
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+            fontWeight = FontWeight.Medium,
+            fontSize = 17.sp,
+            lineHeight = 22.sp
+        )
+    }
 }
 
-/**
- * Displays the weather summary without the "Campus Weather" label.
- */
+/** Displays the weather summary without the "Campus Weather" label. */
 @Composable
 private fun HomeWeatherBanner(
     temp: String,
@@ -281,28 +282,28 @@ private fun HomeWeatherBanner(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(34.dp),
         color = MaterialTheme.colorScheme.primary,
-        shadowElevation = 5.dp
+        shadowElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = weatherIcon,
                 contentDescription = displayCondition,
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(32.dp)
             )
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "$temp • $displayCondition",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 17.sp,
-                    lineHeight = 21.sp,
+                    fontSize = 21.sp,
+                    lineHeight = 25.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -312,8 +313,8 @@ private fun HomeWeatherBanner(
                 Text(
                     text = "Camarillo, CA",
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.86f),
-                    fontSize = 12.sp,
-                    lineHeight = 15.sp,
+                    fontSize = 15.sp,
+                    lineHeight = 19.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -322,9 +323,7 @@ private fun HomeWeatherBanner(
     }
 }
 
-/**
- * Displays the latest news heading, carousel cards, and page indicators.
- */
+/** Displays the latest news heading, carousel cards, and page indicators. */
 @Composable
 private fun LatestNewsCarousel(
     articles: List<NewsArticle>,
@@ -345,7 +344,7 @@ private fun LatestNewsCarousel(
     Column(modifier = Modifier.fillMaxWidth()) {
         LatestNewsHeader(onSeeAllClick = onSeeAllClick)
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         if (articles.isEmpty()) {
             LoadingNewsCard()
@@ -363,7 +362,7 @@ private fun LatestNewsCarousel(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             NewsCarouselIndicators(
                 count = articles.size.coerceAtMost(5),
@@ -373,9 +372,7 @@ private fun LatestNewsCarousel(
     }
 }
 
-/**
- * Displays the latest news title row.
- */
+/** Displays the latest news title row. */
 @Composable
 private fun LatestNewsHeader(
     onSeeAllClick: () -> Unit
@@ -388,7 +385,7 @@ private fun LatestNewsHeader(
             text = "CI View - Latest News",
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.ExtraBold,
-            fontSize = 18.sp,
+            fontSize = 22.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -398,24 +395,23 @@ private fun LatestNewsHeader(
             text = "See all",
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.ExtraBold,
-            fontSize = 13.sp,
+            fontSize = 15.sp,
             modifier = Modifier.clickable(onClick = onSeeAllClick)
         )
     }
 }
 
-/**
- * Displays a temporary news loading card.
- */
+/** Displays a temporary news loading card. */
 @Composable
 private fun LoadingNewsCard() {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp),
-        shape = RoundedCornerShape(34.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-        shadowElevation = 2.dp
+            .height(170.dp),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
@@ -427,9 +423,7 @@ private fun LoadingNewsCard() {
     }
 }
 
-/**
- * Displays one simplified purple news card.
- */
+/** Displays one horizontally scrollable news article card. */
 @Composable
 private fun HomeNewsCard(
     article: NewsArticle,
@@ -474,9 +468,7 @@ private fun HomeNewsCard(
     }
 }
 
-/**
- * Displays the small carousel page indicator dots.
- */
+/** Displays the small carousel page indicator dots. */
 @Composable
 private fun NewsCarouselIndicators(
     count: Int,
@@ -506,22 +498,7 @@ private fun NewsCarouselIndicators(
     }
 }
 
-/**
- * Displays a thin divider between the news and quick actions.
- */
-@Composable
-private fun HomeDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
-    )
-}
-
-/**
- * Displays the circular quick action buttons.
- */
+/** Displays the quick action shortcuts as circular buttons that match the calendar page. */
 @Composable
 private fun QuickActionGrid(
     onMapClick: () -> Unit,
@@ -533,75 +510,69 @@ private fun QuickActionGrid(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
         ) {
             QuickActionCircleButton(
                 icon = Icons.Default.Map,
-                label = "Map",
-                contentDescription = "Open campus map",
+                title = "Map",
                 onClick = onMapClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.CalendarMonth,
-                label = "Calendar",
-                contentDescription = "Open calendar",
+                title = "Calendar",
                 onClick = onCalendarClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.Groups,
-                label = "Social",
-                contentDescription = "Open social",
+                title = "Social",
                 onClick = onSocialClick
             )
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
         ) {
             QuickActionCircleButton(
                 icon = Icons.Default.MenuBook,
-                label = "Study Rooms",
-                contentDescription = "Open study rooms",
+                title = "Study Rooms",
                 onClick = onStudyRoomsClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.Person,
-                label = "Profile",
-                contentDescription = "Open profile",
+                title = "Profile",
                 onClick = onProfileClick
             )
 
             QuickActionCircleButton(
                 icon = Icons.Default.Notifications,
-                label = "Notifications",
-                contentDescription = "Open notifications",
+                title = "Notifications",
                 onClick = onNotificationClick
             )
         }
     }
 }
 
-/**
- * Displays one circular quick action button.
- */
+/** Shows one circular quick action button with its label below it. */
 @Composable
 private fun QuickActionCircleButton(
     icon: ImageVector,
-    label: String,
-    contentDescription: String,
-    onClick: () -> Unit
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier
-            .width(92.dp)
+        modifier = modifier
+            .width(96.dp)
             .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -614,30 +585,29 @@ private fun QuickActionCircleButton(
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = icon,
-                    contentDescription = contentDescription,
+                    contentDescription = title,
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(25.dp)
+                    modifier = Modifier.size(30.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = label,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
+            text = title,
             color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            lineHeight = 17.sp,
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
     }
 }
 
-/**
- * Removes extra campus text from the weather condition.
- */
+/** Removes extra campus text from the weather condition. */
 private fun cleanedWeatherCondition(condition: String): String {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val isNight = hour < 6 || hour >= 19
@@ -652,9 +622,7 @@ private fun cleanedWeatherCondition(condition: String): String {
     }
 }
 
-/**
- * Chooses the best icon for the current weather condition.
- */
+/** Chooses the best icon for the current weather condition. */
 private fun weatherIconFor(condition: String): ImageVector {
     return when {
         condition.contains("Clear Sky", ignoreCase = true) -> Icons.Default.NightsStay
@@ -681,7 +649,16 @@ fun HomeScreenPreview() {
             displayUpcomingEventsItems = emptyList(),
             onUpdateSchedule = {},
             onUpdateEvents = {},
-            onNavigateToLocation = { _ -> }
+            onMapClick = {},
+            onSettingsClick = {},
+            onCalendarClick = {},
+            onAddClassClick = {},
+            onCIViewClick = {},
+            onArticleClick = {},
+            onSocialClick = {},
+            onNotificationClick = {},
+            onProfileClick = {},
+            onNavigateToLocation = {}
         )
     }
 }
