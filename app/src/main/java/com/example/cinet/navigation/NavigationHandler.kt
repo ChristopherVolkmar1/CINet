@@ -146,6 +146,7 @@ private fun MainScaffold(
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var showProfileEdit by remember { mutableStateOf(false) }
+    var profileOpenedFromHome by remember { mutableStateOf(false) }
 
     // Social sub-navigation stack
     var activeConversation by remember { mutableStateOf<Conversation?>(null) }
@@ -250,6 +251,7 @@ private fun MainScaffold(
                                 currentScreen = screen
                                 showCIView = false
                                 selectedNewsArticle = null
+                                profileOpenedFromHome = false
                                 // Tapping Social from any other tab OR while already on Social
                                 // always returns to the Messages (ConversationsListScreen) root.
                                 if (screen == Screen.Social) {
@@ -338,6 +340,19 @@ private fun MainScaffold(
                         },
                         onArticleClick = { article ->
                             selectedNewsArticle = article
+                        },
+                        onSocialClick = {
+                            currentScreen = Screen.Social
+                            activeConversation = null
+                            selectedProfile = null
+                            showNewConversation = false
+                            showSocialScreen = false
+                        },
+                        onNotificationClick = { currentScreen = Screen.Settings },
+                        onProfileClick = {
+                            profileOpenedFromHome = true
+                            selectedProfile = userProfile
+                            currentScreen = Screen.Settings
                         },
                         onNavigateToLocation = { locationName ->
                             val location = campusRegistry["academic"]?.find { it.name == locationName }
@@ -439,7 +454,13 @@ private fun MainScaffold(
                             user = displayProfile,
                             currentUserProfile = userProfile,
                             onOpenConversation = { activeConversation = it; currentScreen = Screen.Social },
-                            onBack = { selectedProfile = null },
+                            onBack = {
+                                selectedProfile = null
+                                if (profileOpenedFromHome) {
+                                    profileOpenedFromHome = false
+                                    currentScreen = Screen.Home
+                                }
+                            },
                             onEditProfile = { showProfileEdit = true },
                         )
                     } else {
@@ -453,7 +474,10 @@ private fun MainScaffold(
                                 authViewModel.updateSettings(dark, notify, theme)
                             },
                             userProfile = userProfile,
-                            onViewProfile = { selectedProfile = userProfile },
+                            onViewProfile = {
+                                profileOpenedFromHome = false
+                                selectedProfile = userProfile
+                            },
                         )
                     }
                 }
