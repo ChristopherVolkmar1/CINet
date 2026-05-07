@@ -1,6 +1,5 @@
 package com.example.cinet.feature.calendar.calendarFiles
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,33 +7,29 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.study.StudySession
@@ -79,97 +74,61 @@ fun CalendarDailyAgendaCard(
     Column(modifier = modifier.fillMaxWidth()) {
         AgendaDateHeader(
             selectedDate = selectedDate,
+            itemCount = agendaItems.size,
             onTodayClick = onTodayClick
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(7.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-            border = BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.10f)
-            )
-        ) {
-            if (agendaItems.isEmpty()) {
-                EmptyAgendaMessage(selectedDate = selectedDate)
-            } else {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    agendaItems.forEachIndexed { index, item ->
-                        AgendaTimelineRow(
-                            item = item,
-                            isFirst = index == 0,
-                            isLast = index == agendaItems.lastIndex
-                        )
-
-                        if (index != agendaItems.lastIndex) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 86.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                            )
-                        }
-                    }
+        if (agendaItems.isEmpty()) {
+            EmptyAgendaMessage(selectedDate = selectedDate)
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                agendaItems.forEach { item ->
+                    AgendaEventCard(item = item)
                 }
             }
         }
     }
 }
 
-/** Shows the date title and the Today shortcut above the agenda card. */
+/** Shows the selected schedule heading and the total number of items. */
 @Composable
 private fun AgendaDateHeader(
     selectedDate: LocalDate,
+    itemCount: Int,
     onTodayClick: () -> Unit
 ) {
-    val formatter = remember { DateTimeFormatter.ofPattern("EEEE, d MMMM") }
-    val green = MaterialTheme.colorScheme.secondaryContainer
+    val selectedFormatter = remember { DateTimeFormatter.ofPattern("MMM d") }
+    val isToday = selectedDate == LocalDate.now()
+    val title = if (isToday) "Today’s Schedule" else "Schedule • ${selectedDate.format(selectedFormatter)}"
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(green.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.CalendarMonth,
-                contentDescription = null,
-                tint = green,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
         Text(
-            text = selectedDate.format(formatter),
+            text = title,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 22.sp,
+            lineHeight = 26.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
 
-        OutlinedButton(
-            onClick = onTodayClick,
-            shape = RoundedCornerShape(22.dp),
-            border = BorderStroke(1.dp, green.copy(alpha = 0.30f)),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = green,
-                containerColor = Color.Transparent
-            )
-        ) {
-            Text(
-                text = "Today",
-                fontWeight = FontWeight.Bold
-            )
-        }
+        Text(
+            text = buildEventCountLabel(itemCount),
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 15.sp,
+            modifier = Modifier.clickable(onClick = onTodayClick),
+            maxLines = 1
+        )
     }
 }
 
@@ -178,126 +137,118 @@ private fun AgendaDateHeader(
 private fun EmptyAgendaMessage(selectedDate: LocalDate) {
     val isToday = selectedDate == LocalDate.now()
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp
     ) {
-        Text(
-            text = if (isToday) "No saved calendar items for today yet" else "No saved calendar items for this day yet",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = if (isToday) "No saved calendar items for today yet" else "No saved calendar items for this day yet",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
 
-        Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-        Text(
-            text = "Use Classes, Study, or Events below to add and view today's items.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+            Text(
+                text = "Saved classes, study sessions, and reminder events will appear here.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.84f)
+            )
+        }
     }
 }
 
-/** Draws one timeline row for one class, study session, event, or reminder-enabled campus event. */
+/** Draws one individual event card using the same bold purple card style as the home news cards. */
 @Composable
-private fun AgendaTimelineRow(
-    item: AgendaItem,
-    isFirst: Boolean,
-    isLast: Boolean
-) {
-    val green = MaterialTheme.colorScheme.secondaryContainer
-
-    Row(
+private fun AgendaEventCard(item: AgendaItem) {
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { item.onClick() }
-            .padding(horizontal = 10.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .height(62.dp)
+            .clickable { item.onClick() },
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp
     ) {
-        Text(
-            text = item.timeText,
-            modifier = Modifier.width(66.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Medium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        Column(
-            modifier = Modifier.width(22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .width(2.dp)
-                    .height(if (isFirst) 12.dp else 22.dp)
-                    .background(if (isFirst) Color.Transparent else green.copy(alpha = 0.55f))
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.42f))
             )
 
-            Box(
-                modifier = Modifier
-                    .size(15.dp)
-                    .clip(CircleShape)
-                    .background(green)
-            )
+            Spacer(modifier = Modifier.width(10.dp))
 
-            Box(
-                modifier = Modifier
-                    .width(2.dp)
-                    .height(if (isLast) 12.dp else 22.dp)
-                    .background(if (isLast) Color.Transparent else green.copy(alpha = 0.55f))
-            )
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(3.dp))
-
-            Text(
-                text = item.subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        if (item.location.isNotBlank()) {
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = green.copy(alpha = 0.80f),
-                    modifier = Modifier.size(18.dp)
-                )
-
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = item.location,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = item.title,
+                    fontSize = 15.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = item.timeText,
+                    fontSize = 12.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.90f),
+                        modifier = Modifier.size(13.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text(
+                        text = item.location.ifBlank { item.subtitle },
+                        fontSize = 12.sp,
+                        lineHeight = 14.sp,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Icon(
+                imageVector = Icons.Default.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(19.dp)
+            )
         }
     }
 }
@@ -391,6 +342,11 @@ private fun parseTimeToMinutes(time: String): Int {
     if (period == "AM" && hour == 12) hour = 0
 
     return hour * 60 + minute
+}
+
+/** Builds a readable event-count label. */
+private fun buildEventCountLabel(itemCount: Int): String {
+    return if (itemCount == 1) "1 Event" else "$itemCount Events"
 }
 
 /** Stores one unified row used by the daily agenda card. */

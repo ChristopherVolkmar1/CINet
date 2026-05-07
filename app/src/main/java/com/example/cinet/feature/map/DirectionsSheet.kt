@@ -328,19 +328,35 @@ fun BusScheduleSheet(onDismiss: () -> Unit) {
         text = {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.weight(1f),horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Arriving", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = "Arriving",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     HorizontalDivider()
                     arrival.forEach { time ->
-                        Text(text = time, modifier = Modifier.padding(vertical = 8.dp))
+                        Text(
+                            text = time,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         HorizontalDivider()
                     }
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Departing", style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = "Departing",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                     HorizontalDivider()
                     departure.forEach { time ->
-                        Text(text = time, modifier = Modifier.padding(vertical = 8.dp))
+                        Text(
+                            text = time,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         HorizontalDivider()
                     }
                 }

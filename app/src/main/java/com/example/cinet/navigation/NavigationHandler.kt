@@ -30,8 +30,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.cinet.CIViewScreen
-import com.example.cinet.NewsArticle
+import com.example.cinet.feature.home.news.CIViewScreen
+import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
@@ -128,6 +128,7 @@ private fun MainScaffold(
     val socialScope = rememberCoroutineScope()
     val socialRepository = remember { SocialRepository() }
 
+    // Sync global AppSettings object with the user profile from Firebase
     LaunchedEffect(userProfile) {
         AppSettings.isDarkMode = userProfile.isDarkMode
         AppSettings.notificationsEnabled = userProfile.notificationsEnabled
@@ -154,6 +155,7 @@ private fun MainScaffold(
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var showProfileEdit by remember { mutableStateOf(false) }
+    var profileOpenedFromHome by remember { mutableStateOf(false) }
 
     var activeConversation by remember { mutableStateOf<Conversation?>(null) }
     var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -295,7 +297,9 @@ private fun MainScaffold(
                                 currentScreen = screen
                                 showCIView = false
                                 selectedNewsArticle = null
-
+                                profileOpenedFromHome = false
+                                // Tapping Social from any other tab OR while already on Social
+                                // always returns to the Messages (ConversationsListScreen) root.
                                 if (screen == Screen.Social) {
                                     activeConversation = null
                                     selectedProfile = null
@@ -395,6 +399,19 @@ private fun MainScaffold(
                         },
                         onArticleClick = { article ->
                             selectedNewsArticle = article
+                        },
+                        onSocialClick = {
+                            currentScreen = Screen.Social
+                            activeConversation = null
+                            selectedProfile = null
+                            showNewConversation = false
+                            showSocialScreen = false
+                        },
+                        onNotificationClick = { currentScreen = Screen.Settings },
+                        onProfileClick = {
+                            profileOpenedFromHome = true
+                            selectedProfile = userProfile
+                            currentScreen = Screen.Settings
                         },
                         onNavigateToLocation = { locationName ->
                             val location = campusRegistry.values.flatten()
@@ -517,7 +534,12 @@ private fun MainScaffold(
                                 activeConversation = it
                                 currentScreen = Screen.Social
                             },
-                            onBack = { selectedProfile = null },
+                            onBack = { selectedProfile = null
+                                if (profileOpenedFromHome) {
+                                    profileOpenedFromHome = false
+                                    currentScreen = Screen.Home
+                                }
+                                     },
                             onEditProfile = { showProfileEdit = true },
                         )
                     } else {
@@ -531,7 +553,10 @@ private fun MainScaffold(
                                 authViewModel.updateSettings(dark, notify, theme)
                             },
                             userProfile = userProfile,
-                            onViewProfile = { selectedProfile = userProfile },
+                            onViewProfile = {
+                                profileOpenedFromHome = false
+                                selectedProfile = userProfile
+                            },
                         )
                     }
                 }
