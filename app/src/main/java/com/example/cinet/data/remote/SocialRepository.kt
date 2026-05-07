@@ -24,16 +24,44 @@ class SocialRepository(
     private val currentUid: String
         get() = auth.currentUser?.uid ?: error("No signed-in user.")
 
-    /** Searches for users whose nickname matches the typed query. */
+    /** Searches for users whose nickname matches the typed query (case-insensitive). */
+    /**
+     * Searches for users whose nickname starts with [query], case-insensitively.
+     *
+     * Two parallel server queries are merged to handle both new and legacy documents:
+     *  1. nicknameLower range — hits users whose nicknameLower field has been populated
+     *     (written on every profile save / backfilled at login post-deploy).
+     *  2. Capitalised nickname range — hits legacy users whose nickname is Title Case
+     *     (the most common format) and whose nicknameLower hasn\'t been written yet.
+     *     A client-side toLowerCase check ensures only genuine prefix matches surface.
+     *
+     * Once all users have logged in at least once after the deploy, query 2 becomes
+     * redundant and can be removed.
+     */
     suspend fun searchUsersByNickname(query: String): Result<List<UserProfile>> {
         return try {
-            val snapshot = db.collection("users")
-                .whereGreaterThanOrEqualTo("nickname", query)
-                .whereLessThanOrEqualTo("nickname", query + "\uf8ff")
+            val lowerQuery = query.lowercase()
+            val capitalisedQuery = lowerQuery.replaceFirstChar { it.uppercaseChar() }
+
+            // Query 1: users with nicknameLower populated (new / backfilled)
+            val byLower = db.collection("users")
+                .whereGreaterThanOrEqualTo("nicknameLower", lowerQuery)
+                .whereLessThanOrEqualTo("nicknameLower", lowerQuery + "\uf8ff")
                 .get()
                 .await()
+                .toObjects(UserProfile::class.java)
 
-            val users = snapshot.toObjects(UserProfile::class.java)
+            // Query 2: Title Case legacy fallback — client-side filter confirms the match
+            val byNickname = db.collection("users")
+                .whereGreaterThanOrEqualTo("nickname", capitalisedQuery)
+                .whereLessThanOrEqualTo("nickname", capitalisedQuery + "\uf8ff")
+                .get()
+                .await()
+                .toObjects(UserProfile::class.java)
+                .filter { it.nickname.lowercase().startsWith(lowerQuery) }
+
+            val users = (byLower + byNickname)
+                .distinctBy { it.uid }
                 .filter { it.uid != currentUid }
 
             Result.success(users)
@@ -46,6 +74,7 @@ class SocialRepository(
     suspend fun sendFriendRequest(receiver: UserProfile): Result<Unit> {
         return try {
             if (!canSendFriendRequest(receiver.uid)) {
+                Log.d("SocialRepository", "sendFriendRequest blocked for ${receiver.uid}")
                 return Result.success(Unit)
             }
 
@@ -54,11 +83,14 @@ class SocialRepository(
                 senderId = currentUid,
                 senderNickname = currentUser.nickname,
                 receiverId = receiver.uid,
+                receiverNickname = receiver.nickname,
             )
 
             saveFriendRequest(request)
+            Log.d("SocialRepository", "sendFriendRequest: sent to ${receiver.uid}")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("SocialRepository", "sendFriendRequest failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -82,15 +114,29 @@ class SocialRepository(
         }
     }
 
-    /** Gets outgoing pending friend requests sent by the current user. */
+    /** Gets outgoing pending friend requests sent by the current user.
+     *  For legacy docs that pre-date the receiverNickname field, the nickname
+     *  is fetched on the fly so the UI never shows a raw UID.
+     */
     suspend fun getSentRequests(): Result<List<FriendRequest>> {
         return try {
             val requests = loadPendingRequestsForSender(currentUid)
                 .sortedByDescending { it.createdAt?.time ?: 0L }
                 .distinctBy { it.receiverId }
 
-            Result.success(requests)
+            // Back-fill receiverNickname for any legacy docs that are missing it
+            val enriched = requests.map { request ->
+                if (request.receiverNickname.isBlank()) {
+                    request.copy(receiverNickname = getUserNickname(request.receiverId))
+                } else {
+                    request
+                }
+            }
+
+            Log.d("SocialRepository", "getSentRequests: found ${enriched.size} for uid $currentUid")
+            Result.success(enriched)
         } catch (e: Exception) {
+            Log.e("SocialRepository", "getSentRequests failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -131,23 +177,66 @@ class SocialRepository(
         }
     }
 
-    /** Removes a friend by deleting the friend doc from both users' subcollections. */
+    /**
+     * Removes a friend atomically via a WriteBatch:
+     *  1. Deletes both users' friend subcollection docs.
+     *  2. Finds the shared DM conversation (client-side isGroup check to handle
+     *     docs where the field was never written) and sets active = false so it
+     *     disappears from ConversationsListScreen without losing message history.
+     *  3. Deletes both possible friendRequest docs.
+     *
+     * Sending a new message after re-adding calls updateConversationLastMessage
+     * which sets active = true, restoring the conversation automatically.
+     */
     suspend fun removeFriend(friendUid: String): Result<Unit> {
         return try {
-            db.collection("users")
-                .document(currentUid)
-                .collection("friends")
-                .document(friendUid)
-                .delete()
+            val batch = db.batch()
+
+            // 1. Delete both friend subcollection docs
+            batch.delete(
+                db.collection("users").document(currentUid)
+                    .collection("friends").document(friendUid)
+            )
+            batch.delete(
+                db.collection("users").document(friendUid)
+                    .collection("friends").document(currentUid)
+            )
+
+            // 2. Find the shared DM conversation and deactivate it.
+            //    Query by participantIds contains currentUid, then filter client-side
+            //    because whereEqualTo("isGroup", false) misses docs where the field
+            //    was never set.
+            val conversationsSnapshot = db.collection("conversations")
+                .whereArrayContains("participantIds", currentUid)
+                .get()
                 .await()
 
-            db.collection("users")
-                .document(friendUid)
-                .collection("friends")
-                .document(currentUid)
-                .delete()
-                .await()
+            conversationsSnapshot.documents
+                .filter { doc ->
+                    val isGroup = doc.getBoolean("isGroup") ?: false
+                    @Suppress("UNCHECKED_CAST")
+                    val participants = doc.get("participantIds") as? List<String> ?: emptyList()
+                    !isGroup && participants.contains(friendUid)
+                }
+                .forEach { doc ->
+                    batch.update(doc.reference, "active", false)
+                }
 
+            batch.commit().await()
+            Log.d("SocialRepository", "removeFriend: friend docs deleted, conversation deactivated")
+
+            // 3. Delete both possible friendRequest docs outside the batch.
+            //    A batch delete on a non-existent doc causes PERMISSION_DENIED
+            //    and fails the whole batch, so each is done individually.
+            for (docId in listOf("${currentUid}_${friendUid}", "${friendUid}_${currentUid}")) {
+                try {
+                    db.collection("friendRequests").document(docId).delete().await()
+                } catch (e: Exception) {
+                    Log.d("SocialRepository", "friendRequest $docId skipped: ${e.message}")
+                }
+            }
+
+            Log.d("SocialRepository", "removeFriend: complete for $friendUid")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SocialRepository", "removeFriend failed: ${e.message}")
@@ -299,18 +388,25 @@ class SocialRepository(
     }
 
     /** Updates the response value for a study invite message. */
+    /**
+     * Records the current user's response to an invite.
+     * Uses per-user arrays (acceptedBy / declinedBy) instead of a single
+     * "response" field so each participant in a group chat can respond
+     * independently without blocking others.
+     */
     suspend fun respondToInvite(
         conversationId: String,
         messageId: String,
         response: String,
     ): Result<Unit> {
         return try {
-            db.collection("conversations")
+            val docRef = db.collection("conversations")
                 .document(conversationId)
                 .collection("messages")
                 .document(messageId)
-                .update("metadata.response", response)
-                .await()
+
+            val field = if (response == "accepted") "metadata.acceptedBy" else "metadata.declinedBy"
+            docRef.update(field, FieldValue.arrayUnion(currentUid)).await()
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -329,7 +425,7 @@ class SocialRepository(
 
             val items = snapshot.documents.mapNotNull { doc ->
                 mapDocumentToStudySession(doc.id, doc.data ?: emptyMap())
-            }
+            }.distinctBy { Triple(it.className, it.date, it.startTime) }
 
             Result.success(items)
         } catch (e: Exception) {
@@ -348,7 +444,7 @@ class SocialRepository(
 
             val items = snapshot.documents.mapNotNull { doc ->
                 mapDocumentToEventItem(doc.id, doc.data ?: emptyMap())
-            }
+            }.distinctBy { Triple(it.name, it.date, it.time) }
 
             Result.success(items)
         } catch (e: Exception) {
@@ -359,9 +455,25 @@ class SocialRepository(
     /** Checks whether a new friend request is allowed to be sent. */
     private suspend fun canSendFriendRequest(receiverUid: String): Boolean {
         if (receiverUid == currentUid) return false
-        if (areAlreadyFriends(receiverUid)) return false
-        if (hasPendingRequest(currentUid, receiverUid)) return false
-        if (hasPendingRequest(receiverUid, currentUid)) return false
+        try {
+            if (areAlreadyFriends(receiverUid)) {
+                Log.d("SocialRepository", "canSendFriendRequest: already friends with $receiverUid")
+                return false
+            }
+            if (hasPendingRequest(currentUid, receiverUid)) {
+                Log.d("SocialRepository", "canSendFriendRequest: pending request already sent to $receiverUid")
+                return false
+            }
+            if (hasPendingRequest(receiverUid, currentUid)) {
+                Log.d("SocialRepository", "canSendFriendRequest: $receiverUid already sent us a request")
+                return false
+            }
+        } catch (e: Exception) {
+            // If the index query fails (e.g. missing composite index), log clearly and
+            // allow the send rather than silently blocking it. The saveFriendRequest
+            // document ID is deterministic so a duplicate write is harmless.
+            Log.e("SocialRepository", "canSendFriendRequest check failed — allowing send. Error: ${e.message}")
+        }
         return true
     }
 
@@ -375,6 +487,7 @@ class SocialRepository(
         senderId: String,
         senderNickname: String,
         receiverId: String,
+        receiverNickname: String,
     ): FriendRequest {
         val requestId = friendRequestDocumentId(senderId, receiverId)
 
@@ -383,16 +496,20 @@ class SocialRepository(
             senderId = senderId,
             senderNickname = senderNickname,
             receiverId = receiverId,
+            receiverNickname = receiverNickname,
             status = "pending",
         )
     }
 
-    /** Saves a friend request to Firestore. */
+    /**
+     * Saves a friend request to Firestore.
+     * Deletes any stale doc first (e.g. a previously declined request) so the
+     * write is always a `create` -- which the sender is permitted to do.
+     */
     private suspend fun saveFriendRequest(request: FriendRequest) {
-        db.collection("friendRequests")
-            .document(request.id)
-            .set(request)
-            .await()
+        val docRef = db.collection("friendRequests").document(request.id)
+        try { docRef.delete().await() } catch (_: Exception) { }
+        docRef.set(request).await()
     }
 
     /** Loads the current user's full profile from Firestore. */
@@ -601,7 +718,12 @@ class SocialRepository(
             .set(
                 mapOf(
                     "lastMessage" to content,
-                    "lastUpdated" to FieldValue.serverTimestamp()
+                    "lastUpdated" to FieldValue.serverTimestamp(),
+                    "lastSenderId" to currentUid,
+                    // Re-activates the conversation if it was hidden after an unfriend.
+                    // This means sending a message after re-adding a friend restores
+                    // the conversation in the list automatically.
+                    "active" to true
                 ),
                 SetOptions.merge()
             )

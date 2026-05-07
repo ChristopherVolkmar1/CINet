@@ -1,5 +1,6 @@
 package com.example.cinet.feature.map
 
+import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.firestore.GeoPoint
 
@@ -11,16 +12,59 @@ data class CampusLocation(
     val name: String = "",
     val category: String = "",
     val coordinates: GeoPoint = GeoPoint(0.0, 0.0),
-    val description: String = ""
+    val description: String = "",
+    val hours: WeeklyHours? = null
 ) {
     val latLng: LatLng
         get() = LatLng(coordinates.latitude, coordinates.longitude)
 }
 
+
+data class DayHours(
+    val open: Int = 0,
+    val close: Int = 0,
+    val isClosed: Boolean = false
+)
+
+data class WeeklyHours(
+    val monday: DayHours? = null,
+    val tuesday: DayHours? = null,
+    val wednesday: DayHours? = null,
+    val thursday: DayHours? = null,
+    val friday: DayHours? = null,
+    val saturday: DayHours? = null,
+    val sunday: DayHours? = null,
+)
+
+data class CampusIcons(
+    val academic: BitmapDescriptor?,
+    val transit: BitmapDescriptor?,
+    val parking: BitmapDescriptor?,
+    val dining: BitmapDescriptor?,
+    val default: BitmapDescriptor?
+)
+
+val transitDayHours = DayHours(open = 725, close = 1730, isClosed = false)
+
+val csuciWeeklyHours = WeeklyHours(
+    monday = transitDayHours,
+    tuesday = transitDayHours,
+    wednesday = transitDayHours,
+    thursday = transitDayHours,
+    friday = transitDayHours,
+    saturday = DayHours(isClosed = true),
+    sunday = DayHours(isClosed = true)
+)
 val csuciTransitStop = CampusLocation(
     name = "CSUCI Transit Stop",
     category = "TRANSIT",
-    coordinates = GeoPoint(34.16546748540989, -119.04402834425024)
+    coordinates = GeoPoint(34.16546748540989, -119.04402834425024),
+    hours = csuciWeeklyHours,
+    description = "How to Ride: Activate bus pass onto your school ID card for free at Transportation " +
+            "and Parking Services in Placer Hall. College Ride program is free for CI students, " +
+            "staff, and faculty with a valid DolphinOne I.D. card! If you have activated your school ID card with TPS, " +
+            "you can now self-activate your card by selecting the VCTC Bus Activation service tile when you log into myCI. " +
+            "If you have a new card, you must activate in-person for the first time."
 )
 
 // -------------------- Location filtering --------------------
@@ -28,22 +72,24 @@ val csuciTransitStop = CampusLocation(
 /** Returns every location, alphabetically sorted, that matches the given category filter and search query. */
 fun getFilteredLocations(
     fullRegistry: Map<String, List<CampusLocation>>,
-    selectedCategory: String?, // null means "all"
+    activeFilters: Set<String>,
     searchQuery: String
 ): List<CampusLocation> {
     val allLocations = fullRegistry.values.flatten()
     return allLocations
-        .filter { matchesFilter(it, selectedCategory, searchQuery) }
+        .filter { matchesFilter(it, activeFilters, searchQuery) }
         .sortedBy { it.name }
 }
 
 /** Returns true when a location matches both the category filter and the search query. */
 private fun matchesFilter(
     location: CampusLocation,
-    selectedCategory: String?,
+    activeFilters: Set<String>,
     searchQuery: String
 ): Boolean {
-    val matchesCategory = selectedCategory == null || location.category.equals(selectedCategory, ignoreCase = true)
-    val matchesSearch = searchQuery.isEmpty() || location.name.contains(searchQuery, ignoreCase = true)
+    val matchesCategory = activeFilters.isEmpty() ||
+            activeFilters.contains(location.category.uppercase().trim())
+    val matchesSearch = searchQuery.isEmpty() ||
+            location.name.contains(searchQuery, ignoreCase = true)
     return matchesCategory && matchesSearch
 }
