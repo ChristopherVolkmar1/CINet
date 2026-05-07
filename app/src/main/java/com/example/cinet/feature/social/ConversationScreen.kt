@@ -4,14 +4,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
@@ -22,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -155,7 +162,9 @@ fun ConversationScreen(
                 ) { Text("Remove") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showRemoveFriendDialog = false }) {
+                OutlinedButton(
+                    onClick = { showRemoveFriendDialog = false },
+                ) {
                     Text("Cancel")
                 }
             }
@@ -201,7 +210,9 @@ fun ConversationScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding(),
             color = MaterialTheme.colorScheme.background
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -296,45 +307,31 @@ fun ConversationScreen(
 
                     // Remove Friend button — only for direct (non-group) conversations
                     if (!conversation.isGroup && otherUid.isNotBlank()) {
-                        OutlinedButton(
-                            onClick = { showRemoveFriendDialog = true },
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            )
-                        ) {
-                            Text("Remove Friend", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
+                        var expanded by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "Remove Friend",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
 
-                HorizontalDivider()
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                repository.getMyScheduleItems().onSuccess { myScheduleItems = it }
-                                repository.getMyStudySessions().onSuccess { myStudySessions = it }
-                                showStudyInviteDialog = true
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                                offset = DpOffset(x = 0.dp, y = 4.dp)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Remove Friend") },
+                                    leadingIcon = { Icon(Icons.Default.PersonRemove, "Remove Friend") },
+                                    onClick = {
+                                        expanded = false
+                                        showRemoveFriendDialog = true
+                                    }
+                                )
                             }
                         }
-                    ) {
-                        Text("Study Invite", style = MaterialTheme.typography.labelSmall)
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                repository.getMyEvents().onSuccess { myEvents = it }
-                                showEventInviteDialog = true
-                            }
-                        }
-                    ) {
-                        Text("Event Invite", style = MaterialTheme.typography.labelSmall)
                     }
                 }
 
@@ -397,7 +394,6 @@ fun ConversationScreen(
                                 {
                                     scope.launch {
                                         repository.respondToInvite(conversation.id, message.id, "declined")
-                                        repository.sendMessage(conversation.id, "Declined your invite.", "text")
                                     }
                                 }
                             } else null
@@ -405,35 +401,23 @@ fun ConversationScreen(
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = messageInput,
-                        onValueChange = { messageInput = it },
-                        label = { Text("Message") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            val content = messageInput.trim()
-                            if (content.isNotBlank()) {
-                                scope.launch {
-                                    repository.sendMessage(conversation.id, content)
-                                    messageInput = ""
-                                }
+                val textFieldState = rememberTextFieldState()
+                MessageBox(
+                    state = textFieldState,
+                    onSendMessage = {
+                        val content = textFieldState.text.toString().trim()
+                        if (content.isNotBlank()) {
+                            scope.launch {
+                                repository.sendMessage(conversation.id, content)
+                                textFieldState.clearText()
                             }
                         }
-                    ) { Text("Send") }
-                }
+                    },
+                    studySelected = { showStudyInviteDialog = true },
+                    eventSelected = { showEventInviteDialog = true }
+                )
             }
         }
-
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -447,17 +431,12 @@ fun ConversationScreen(
                 tonalElevation = 6.dp,
                 shadowElevation = 8.dp,
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = data.visuals.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.inverseOnSurface,
-                    )
-                }
+                Text(
+                    text = data.visuals.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
             }
         }
     } // outer Box

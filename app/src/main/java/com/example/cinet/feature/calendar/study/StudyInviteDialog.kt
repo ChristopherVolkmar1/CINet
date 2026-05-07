@@ -72,7 +72,7 @@ fun StudyInviteDialog(
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                Button(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         sdf.timeZone = TimeZone.getTimeZone("UTC")
@@ -82,7 +82,7 @@ fun StudyInviteDialog(
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                Button(onClick = { showDatePicker = false }) { Text("Cancel") }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -189,7 +189,7 @@ fun StudyInviteDialog(
                     ) {
                         Text("Your Sessions", style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { isCreatingNew = true }) {
+                        Button(onClick = { isCreatingNew = true }) {
                             Text("Create new")
                         }
                     }
@@ -292,7 +292,7 @@ fun StudyInviteDialog(
         },
         confirmButton = {
             if (isCreatingNew) {
-                TextButton(
+                Button(
                     onClick = {
                         if (newClassName.isNotBlank() && newAssignmentName.isNotBlank()
                             && newDate.isNotBlank() && newTime.isNotBlank()
@@ -310,7 +310,7 @@ fun StudyInviteDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = {
+            Button(onClick = {
                 if (isCreatingNew) isCreatingNew = false else onDismiss()
             }) {
                 Text(if (isCreatingNew) "Back" else "Cancel")
