@@ -334,6 +334,12 @@ private fun MainScaffold(
                                     showSocialScreen = false
                                 }
 
+                                // makes the settings button on the nav bar only open the settings
+                                if (screen == Screen.Settings) {
+                                    selectedProfile = null
+                                    showProfileEdit = false
+                                }
+
                                 if (screen != Screen.Calendar) {
                                     showAddClassOnCalendar = false
                                     if (screen != Screen.Settings) {
