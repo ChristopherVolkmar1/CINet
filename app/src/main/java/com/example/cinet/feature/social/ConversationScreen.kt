@@ -32,12 +32,12 @@ import com.example.cinet.feature.calendar.calendarFiles.CalendarFirestoreReposit
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.example.cinet.feature.calendar.study.StudySession
+import com.example.cinet.feature.calendar.study.StudyInviteDialog
+import com.example.cinet.feature.calendar.event.EventInviteSenderDialog
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import com.example.cinet.feature.calendar.study.*
-import com.example.cinet.feature.calendar.event.*
 
 @Composable
 fun ConversationScreen(
@@ -67,6 +67,19 @@ fun ConversationScreen(
     var myEvents by remember { mutableStateOf<List<EventItem>>(emptyList()) }
     var otherUserPhotoUrl by remember { mutableStateOf("") }
     var currentUserPhotoUrl by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Returns true if the same invite was sent in this conversation within
+    // the last 5 minutes, preventing accidental double-sends.
+    fun isDuplicateInvite(type: String, name: String, date: String): Boolean {
+        val fiveMinutesAgo = System.currentTimeMillis() - 5 * 60 * 1000L
+        return messages.any { msg ->
+            msg.type == type &&
+                    (msg.metadata["name"] as? String ?: msg.metadata["className"] as? String ?: "") == name &&
+                    (msg.metadata["date"] as? String ?: "") == date &&
+                    (msg.createdAt?.time ?: 0L) >= fiveMinutesAgo
+        }
+    }
 
     val otherUid = conversation.participantIds.firstOrNull { it != currentUid } ?: ""
 
@@ -186,234 +199,268 @@ fun ConversationScreen(
         )
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
 
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // iOS-style back: bare chevron + conversation count pill
+                // Header
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable(onClick = onBack),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp),
-                    )
-                    if (conversationCount > 0) {
-                        Surface(
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primary,
+                    // iOS-style back: bare chevron + conversation count pill
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onBack),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp),
+                        )
+                        if (conversationCount > 0) {
+                            Surface(
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                            ) {
+                                Text(
+                                    text = conversationCount.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Avatar — uses secondaryContainer for consistent green branding
+                    val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() && !conversation.isGroup }
+                    if (headerPhoto != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(headerPhoto)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Profile photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = conversationCount.toString(),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                text = conversationTitle.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                style = MaterialTheme.typography.titleMedium
                             )
                         }
                     }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
 
-                // Avatar — uses secondaryContainer for consistent green branding
-                val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() && !conversation.isGroup }
-                if (headerPhoto != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(headerPhoto)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Profile photo",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    // Group name is tappable to rename; DM name is static
+                    if (conversation.isGroup) {
                         Text(
-                            text = conversationTitle.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                            style = MaterialTheme.typography.titleMedium
+                            text = conversationTitle,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    renameInput = displayGroupName
+                                    showRenameDialog = true
+                                }
                         )
+                    } else {
+                        Text(
+                            text = conversationTitle,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Remove Friend button — only for direct (non-group) conversations
+                    if (!conversation.isGroup && otherUid.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = { showRemoveFriendDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Remove Friend", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                HorizontalDivider()
 
-                // Group name is tappable to rename; DM name is static
-                if (conversation.isGroup) {
-                    Text(
-                        text = conversationTitle,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                renameInput = displayGroupName
-                                showRenameDialog = true
-                            }
-                    )
-                } else {
-                    Text(
-                        text = conversationTitle,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // Remove Friend button — only for direct (non-group) conversations
-                if (!conversation.isGroup && otherUid.isNotBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedButton(
-                        onClick = { showRemoveFriendDialog = true },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text("Remove Friend", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-
-            HorizontalDivider()
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            repository.getMyScheduleItems().onSuccess { myScheduleItems = it }
-                            repository.getMyStudySessions().onSuccess { myStudySessions = it }
-                            showStudyInviteDialog = true
-                        }
-                    }
-                ) {
-                    Text("Study Invite", style = MaterialTheme.typography.labelSmall)
-                }
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            repository.getMyEvents().onSuccess { myEvents = it }
-                            showEventInviteDialog = true
-                        }
-                    }
-                ) {
-                    Text("Event Invite", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-
-            HorizontalDivider()
-
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(messages) { message ->
-                    val alreadyResponded = message.metadata["response"] != null
-                    MessageBubble(
-                        message = message,
-                        isCurrentUser = message.senderId == currentUid,
-                        currentUserPhotoUrl = currentUserPhotoUrl,
-                        onNavigateToLocation = onNavigateToLocation,
-                        onAccept = if (!alreadyResponded && message.senderId != currentUid &&
-                            (message.type == "study_invite" || message.type == "event_invite")) {
-                            {
-                                scope.launch {
-                                    if (message.type == "study_invite") {
-                                        val className = message.metadata["className"] ?: ""
-                                        val topic = message.metadata["topic"] ?: ""
-                                        val date = message.metadata["date"] ?: ""
-                                        val time = message.metadata["time"] ?: ""
-                                        val location = message.metadata["location"] ?: ""
-                                        android.util.Log.d("CalendarSave", "Saving study session: $className $topic $date $time")
-                                        if (date.isNotBlank()) {
-                                            android.util.Log.d("CalendarSave", "metadata: ${message.metadata}")
-                                            android.util.Log.d("CalendarSave", "date: ${message.metadata["date"]}")
-                                            calendarRepository.addStudySession(date, className, topic, time, location)
-                                            android.util.Log.d("CalendarSave", "Study session saved successfully")
-                                        } else {
-                                            android.util.Log.e("CalendarSave", "Date is blank — metadata: ${message.metadata}")
-                                        }
-                                    } else {
-                                        val name = message.metadata["name"] ?: ""
-                                        val date = message.metadata["date"] ?: ""
-                                        val time = message.metadata["time"] ?: ""
-                                        val location = message.metadata["location"] ?: ""
-                                        if (date.isNotBlank()) {
-                                            calendarRepository.addEvent(date, name, time, location)
-                                        }
-                                    }
-                                    repository.respondToInvite(conversation.id, message.id, "accepted")
-                                    repository.sendMessage(conversation.id, "Accepted your invite!", "text")
-                                }
-                            }
-                        } else null,
-                        onDecline = if (!alreadyResponded && message.senderId != currentUid &&
-                            (message.type == "study_invite" || message.type == "event_invite")) {
-                            {
-                                scope.launch {
-                                    repository.respondToInvite(conversation.id, message.id, "declined")
-                                    repository.sendMessage(conversation.id, "Declined your invite.", "text")
-                                }
-                            }
-                        } else null
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = messageInput,
-                    onValueChange = { messageInput = it },
-                    label = { Text("Message") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        val content = messageInput.trim()
-                        if (content.isNotBlank()) {
+                        onClick = {
                             scope.launch {
-                                repository.sendMessage(conversation.id, content)
-                                messageInput = ""
+                                repository.getMyScheduleItems().onSuccess { myScheduleItems = it }
+                                repository.getMyStudySessions().onSuccess { myStudySessions = it }
+                                showStudyInviteDialog = true
                             }
                         }
+                    ) {
+                        Text("Study Invite", style = MaterialTheme.typography.labelSmall)
                     }
-                ) { Text("Send") }
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                repository.getMyEvents().onSuccess { myEvents = it }
+                                showEventInviteDialog = true
+                            }
+                        }
+                    ) {
+                        Text("Event Invite", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                HorizontalDivider()
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(messages) { message ->
+                        // Per-user check: has THIS user already accepted or declined?
+                        // acceptedBy/declinedBy are comma-separated UIDs stored in metadata.
+                        val acceptedBy = (message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        val declinedBy = (message.metadata["declinedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        val alreadyResponded = currentUid in acceptedBy || currentUid in declinedBy
+                        MessageBubble(
+                            message = message,
+                            isCurrentUser = message.senderId == currentUid,
+                            currentUid = currentUid,
+                            currentUserPhotoUrl = currentUserPhotoUrl,
+                            onNavigateToLocation = onNavigateToLocation,
+                            onAccept = if (!alreadyResponded && message.senderId != currentUid &&
+                                (message.type == "study_invite" || message.type == "event_invite")) {
+                                {
+                                    scope.launch {
+                                        if (message.type == "study_invite") {
+                                            val className = message.metadata["className"] as? String ?: ""
+                                            val topic = message.metadata["topic"] as? String ?: ""
+                                            val date = message.metadata["date"] as? String ?: ""
+                                            val time = message.metadata["time"] as? String ?: ""
+                                            val location = message.metadata["location"] as? String ?: ""
+                                            android.util.Log.d("CalendarSave", "Saving study session: $className $topic $date $time")
+                                            if (date.isNotBlank()) {
+                                                android.util.Log.d("CalendarSave", "metadata: ${message.metadata}")
+                                                android.util.Log.d("CalendarSave", "date: ${message.metadata["date"]}")
+                                                calendarRepository.addStudySession(date, className, topic, time, location)
+                                                android.util.Log.d("CalendarSave", "Study session saved successfully")
+                                            } else {
+                                                android.util.Log.e("CalendarSave", "Date is blank — metadata: ${message.metadata}")
+                                            }
+                                        } else {
+                                            val name = message.metadata["name"] as? String ?: ""
+                                            val date = message.metadata["date"] as? String ?: ""
+                                            val time = message.metadata["time"] as? String ?: ""
+                                            val location = message.metadata["location"] as? String ?: ""
+                                            if (date.isNotBlank()) {
+                                                calendarRepository.addEvent(date, name, time, location)
+                                            }
+                                        }
+                                        repository.respondToInvite(conversation.id, message.id, "accepted")
+                                        repository.sendMessage(conversation.id, "Accepted your invite!", "text")
+                                    }
+                                }
+                            } else null,
+                            onDecline = if (!alreadyResponded && message.senderId != currentUid &&
+                                (message.type == "study_invite" || message.type == "event_invite")) {
+                                {
+                                    scope.launch {
+                                        repository.respondToInvite(conversation.id, message.id, "declined")
+                                        repository.sendMessage(conversation.id, "Declined your invite.", "text")
+                                    }
+                                }
+                            } else null
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = messageInput,
+                        onValueChange = { messageInput = it },
+                        label = { Text("Message") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val content = messageInput.trim()
+                            if (content.isNotBlank()) {
+                                scope.launch {
+                                    repository.sendMessage(conversation.id, content)
+                                    messageInput = ""
+                                }
+                            }
+                        }
+                    ) { Text("Send") }
+                }
             }
         }
-    }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp)
+                .padding(horizontal = 16.dp)
+        ) { data ->
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = data.visuals.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                    )
+                }
+            }
+        }
+    } // outer Box
 
     if (showStudyInviteDialog) {
         StudyInviteDialog(
@@ -422,6 +469,11 @@ fun ConversationScreen(
             onDismiss = { showStudyInviteDialog = false },
             onSendExisting = { item ->
                 scope.launch {
+                    if (isDuplicateInvite("study_invite", item.className, item.date)) {
+                        showStudyInviteDialog = false
+                        snackbarHostState.showSnackbar("Already sent this study invite recently — try again in a few minutes.")
+                        return@launch
+                    }
                     val content = "Study invite: ${item.className} — ${item.assignmentName} on ${item.date} at ${item.dueTime}"
                     repository.sendMessage(
                         conversationId = conversation.id,
@@ -444,6 +496,11 @@ fun ConversationScreen(
             },
             onSendExistingSession = { session ->
                 scope.launch {
+                    if (isDuplicateInvite("study_invite", session.className, session.date)) {
+                        showStudyInviteDialog = false
+                        snackbarHostState.showSnackbar("Already sent this study invite recently — try again in a few minutes.")
+                        return@launch
+                    }
                     val content = "Study invite: ${session.className} — ${session.topic} on ${session.date} at ${session.startTime}"
                     repository.sendMessage(
                         conversationId = conversation.id,
@@ -463,6 +520,11 @@ fun ConversationScreen(
             },
             onSendNew = { cls, topic, date, time, location ->
                 scope.launch {
+                    if (isDuplicateInvite("study_invite", cls, date)) {
+                        showStudyInviteDialog = false
+                        snackbarHostState.showSnackbar("Already sent this study invite recently — try again in a few minutes.")
+                        return@launch
+                    }
                     val content = "Study invite: $cls — $topic on $date at $time"
                     repository.sendMessage(
                         conversationId = conversation.id,
@@ -486,6 +548,11 @@ fun ConversationScreen(
             onDismiss = { showEventInviteDialog = false },
             onSend = { name, date, time, location ->
                 scope.launch {
+                    if (isDuplicateInvite("event_invite", name, date)) {
+                        showEventInviteDialog = false
+                        snackbarHostState.showSnackbar("Already sent this invite recently — try again in a few minutes.")
+                        return@launch
+                    }
                     val content = "Event invite: $name on $date at $time"
                     repository.sendMessage(
                         conversationId = conversation.id,
@@ -509,6 +576,7 @@ fun ConversationScreen(
 fun MessageBubble(
     message: Message,
     isCurrentUser: Boolean,
+    currentUid: String = "",
     currentUserPhotoUrl: String = "",
     onNavigateToLocation: ((String) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
@@ -570,9 +638,16 @@ fun MessageBubble(
                 InviteBubble(
                     message = message,
                     isCurrentUser = isCurrentUser,
+                    currentUid = currentUid,
                     onAccept = onAccept,
                     onDecline = onDecline,
                     onNavigateToLocation = onNavigateToLocation,
+                )
+            } else if (message.type == "location_share") {
+                LocationShareBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onNavigateToLocation = onNavigateToLocation
                 )
             } else {
                 val bubbleColor = if (isCurrentUser)
@@ -649,6 +724,7 @@ fun MessageBubble(
 fun InviteBubble(
     message: Message,
     isCurrentUser: Boolean,
+    currentUid: String = "",
     onAccept: (() -> Unit)?,
     onDecline: (() -> Unit)?,
     onNavigateToLocation: ((String) -> Unit)? = null,
@@ -658,12 +734,12 @@ fun InviteBubble(
 
     val typeLabel  = if (isStudy) "Study Session" else "Event Invite"
     val typeIcon   = if (isStudy) Icons.Default.School else Icons.Default.Event
-    val title      = if (isStudy) meta["className"] ?: "" else meta["name"] ?: ""
-    val subtitle   = if (isStudy) meta["topic"] ?: "" else ""
-    val date       = meta["date"] ?: ""
-    val time       = meta["time"] ?: ""
-    val location   = meta["location"] ?: ""
-    val response   = meta["response"]
+    val title      = if (isStudy) meta["className"] as? String ?: "" else meta["name"] as? String ?: ""
+    val subtitle   = if (isStudy) meta["topic"] as? String ?: "" else ""
+    val date       = meta["date"] as? String ?: ""
+    val time       = meta["time"] as? String ?: ""
+    val location   = meta["location"] as? String ?: ""
+    val response   = meta["response"] as? String
 
     val cardShape = RoundedCornerShape(
         topStart = if (isCurrentUser) 16.dp else 4.dp,
@@ -777,7 +853,7 @@ fun InviteBubble(
 
             // ── Response status or Accept / Decline buttons ──────────
             when {
-                response == "accepted" -> {
+                response == "accepted" || currentUid in ((message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()) -> {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "✓ Accepted",
@@ -786,7 +862,7 @@ fun InviteBubble(
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                     )
                 }
-                response == "declined" -> {
+                response == "declined" || currentUid in ((message.metadata["declinedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()) -> {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "✗ Declined",
@@ -806,6 +882,68 @@ fun InviteBubble(
                             modifier = Modifier.weight(1f),
                         ) { Text("Decline") }
                     }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun LocationShareBubble(
+    message: Message,
+    isCurrentUser: Boolean,
+    onNavigateToLocation: ((String) -> Unit)? = null
+) {
+    val locationName = message.metadata["locationName"] as? String ?: ""
+    val cardShape = RoundedCornerShape(
+        topStart = if (isCurrentUser) 16.dp else 4.dp,
+        topEnd = if (isCurrentUser) 4.dp else 16.dp,
+        bottomStart = 16.dp,
+        bottomEnd = 16.dp
+    )
+    Card(
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier.widthIn(min = 220.dp, max = 280.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "LOCATION SHARE",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                thickness = 0.5.dp
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = locationName,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            if (locationName.isNotBlank() && onNavigateToLocation != null) {
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { onNavigateToLocation(locationName) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("View on Map")
                 }
             }
         }
