@@ -210,7 +210,9 @@ fun ConversationScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding(),
             color = MaterialTheme.colorScheme.background
         ) {
             Column(modifier = Modifier.fillMaxSize()) {

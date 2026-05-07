@@ -19,6 +19,7 @@ import com.example.cinet.navigation.NavigationHandler
 import com.example.cinet.feature.auth.viewmodel.AuthViewModel
 import com.example.cinet.feature.auth.viewmodel.AuthViewModelFactory
 import com.example.cinet.feature.auth.AuthState
+import androidx.core.view.WindowCompat
 import com.example.cinet.ui.theme.CINetTheme
 
 class MainActivity : ComponentActivity() {
@@ -45,6 +46,8 @@ class MainActivity : ComponentActivity() {
         pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
 
         enableEdgeToEdge()
+        // Allow the keyboard to resize the layout properly alongside edge-to-edge
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
             val authState by authViewModel.authState.collectAsState()
