@@ -401,7 +401,11 @@ fun CalendarScreen(
                 ) {
                     val classToEdit = editingClass
                     val meetingDaysList = selectedMeetingDays.toList()
-                    val locationName = campusLocation?.name ?: ""
+                    val locationName = when {
+                        campusLocation != null -> campusLocation.name
+                        classToEdit != null -> classToEdit.location
+                        else -> ""
+                    }
 
                     if (classToEdit == null) {
                         viewModel.addClass(
@@ -424,7 +428,7 @@ fun CalendarScreen(
                         ClassReminderScheduler.scheduleNextReminder(
                             context = context,
                             classItem = newClass,
-                            minutesBefore = AppSettings.classReminderMinutesBefore
+                            minutesBefore = AppSettings.classReminderMinutesBefore.toInt()
                         )
                     } else {
                         ClassReminderScheduler.cancelReminder(context, classToEdit)
@@ -449,7 +453,7 @@ fun CalendarScreen(
                         ClassReminderScheduler.scheduleNextReminder(
                             context = context,
                             classItem = updatedClass,
-                            minutesBefore = AppSettings.classReminderMinutesBefore
+                            minutesBefore = AppSettings.classReminderMinutesBefore.toInt()
                         )
                     }
                     showClassDialog = false

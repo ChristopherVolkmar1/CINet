@@ -41,17 +41,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
-
-// Main campus map screen. Wires together state, side-effects, permissions,
-// user location tracking, and all map overlay composable.
-// -------------------- Main screen --------------------
-
-/** Top-level campus map screen: wires together state, side-effects, the map layer, and overlay controls. */
 @Composable
 fun CampusMapScreen(
     onBack: () -> Unit,
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
     preSelectedLocation: CampusLocation? = null,
+    autoRouteToPreSelectedLocation: Boolean = false,
     onFinishedLoading: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -91,15 +86,17 @@ fun CampusMapScreen(
     }
 
     val markersToDraw = remember(
-        activeFilters, textFieldState.text, campusRegistry, selectedLocation, showRemoveRoute
+        activeFilters,
+        textFieldState.text,
+        campusRegistry,
+        selectedLocation,
+        routeLocation,
+        showRemoveRoute
     ) {
         computeMarkersToDraw(
             registry = campusRegistry,
             activeFilters = activeFilters,
-            searchQuery = textFieldState.text.toString(),
-            selectedLocation = selectedLocation,
-            routeLocation = routeLocation,
-            showRemoveRoute = showRemoveRoute
+            searchQuery = textFieldState.text.toString()
         )
     }
 
@@ -152,15 +149,24 @@ fun CampusMapScreen(
         hasPermission = hasPermission,
         fusedLocationClient = fusedLocationClient,
         textFieldState = textFieldState,
-        onPolylinePoints = { polylinePoints = it },
         onSelectedLocation = { selectedLocation = it },
         onUserLatLng = { userLatLng = it }
     )
 
     ApplyPreSelectedLocation(
         preSelectedLocation = preSelectedLocation,
+        autoRouteToPreSelectedLocation = autoRouteToPreSelectedLocation,
+        hasPermission = hasPermission,
+        fusedLocationClient = fusedLocationClient,
+        context = context,
         cameraPositionState = cameraPositionState,
+        coroutineScope = coroutineScope,
         onSelectedLocation = { selectedLocation = it },
+        onUserLatLng = { userLatLng = it },
+        onEta = { eta = it },
+        onPolylinePoints = { polylinePoints = it },
+        onRouteVisible = { showRemoveRoute = true },
+        onTravelModeSelected = { activeTravelMode = it },
         onFinishedLoading = onFinishedLoading
     )
 
@@ -194,9 +200,11 @@ fun CampusMapScreen(
             mode = activeTravelMode
         )
 
-        Box(modifier = Modifier
-            .fillMaxSize()
-            .align(Alignment.BottomCenter)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .align(Alignment.BottomCenter)
+        ) {
             if (showRemoveRoute) {
                 RemoveRoute(
                     onDismiss = {
@@ -242,9 +250,6 @@ fun CampusMapScreen(
     }
 }
 
-// -------------------- Derived state helpers --------------------
-
-/** Returns the dark-mode map style options when dark mode is on, otherwise null (default style). */
 @Composable
 private fun rememberCampusMapStyle(context: Context): MapStyleOptions? =
     remember(AppSettings.isDarkMode) {
@@ -255,7 +260,6 @@ private fun rememberCampusMapStyle(context: Context): MapStyleOptions? =
         }
     }
 
-/** Builds the GoogleMap MapProperties, reacting to permission and style changes. */
 @Composable
 private fun rememberCampusMapProperties(
     hasPermission: Boolean,
@@ -268,14 +272,10 @@ private fun rememberCampusMapProperties(
         )
     }
 
-/** Decides which campus-location markers should be drawn given filter, search, selection, and route state. */
 private fun computeMarkersToDraw(
     registry: Map<String, List<CampusLocation>>,
     activeFilters: Set<String>,
-    searchQuery: String,
-    selectedLocation: CampusLocation?,
-    routeLocation: CampusLocation?,
-    showRemoveRoute: Boolean
+    searchQuery: String
 ): List<CampusLocation> {
     val allLocations = getFilteredLocations(registry, activeFilters, searchQuery)
     return when {
@@ -284,22 +284,16 @@ private fun computeMarkersToDraw(
     }
 }
 
-// -------------------- Side-effects --------------------
-
-/** Resets search/polyline/selection once on first composition and seeds the user location from last-known or default. */
 @Composable
 private fun InitializeCampusState(
     hasPermission: Boolean,
     fusedLocationClient: FusedLocationProviderClient,
     textFieldState: TextFieldState,
-    onPolylinePoints: (List<LatLng>) -> Unit,
     onSelectedLocation: (CampusLocation?) -> Unit,
     onUserLatLng: (LatLng) -> Unit
 ) {
     LaunchedEffect(Unit) {
         textFieldState.edit { replace(0, length, "") }
-        // This is where the route gets deleted when the map is reloaded, delete the comment to have it be removed again
-        //onPolylinePoints(emptyList())
         onSelectedLocation(null)
 
         if (hasPermission) {
@@ -319,25 +313,55 @@ private fun InitializeCampusState(
     }
 }
 
-/** Centers the map on an initially-supplied location and notifies the caller when done. */
 @Composable
 private fun ApplyPreSelectedLocation(
     preSelectedLocation: CampusLocation?,
+    autoRouteToPreSelectedLocation: Boolean,
+    hasPermission: Boolean,
+    fusedLocationClient: FusedLocationProviderClient,
+    context: Context,
     cameraPositionState: CameraPositionState,
+    coroutineScope: CoroutineScope,
     onSelectedLocation: (CampusLocation) -> Unit,
+    onUserLatLng: (LatLng) -> Unit,
+    onEta: (String) -> Unit,
+    onPolylinePoints: (List<LatLng>) -> Unit,
+    onRouteVisible: () -> Unit,
+    onTravelModeSelected: (TravelMode) -> Unit,
     onFinishedLoading: () -> Unit
 ) {
-    LaunchedEffect(preSelectedLocation) {
-        if (preSelectedLocation == null || preSelectedLocation.coordinates.latitude == 0.0) return@LaunchedEffect
+    LaunchedEffect(preSelectedLocation, autoRouteToPreSelectedLocation, hasPermission) {
+        if (preSelectedLocation == null || preSelectedLocation.coordinates.latitude == 0.0) {
+            return@LaunchedEffect
+        }
+
         onSelectedLocation(preSelectedLocation)
-        cameraPositionState.move(
-            update = CameraUpdateFactory.newLatLngZoom(preSelectedLocation.latLng, 18f)
-        )
+
+        if (autoRouteToPreSelectedLocation) {
+            onTravelModeSelected(TravelMode.WALKING)
+            requestRouteToDestination(
+                destination = preSelectedLocation.latLng,
+                hasPermission = hasPermission,
+                fusedLocationClient = fusedLocationClient,
+                context = context,
+                mode = TravelMode.WALKING,
+                cameraPositionState = cameraPositionState,
+                coroutineScope = coroutineScope,
+                onUserLatLng = onUserLatLng,
+                onEta = onEta,
+                onPolylinePoints = onPolylinePoints
+            )
+            onRouteVisible()
+        } else {
+            cameraPositionState.move(
+                update = CameraUpdateFactory.newLatLngZoom(preSelectedLocation.latLng, 18f)
+            )
+        }
+
         onFinishedLoading()
     }
 }
 
-/** Recomputes driving/walking/biking durations whenever the selected destination or user position changes. */
 @Composable
 private fun ObserveRouteDurations(
     selectedLocation: CampusLocation?,
@@ -353,8 +377,9 @@ private fun ObserveRouteDurations(
         val destination = selectedLocation?.latLng ?: return@LaunchedEffect
         val start = userLatLng ?: return@LaunchedEffect
         if (!hasPermission) return@LaunchedEffect
+
         try {
-            fusedLocationClient.lastLocation.addOnSuccessListener { _ ->
+            fusedLocationClient.lastLocation.addOnSuccessListener {
                 coroutineScope.launch {
                     val drive = async { fetchDirections(start, destination, context, TravelMode.DRIVING) }
                     val walk = async { fetchDirections(start, destination, context, TravelMode.WALKING) }
@@ -380,7 +405,6 @@ private fun ObserveRouteDurations(
     }
 }
 
-/** Subscribes to continuous user-location updates while permission is granted; unsubscribes on dispose. */
 @Composable
 private fun ObserveUserLocationUpdates(
     hasPermission: Boolean,
@@ -392,7 +416,7 @@ private fun ObserveUserLocationUpdates(
 
         val locationRequest = com.google.android.gms.location.LocationRequest.Builder(
             com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
-            2000L // update every 2 seconds
+            2000L
         ).build()
 
         val locationCallback = object : com.google.android.gms.location.LocationCallback() {
@@ -415,9 +439,6 @@ private fun ObserveUserLocationUpdates(
     }
 }
 
-// -------------------- Action handlers (non-composable) --------------------
-
-/** Fetches a route from the user's current location to a destination and publishes the polyline, ETA, and camera bounds. */
 private fun requestRouteToDestination(
     destination: LatLng?,
     hasPermission: Boolean,
@@ -431,6 +452,7 @@ private fun requestRouteToDestination(
     onPolylinePoints: (List<LatLng>) -> Unit
 ) {
     if (destination == null || !hasPermission) return
+
     try {
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             location?.let {
@@ -449,7 +471,6 @@ private fun requestRouteToDestination(
     }
 }
 
-/** Animates the camera so both the start and destination are visible within the route bounds. */
 private suspend fun animateToRouteBounds(
     cameraPositionState: CameraPositionState,
     start: LatLng,
@@ -459,13 +480,13 @@ private suspend fun animateToRouteBounds(
         .include(start)
         .include(destination)
         .build()
+
     cameraPositionState.animate(
         update = CameraUpdateFactory.newLatLngBounds(bounds, 100),
         durationMs = 1000
     )
 }
 
-/** Looks up the campus location matching the search query and, if found, selects it and animates the camera to it. */
 private fun selectLocationFromSearch(
     query: String,
     registry: Map<String, List<CampusLocation>>,
@@ -474,9 +495,13 @@ private fun selectLocationFromSearch(
     onSelectedLocation: (CampusLocation) -> Unit,
     onClearRoute: () -> Unit
 ) {
-    val target = registry.values.flatten().find { it.name.equals(query, ignoreCase = true) } ?: return
+    val target = registry.values.flatten()
+        .find { it.name.equals(query, ignoreCase = true) }
+        ?: return
+
     onSelectedLocation(target)
     onClearRoute()
+
     coroutineScope.launch {
         cameraPositionState.animate(
             update = CameraUpdateFactory.newLatLngZoom(target.latLng, 18f),
@@ -485,9 +510,6 @@ private fun selectLocationFromSearch(
     }
 }
 
-// -------------------- Map rendering --------------------
-
-/** Renders the GoogleMap layer together with category-colored markers and the active route polyline. */
 @Composable
 private fun CampusMapLayer(
     mapProperties: MapProperties,
@@ -518,32 +540,30 @@ private fun CampusMapLayer(
                 onSelected = onMarkerSelected
             )
         }
+
         if (polylinePoints.isNotEmpty()) {
-            if(mode == TravelMode.DRIVING || mode == TravelMode.BICYCLING) {
+            if (mode == TravelMode.DRIVING || mode == TravelMode.BICYCLING) {
                 Polyline(
                     points = polylinePoints,
                     color = Color(0xFF4285F4),
                     width = 12f,
                     jointType = JointType.ROUND
                 )
-            } else if(mode == TravelMode.WALKING) {
-                val dottedPattern = listOf(
-                    Dot(), Gap(20f)
-                )
+            } else if (mode == TravelMode.WALKING) {
                 Polyline(
                     points = polylinePoints,
                     color = Color(0xFF4285F4),
                     width = 12f,
                     jointType = JointType.ROUND,
-                    pattern = dottedPattern
+                    pattern = listOf(Dot(), Gap(20f))
                 )
             }
+
             onRouteVisible()
         }
     }
 }
 
-/** Renders a single campus-location marker that zooms to and selects the location when tapped. */
 @Composable
 private fun CampusMarker(
     location: CampusLocation,
@@ -553,20 +573,29 @@ private fun CampusMarker(
 ) {
     val context = LocalContext.current
     val primaryColor = MaterialTheme.colorScheme.primary
+
     val customIcon = remember(location.category, primaryColor) {
         try {
-            customMarker(context, when (location.category) {
-                "ACADEMIC" -> R.drawable.school
-                "TRANSIT" -> R.drawable.bus_stop
-                "COMMUTER_PARKING" -> R.drawable.parking
-                "DINING" -> R.drawable.dining
-                else -> R.drawable.unlisted
-            }, primaryColor)
+            customMarker(
+                context = context,
+                iconResId = when (location.category) {
+                    "ACADEMIC" -> R.drawable.school
+                    "TRANSIT" -> R.drawable.bus_stop
+                    "COMMUTER_PARKING" -> R.drawable.parking
+                    "DINING" -> R.drawable.dining
+                    else -> R.drawable.unlisted
+                },
+                backgroundColor = primaryColor
+            )
         } catch (_: Exception) {
             null
         }
     }
-    val markerState = remember(location.name) { MarkerState(position = location.latLng) }
+
+    val markerState = remember(location.name) {
+        MarkerState(position = location.latLng)
+    }
+
     Marker(
         state = markerState,
         title = location.name,
@@ -585,8 +614,11 @@ private fun CampusMarker(
     )
 }
 
-/** Returns the default-marker hue used for a given campus category OR desired icon*/
-fun customMarker(context: Context, iconResId: Int, backgroundColor: Color): BitmapDescriptor? {
+fun customMarker(
+    context: Context,
+    iconResId: Int,
+    backgroundColor: Color
+): BitmapDescriptor? {
     val pinDrawable = ContextCompat.getDrawable(context, R.drawable.pin)
     val iconDrawable = ContextCompat.getDrawable(context, iconResId)
     val size = 105
@@ -598,6 +630,7 @@ fun customMarker(context: Context, iconResId: Int, backgroundColor: Color): Bitm
         it.setBounds(0, 0, size, size)
         it.draw(canvas)
     }
+
     iconDrawable?.let {
         it.setTint(android.graphics.Color.WHITE)
         val iconSize = (size * 0.5).toInt()
@@ -607,5 +640,6 @@ fun customMarker(context: Context, iconResId: Int, backgroundColor: Color): Bitm
         it.setBounds(left, top, left + iconSize, top + iconSize)
         it.draw(canvas)
     }
+
     return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
