@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,15 +53,16 @@ fun MessageBox(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .navigationBarsPadding(),
+        verticalAlignment = Alignment.Bottom
     ) {
         // Study/Event invite pop up buttons
-        Box {
+        Box() {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(52.dp)
             ) {
                 IconButton(onClick = { showMenu = true }) {
                     Icon(
@@ -86,8 +87,6 @@ fun MessageBox(
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .weight(1f)
-                .imePadding()
-                .padding(bottom = 8.dp)
         ) {
             TextField(
                 value = state.text.toString(),
@@ -107,8 +106,8 @@ fun MessageBox(
                     unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 ),
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 4
             )
         }
 
@@ -117,7 +116,7 @@ fun MessageBox(
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(56.dp)
+            modifier = Modifier.size(52.dp)
         ) {
             IconButton(onClick = onSendMessage) {
                 Icon(
