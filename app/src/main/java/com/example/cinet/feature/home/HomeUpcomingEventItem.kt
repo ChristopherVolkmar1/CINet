@@ -4,5 +4,6 @@ package com.example.cinet.feature.home
 data class HomeUpcomingEventItem(
     val title: String,
     val description: String,
-    val isCampusEvent: Boolean
+    val isCampusEvent: Boolean,
+    val sortKey: Long = Long.MAX_VALUE
 )

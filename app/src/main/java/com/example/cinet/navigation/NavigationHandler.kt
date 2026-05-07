@@ -58,9 +58,13 @@ import com.example.cinet.feature.social.ConversationScreen
 import com.example.cinet.feature.social.ConversationsListScreen
 import com.example.cinet.feature.social.NewConversationScreen
 import com.example.cinet.feature.social.SocialScreen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 import java.util.Locale
 
 enum class Screen(val label: String, val icon: ImageVector) {
@@ -248,14 +252,29 @@ private fun MainScaffold(
 
     var manualUpcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
+    // Use a ticker to ensure the home banner updates as time passes
+    var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30000) // Update every 30 seconds
+            currentTimeMillis = System.currentTimeMillis()
+        }
+    }
+
     val displayUpcomingEventsItems = remember(
         manualUpcomingEventsItems,
-        calendarViewModel.campusEventItems
+        calendarViewModel.campusEventItems,
+        calendarViewModel.userEventItems,
+        calendarViewModel.classItems,
+        currentTimeMillis
     ) {
         buildHomeUpcomingEventItems(
-            context,
-            manualUpcomingEventsItems,
-            calendarViewModel.campusEventItems
+            context = context,
+            manualItems = manualUpcomingEventsItems,
+            campusEvents = calendarViewModel.campusEventItems,
+            userEvents = calendarViewModel.userEventItems,
+            classItems = calendarViewModel.classItems,
+            currentTimeMillis = currentTimeMillis
         )
     }
 
@@ -297,10 +316,18 @@ private fun MainScaffold(
         }
     }
 
+    val density = LocalDensity.current
+    val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+
+    val hideBottomBarForConversationTyping =
+        currentScreen == Screen.Social &&
+                activeConversation != null &&
+                isKeyboardOpen
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            if (!isOverlayActive) {
+            if (!isShowingNews && !hideBottomBarForConversationTyping) {
                 NavigationBar {
                     Screen.entries.forEach { screen ->
                         NavigationBarItem(
@@ -319,6 +346,12 @@ private fun MainScaffold(
                                     selectedProfile = null
                                     showNewConversation = false
                                     showSocialScreen = false
+                                }
+
+                                // makes the settings button on the nav bar only open the settings
+                                if (screen == Screen.Settings) {
+                                    selectedProfile = null
+                                    showProfileEdit = false
                                 }
 
                                 if (screen != Screen.Calendar) {
@@ -361,7 +394,7 @@ private fun MainScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    if (isOverlayActive) {
+                    if (isShowingNews || hideBottomBarForConversationTyping) {
                         androidx.compose.foundation.layout.PaddingValues(0.dp)
                     } else {
                         innerPadding
