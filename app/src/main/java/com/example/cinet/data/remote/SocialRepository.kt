@@ -388,18 +388,25 @@ class SocialRepository(
     }
 
     /** Updates the response value for a study invite message. */
+    /**
+     * Records the current user's response to an invite.
+     * Uses per-user arrays (acceptedBy / declinedBy) instead of a single
+     * "response" field so each participant in a group chat can respond
+     * independently without blocking others.
+     */
     suspend fun respondToInvite(
         conversationId: String,
         messageId: String,
         response: String,
     ): Result<Unit> {
         return try {
-            db.collection("conversations")
+            val docRef = db.collection("conversations")
                 .document(conversationId)
                 .collection("messages")
                 .document(messageId)
-                .update("metadata.response", response)
-                .await()
+
+            val field = if (response == "accepted") "metadata.acceptedBy" else "metadata.declinedBy"
+            docRef.update(field, FieldValue.arrayUnion(currentUid)).await()
 
             Result.success(Unit)
         } catch (e: Exception) {

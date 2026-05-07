@@ -75,8 +75,8 @@ fun ConversationScreen(
         val fiveMinutesAgo = System.currentTimeMillis() - 5 * 60 * 1000L
         return messages.any { msg ->
             msg.type == type &&
-                    (msg.metadata["name"] ?: msg.metadata["className"] ?: "") == name &&
-                    (msg.metadata["date"] ?: "") == date &&
+                    (msg.metadata["name"] as? String ?: msg.metadata["className"] as? String ?: "") == name &&
+                    (msg.metadata["date"] as? String ?: "") == date &&
                     (msg.createdAt?.time ?: 0L) >= fiveMinutesAgo
         }
     }
@@ -348,10 +348,15 @@ fun ConversationScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(messages) { message ->
-                        val alreadyResponded = message.metadata["response"] != null
+                        // Per-user check: has THIS user already accepted or declined?
+                        // acceptedBy/declinedBy are comma-separated UIDs stored in metadata.
+                        val acceptedBy = (message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        val declinedBy = (message.metadata["declinedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                        val alreadyResponded = currentUid in acceptedBy || currentUid in declinedBy
                         MessageBubble(
                             message = message,
                             isCurrentUser = message.senderId == currentUid,
+                            currentUid = currentUid,
                             currentUserPhotoUrl = currentUserPhotoUrl,
                             onNavigateToLocation = onNavigateToLocation,
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
@@ -359,11 +364,11 @@ fun ConversationScreen(
                                 {
                                     scope.launch {
                                         if (message.type == "study_invite") {
-                                            val className = message.metadata["className"] ?: ""
-                                            val topic = message.metadata["topic"] ?: ""
-                                            val date = message.metadata["date"] ?: ""
-                                            val time = message.metadata["time"] ?: ""
-                                            val location = message.metadata["location"] ?: ""
+                                            val className = message.metadata["className"] as? String ?: ""
+                                            val topic = message.metadata["topic"] as? String ?: ""
+                                            val date = message.metadata["date"] as? String ?: ""
+                                            val time = message.metadata["time"] as? String ?: ""
+                                            val location = message.metadata["location"] as? String ?: ""
                                             android.util.Log.d("CalendarSave", "Saving study session: $className $topic $date $time")
                                             if (date.isNotBlank()) {
                                                 android.util.Log.d("CalendarSave", "metadata: ${message.metadata}")
@@ -374,10 +379,10 @@ fun ConversationScreen(
                                                 android.util.Log.e("CalendarSave", "Date is blank — metadata: ${message.metadata}")
                                             }
                                         } else {
-                                            val name = message.metadata["name"] ?: ""
-                                            val date = message.metadata["date"] ?: ""
-                                            val time = message.metadata["time"] ?: ""
-                                            val location = message.metadata["location"] ?: ""
+                                            val name = message.metadata["name"] as? String ?: ""
+                                            val date = message.metadata["date"] as? String ?: ""
+                                            val time = message.metadata["time"] as? String ?: ""
+                                            val location = message.metadata["location"] as? String ?: ""
                                             if (date.isNotBlank()) {
                                                 calendarRepository.addEvent(date, name, time, location)
                                             }
@@ -571,6 +576,7 @@ fun ConversationScreen(
 fun MessageBubble(
     message: Message,
     isCurrentUser: Boolean,
+    currentUid: String = "",
     currentUserPhotoUrl: String = "",
     onNavigateToLocation: ((String) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
@@ -632,6 +638,7 @@ fun MessageBubble(
                 InviteBubble(
                     message = message,
                     isCurrentUser = isCurrentUser,
+                    currentUid = currentUid,
                     onAccept = onAccept,
                     onDecline = onDecline,
                     onNavigateToLocation = onNavigateToLocation,
@@ -717,6 +724,7 @@ fun MessageBubble(
 fun InviteBubble(
     message: Message,
     isCurrentUser: Boolean,
+    currentUid: String = "",
     onAccept: (() -> Unit)?,
     onDecline: (() -> Unit)?,
     onNavigateToLocation: ((String) -> Unit)? = null,
@@ -726,12 +734,12 @@ fun InviteBubble(
 
     val typeLabel  = if (isStudy) "Study Session" else "Event Invite"
     val typeIcon   = if (isStudy) Icons.Default.School else Icons.Default.Event
-    val title      = if (isStudy) meta["className"] ?: "" else meta["name"] ?: ""
-    val subtitle   = if (isStudy) meta["topic"] ?: "" else ""
-    val date       = meta["date"] ?: ""
-    val time       = meta["time"] ?: ""
-    val location   = meta["location"] ?: ""
-    val response   = meta["response"]
+    val title      = if (isStudy) meta["className"] as? String ?: "" else meta["name"] as? String ?: ""
+    val subtitle   = if (isStudy) meta["topic"] as? String ?: "" else ""
+    val date       = meta["date"] as? String ?: ""
+    val time       = meta["time"] as? String ?: ""
+    val location   = meta["location"] as? String ?: ""
+    val response   = meta["response"] as? String
 
     val cardShape = RoundedCornerShape(
         topStart = if (isCurrentUser) 16.dp else 4.dp,
@@ -845,7 +853,7 @@ fun InviteBubble(
 
             // ── Response status or Accept / Decline buttons ──────────
             when {
-                response == "accepted" -> {
+                response == "accepted" || currentUid in ((message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()) -> {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "✓ Accepted",
@@ -854,7 +862,7 @@ fun InviteBubble(
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
                     )
                 }
-                response == "declined" -> {
+                response == "declined" || currentUid in ((message.metadata["declinedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()) -> {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "✗ Declined",
@@ -885,7 +893,7 @@ fun LocationShareBubble(
     isCurrentUser: Boolean,
     onNavigateToLocation: ((String) -> Unit)? = null
 ) {
-    val locationName = message.metadata["locationName"] ?: ""
+    val locationName = message.metadata["locationName"] as? String ?: ""
     val cardShape = RoundedCornerShape(
         topStart = if (isCurrentUser) 16.dp else 4.dp,
         topEnd = if (isCurrentUser) 4.dp else 16.dp,
@@ -932,7 +940,7 @@ fun LocationShareBubble(
                     onClick = { onNavigateToLocation(locationName) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     Text("View on Map")

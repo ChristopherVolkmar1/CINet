@@ -11,7 +11,8 @@ data class Message(
     val content: String = "",
     // type: "text", "study_invite", "event_invite"
     val type: String = "text",
-    // stores structured invite data so receiver can auto-populate their calendar
-    val metadata: Map<String, String> = emptyMap(),
+    // Stores structured invite data. Values can be String (name, date, time, etc.)
+    // or List<String> (acceptedBy, declinedBy) — hence Any.
+    val metadata: Map<String, Any> = emptyMap(),
     @ServerTimestamp val createdAt: Date? = null,
 )
