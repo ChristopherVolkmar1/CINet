@@ -71,9 +71,9 @@ fun CalendarQuickAccessPopup(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.16f))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.16f))
         ) {
             Column(
                 modifier = Modifier
@@ -91,7 +91,7 @@ fun CalendarQuickAccessPopup(
                 Text(
                     text = popupDescription(type),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSecondary
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -99,7 +99,7 @@ fun CalendarQuickAccessPopup(
                 Text(
                     text = selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    color = MaterialTheme.colorScheme.onSecondary,
                     fontWeight = FontWeight.SemiBold
                 )
 
@@ -156,14 +156,14 @@ private fun PopupHeader(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSecondary
         )
 
         IconButton(onClick = onAddClick) {
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = "Add",
-                tint = MaterialTheme.colorScheme.secondaryContainer
+                tint = MaterialTheme.colorScheme.onSecondary
             )
         }
 
@@ -171,7 +171,7 @@ private fun PopupHeader(
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = "Close",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSecondary
             )
         }
     }
@@ -180,7 +180,7 @@ private fun PopupHeader(
 /** Shows the icon bubble for the selected popup type. */
 @Composable
 private fun PopupIcon(type: CalendarQuickAccessType) {
-    val green = MaterialTheme.colorScheme.secondaryContainer
+    val green = MaterialTheme.colorScheme.onSecondary
 
     Surface(
         modifier = Modifier.size(44.dp),
@@ -288,16 +288,16 @@ private fun PopupItemCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.06f)
+            containerColor = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.06f)
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.12f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.12f))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSecondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -315,7 +315,7 @@ private fun PopupItemCard(
                 Text(
                     text = secondaryDetail,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -345,14 +345,14 @@ private fun DetailRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.82f),
+            tint = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.82f),
             modifier = Modifier.size(16.dp)
         )
 
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -371,7 +371,7 @@ private fun EmptyPopupMessage(text: String) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSecondary
         )
     }
 }

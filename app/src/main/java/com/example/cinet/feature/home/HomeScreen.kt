@@ -1,33 +1,40 @@
 package com.example.cinet.feature.home
 
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cinet.NewsArticle
-import com.example.cinet.NewsRepository
-import com.example.cinet.NewsSection
 import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.feature.home.news.NewsArticle
+import com.example.cinet.feature.home.news.NewsRepository
+import com.example.cinet.feature.map.BusScheduleSheet
 import com.example.cinet.ui.theme.CINetTheme
-import com.example.cinet.feature.map.*
-import com.example.cinet.core.designsystem.InfoSection
-import com.example.cinet.core.designsystem.WeatherDisplay
 import java.util.Calendar
 
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun HomeScreen(
     nickname: String,
@@ -43,290 +50,601 @@ fun HomeScreen(
     onAddClassClick: () -> Unit = {},
     onCIViewClick: (NewsArticle?) -> Unit = {},
     onArticleClick: (NewsArticle) -> Unit = {},
+    onSocialClick: () -> Unit = {},
+    onNotificationClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateToLocation: (String) -> Unit
 ) {
-    val academic by viewModel.academic.collectAsState(initial = emptyList())
     val context = LocalContext.current
-    var weatherInfo by remember { mutableStateOf(WeatherInfo("...", "Loading...")) }
-    
-    // Real news data from repository
     val newsRepository = remember { NewsRepository() }
+
+    var weatherInfo by remember { mutableStateOf(WeatherInfo("...", "Loading...")) }
     var newsArticles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
+    var showBusScheduleSheet by remember { mutableStateOf(false) }
 
-    // State for the "Add/Edit" dialog (Now only for Upcoming Events)
-    var showDialog by remember { mutableStateOf(false) }
-    var editingIndex by remember { mutableStateOf<Int?>(null) }
-    
-    var nameField by remember { mutableStateOf("") }
-    var timeOrDateField by remember { mutableStateOf("") }
-
-    var locationField by remember { mutableStateOf<CampusLocation?>(null) }
-    val textFieldState = rememberTextFieldState()
-    val academicNames = remember(textFieldState.text, academic) {
-        academic
-            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
-            .map { it.name }
-    }
-
-    var amPmSelection by remember { mutableStateOf("AM") } // AM/PM choice
-
-    // Support Hours logic
-    val supportHoursSubtitle = remember {
-        val calendar = Calendar.getInstance()
-        val info = when (calendar.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY, Calendar.THURSDAY -> 
-                "11 AM - 7 PM | In Person & Online"
-            Calendar.FRIDAY -> 
-                "10 AM - 2 PM | In Person & Online"
-            Calendar.SUNDAY -> 
-                "5 PM - 7 PM | Online Only"
-            else -> "Closed | No Support Today"
-        }
-        "LRC Availability: $info"
-    }
-
-    // Call the weather fetching logic on launch
     LaunchedEffect(Unit) {
-        Log.d("HomeScreen", "LaunchedEffect triggered")
+        Log.d("HomeScreen", "Home screen launched")
         weatherInfo = WeatherHelper.fetchCampusWeather(context)
-        // Fetch real news
         newsArticles = newsRepository.fetchLatestNews()
     }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { 
-                Text(if (editingIndex == null) "Add Upcoming Event" else "Edit Upcoming Event") 
-            },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = nameField,
-                        onValueChange = { nameField = it },
-                        label = { Text("Event Name") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = timeOrDateField,
-                            onValueChange = { timeOrDateField = it },
-                            label = { Text("Date/Time") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        // AM/PM Toggle
-                        Row(
-                            modifier = Modifier.padding(top = 8.dp)
-                        ) {
-                            FilterChip(
-                                selected = amPmSelection == "AM",
-                                onClick = { amPmSelection = "AM" },
-                                label = { Text("AM") }
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            FilterChip(
-                                selected = amPmSelection == "PM",
-                                onClick = { amPmSelection = "PM" },
-                                label = { Text("PM") }
-                            )
-                        }
-                    }
+    HomeScreenContent(
+        nickname = nickname,
+        weatherInfo = weatherInfo,
+        newsArticles = newsArticles,
+        nextUpcomingEvent = displayUpcomingEventsItems.firstOrNull(),
+        onMapClick = onMapClick,
+        onCalendarClick = onCalendarClick,
+        onSocialClick = onSocialClick,
+        onNotificationClick = { showBusScheduleSheet = true },
+        onProfileClick = onProfileClick,
+        onSettingsClick = onSettingsClick,
+        onSeeAllNewsClick = { onCIViewClick(null) },
+        onArticleClick = { article -> onCIViewClick(article) },
+        onStudyRoomsClick = {
+            onArticleClick(
+                NewsArticle(
+                    title = "Study Rooms",
+                    date = "",
+                    previewText = "Reserve a CSUCI library study room.",
+                    url = "https://csuci.libcal.com/allspaces"
+                )
+            )
+        },
+        modifier = modifier
+    )
 
-                    // Location
-                    Spacer(modifier = Modifier.height(8.dp))
-                    SearchLocationBar(
-                        textFieldState = textFieldState,
-                        searchResults = academicNames,
-                        onSearch = { query ->
-                            locationField = academic.find { it.name.equals(query, ignoreCase = true) }
-                            textFieldState.edit { replace(0, length, query) }
-
-                        }
-                    )
-                }
-            },
-            confirmButton = {
-                @Suppress("DEPRECATION")
-                Button(onClick = {
-                    if (nameField.isNotBlank() && timeOrDateField.isNotBlank() && locationField != null) {
-                        val fullTime = "$timeOrDateField $amPmSelection"
-                        val newItem = nameField to "$fullTime | ${locationField?.name}"
-                        
-                        val newList = manualUpcomingEventsItems.toMutableList()
-                        if (editingIndex != null) {
-                            newList[editingIndex!!] = newItem
-                        } else {
-                            newList.add(newItem)
-                        }
-                        onUpdateEvents(newList)
-                        
-                        showDialog = false
-                        editingIndex = null
-                        nameField = ""
-                        timeOrDateField = ""
-                        locationField = null
-                    }
-                }) {
-                    Text(if (editingIndex == null) "Add" else "Update")
-                }
-            },
-            dismissButton = {
-                Row {
-                    if (editingIndex != null) {
-                        TextButton(onClick = {
-                            val newList = manualUpcomingEventsItems.toMutableList()
-                            newList.removeAt(editingIndex!!)
-                            onUpdateEvents(newList)
-                            showDialog = false
-                            editingIndex = null
-                            nameField = ""
-                            timeOrDateField = ""
-                            locationField = null
-                        }) {
-                            Text("Delete", color = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                    TextButton(onClick = { 
-                        showDialog = false
-                        editingIndex = null
-                        nameField = ""
-                        timeOrDateField = ""
-                        locationField = null
-                    }) {
-                        Text("Cancel")
-                    }
-                }
-            }
+    if (showBusScheduleSheet) {
+        BusScheduleSheet(
+            onDismiss = { showBusScheduleSheet = false }
         )
     }
+}
 
+/** Arranges the home screen from top to bottom. */
+@Composable
+private fun HomeScreenContent(
+    nickname: String,
+    weatherInfo: WeatherInfo,
+    newsArticles: List<NewsArticle>,
+    nextUpcomingEvent: HomeUpcomingEventItem?,
+    onMapClick: () -> Unit,
+    onCalendarClick: () -> Unit,
+    onSocialClick: () -> Unit,
+    onNotificationClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onSeeAllNewsClick: () -> Unit,
+    onArticleClick: (NewsArticle) -> Unit,
+    onStudyRoomsClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 24.dp)
+            .padding(top = 18.dp, bottom = 24.dp)
     ) {
-        // Header Section
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(130.dp),
-            color = MaterialTheme.colorScheme.primary,
-            shape = RoundedCornerShape(12.dp)
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        WelcomeHeader(nickname = nickname)
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        HomeWeatherBanner(
+            temp = weatherInfo.temp,
+            condition = weatherInfo.condition
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        LatestNewsCarousel(
+            articles = newsArticles,
+            onSeeAllClick = onSeeAllNewsClick,
+            onArticleClick = onArticleClick
+        )
+
+        if (nextUpcomingEvent != null) {
+            Spacer(modifier = Modifier.height(14.dp))
+
+            NextUpcomingEventBanner(nextUpcomingEvent = nextUpcomingEvent)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        QuickActionGrid(
+            onMapClick = onMapClick,
+            onCalendarClick = onCalendarClick,
+            onSocialClick = onSocialClick,
+            onStudyRoomsClick = onStudyRoomsClick,
+            onProfileClick = onProfileClick,
+            onNotificationClick = onNotificationClick
+        )
+    }
+}
+
+/** Displays the greeting and keeps it locked to one line by scaling long names down. */
+@Composable
+private fun WelcomeHeader(nickname: String) {
+    val displayName = nickname.ifBlank { "there" }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Welcome back, $displayName 👋",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = greetingFontSizeFor(displayName),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/** Chooses a smaller greeting size when the name is longer so the greeting stays on one line. */
+private fun greetingFontSizeFor(displayName: String) = when {
+    displayName.length > 22 -> 20.sp
+    displayName.length > 16 -> 22.sp
+    displayName.length > 10 -> 24.sp
+    else -> 26.sp
+}
+
+/** Displays the weather summary without the "Campus Weather" label. */
+@Composable
+private fun HomeWeatherBanner(
+    temp: String,
+    condition: String
+) {
+    val displayCondition = remember(condition) { cleanedWeatherCondition(condition) }
+    val weatherIcon = remember(displayCondition) { weatherIconFor(displayCondition) }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(34.dp),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
+            Icon(
+                imageVector = weatherIcon,
+                contentDescription = displayCondition,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(32.dp)
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Welcome back to CINet, $nickname",
+                    text = "$temp • $displayCondition",
                     color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 21.sp,
+                    lineHeight = 25.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                WeatherDisplay(
-                    modifier = Modifier.fillMaxWidth(),
-                    temp = weatherInfo.temp,
-                    condition = weatherInfo.condition + " - Camarillo, CA"
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "Camarillo, CA",
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.86f),
+                    fontSize = 15.sp,
+                    lineHeight = 19.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Quick Actions Row
+/** Displays the next upcoming calendar event using the calendar pill style with the home banner shape. */
+@Composable
+private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(34.dp),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.42f))
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = nextUpcomingEvent.title,
+                    fontSize = 15.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = nextUpcomingEventTimeText(nextUpcomingEvent),
+                    fontSize = 12.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.90f),
+                        modifier = Modifier.size(13.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text(
+                        text = nextUpcomingEventLocationText(nextUpcomingEvent),
+                        fontSize = 12.sp,
+                        lineHeight = 14.sp,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Icon(
+                imageVector = Icons.Default.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+    }
+}
+
+/** Pulls the date/time part from the Home event description when possible. */
+private fun nextUpcomingEventTimeText(event: HomeUpcomingEventItem): String {
+    return event.description
+        .substringBefore("|")
+        .trim()
+        .ifBlank { if (event.isCampusEvent) "Campus Event" else "Upcoming Event" }
+}
+
+/** Pulls the location part from the Home event description when possible. */
+private fun nextUpcomingEventLocationText(event: HomeUpcomingEventItem): String {
+    val locationText = event.description
+        .substringAfter("|", missingDelimiterValue = "")
+        .trim()
+
+    return locationText.ifBlank {
+        if (event.isCampusEvent) "Campus Event • Reminder on" else "Calendar Event"
+    }
+}
+
+/** Displays the latest news heading, carousel cards, and page indicators. */
+@Composable
+private fun LatestNewsCarousel(
+    articles: List<NewsArticle>,
+    onSeeAllClick: () -> Unit,
+    onArticleClick: (NewsArticle) -> Unit
+) {
+    val listState = rememberLazyListState()
+    val activeIndex by remember(articles.size) {
+        derivedStateOf {
+            if (articles.isEmpty()) {
+                0
+            } else {
+                listState.firstVisibleItemIndex.coerceIn(0, articles.lastIndex)
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LatestNewsHeader(onSeeAllClick = onSeeAllClick)
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        if (articles.isEmpty()) {
+            LoadingNewsCard()
+        } else {
+            LazyRow(
+                state = listState,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(end = 20.dp)
+            ) {
+                itemsIndexed(articles) { _, article ->
+                    HomeNewsCard(
+                        article = article,
+                        onClick = { onArticleClick(article) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            NewsCarouselIndicators(
+                count = articles.size.coerceAtMost(5),
+                activeIndex = activeIndex.coerceAtMost(4)
+            )
+        }
+    }
+}
+
+/** Displays the latest news title row. */
+@Composable
+private fun LatestNewsHeader(
+    onSeeAllClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "CI View - Latest News",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 22.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+
+        Text(
+            text = "See all",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 15.sp,
+            modifier = Modifier.clickable(onClick = onSeeAllClick)
+        )
+    }
+}
+
+/** Displays a temporary news loading card. */
+@Composable
+private fun LoadingNewsCard() {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(170.dp),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = "Loading latest campus news...",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+/** Displays one horizontally scrollable news article card. */
+@Composable
+private fun HomeNewsCard(
+    article: NewsArticle,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .width(165.dp)
+            .height(165.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Article,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(24.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = article.title,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 5,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** Displays the small carousel page indicator dots. */
+@Composable
+private fun NewsCarouselIndicators(
+    count: Int,
+    activeIndex: Int
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(count) { index ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 5.dp)
+                    .width(if (index == activeIndex) 36.dp else 24.dp)
+                    .height(7.dp)
+                    .background(
+                        color = if (index == activeIndex) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+                        },
+                        shape = RoundedCornerShape(50)
+                    )
+            )
+        }
+    }
+}
+
+/** Displays the quick action shortcuts as circular buttons that match the calendar page. */
+@Composable
+private fun QuickActionGrid(
+    onMapClick: () -> Unit,
+    onCalendarClick: () -> Unit,
+    onSocialClick: () -> Unit,
+    onStudyRoomsClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onNotificationClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(28.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
+        ) { }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
         ) {
-            Button(
-                onClick = { 
-                    val studyRoomsLink = "https://csuci.libcal.com/allspaces"
-                    onArticleClick(NewsArticle("Study Rooms", "", "", studyRoomsLink))
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                contentPadding = PaddingValues(vertical = 12.dp)
-            ) {
-                Icon(Icons.Default.Language, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Study Rooms")
+            QuickActionCircleButton(
+                icon = Icons.Default.MenuBook,
+                title = "Study Rooms",
+                onClick = onStudyRoomsClick
+            )
+
+            QuickActionCircleButton(
+                icon = Icons.Default.Person,
+                title = "Profile",
+                onClick = onProfileClick
+            )
+
+            QuickActionCircleButton(
+                icon = Icons.Default.DirectionsBus,
+                title = "Bus Schedule",
+                onClick = onNotificationClick
+            )
+        }
+    }
+}
+
+/** Shows one circular quick action button with its label below it. */
+@Composable
+private fun QuickActionCircleButton(
+    icon: ImageVector,
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(96.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            modifier = Modifier.size(75.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            shadowElevation = 5.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(30.dp)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // CI View Section
-        NewsSection(
-            articles = newsArticles,
-            onSeeAllClick = { onCIViewClick(null) },
-            onArticleClick = { onCIViewClick(it) }
+        Text(
+            text = title,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            lineHeight = 17.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
+/** Removes extra campus text from the weather condition. */
+private fun cleanedWeatherCondition(condition: String): String {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val isNight = hour < 6 || hour >= 19
+    val campusText = condition
+        .replace(" - Camarillo, CA", "", ignoreCase = true)
+        .trim()
 
-        // Today's Schedule Section (Sourced from Calendar)
-        InfoSection(
-            title = "Today's Schedule",
-            subtitle = supportHoursSubtitle,
-            items = scheduleItems,
-            onAddClick = onAddClassClick,
-            onItemClick = { _ -> onCalendarClick() }, // Open calendar on item click
-            onNavigateToLocation = onNavigateToLocation
-        )
+    return if (isNight && campusText.contains("Sunny", ignoreCase = true)) {
+        "Clear Sky"
+    } else {
+        campusText.ifBlank { "Loading..." }
+    }
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Upcoming Events Section
-        InfoSection(
-            title = "Upcoming Events",
-            items = displayUpcomingEventsItems.map { it.title to it.description },
-            onAddClick = {
-                editingIndex = null
-                nameField = ""
-                timeOrDateField = ""
-                locationField = null
-                showDialog = true
-            },
-            onItemClick = { index ->
-                val selectedItem = displayUpcomingEventsItems[index]
-                if (selectedItem.isCampusEvent) {
-                    onCalendarClick()
-                } else {
-                    val manualIndex = manualUpcomingEventsItems.indexOfFirst {
-                        it.first == selectedItem.title && it.second == selectedItem.description
-                    }
-
-                    if (manualIndex == -1) {
-                        onCalendarClick()
-                    } else {
-                        editingIndex = manualIndex
-                        val item = manualUpcomingEventsItems[manualIndex]
-                        nameField = item.first
-                        // Simple parsing for demo purposes
-                        val parts = item.second.split(" | ")
-                        val timeParts = parts[0].split(" ")
-                        timeOrDateField = if (timeParts.isNotEmpty()) timeParts[0] else ""
-                        amPmSelection = if (timeParts.size > 1) timeParts[1] else "AM"
-                        locationField = academic.find { it.name == if (parts.size > 1) parts[1] else "" }
-                        showDialog = true
-                    }
-                }
-            },
-            onNavigateToLocation = onNavigateToLocation
-        )
+/** Chooses the best icon for the current weather condition. */
+private fun weatherIconFor(condition: String): ImageVector {
+    return when {
+        condition.contains("Clear Sky", ignoreCase = true) -> Icons.Default.NightsStay
+        condition.contains("Sunny", ignoreCase = true) -> Icons.Default.WbSunny
+        condition.contains("Clear", ignoreCase = true) -> Icons.Default.WbSunny
+        condition.contains("Partly Cloudy", ignoreCase = true) -> Icons.Default.WbCloudy
+        condition.contains("Cloudy", ignoreCase = true) -> Icons.Default.Cloud
+        condition.contains("Cloud", ignoreCase = true) -> Icons.Default.Cloud
+        condition.contains("Rain", ignoreCase = true) -> Icons.Default.Umbrella
+        condition.contains("Shower", ignoreCase = true) -> Icons.Default.Umbrella
+        condition.contains("Thunder", ignoreCase = true) -> Icons.Default.Thunderstorm
+        else -> Icons.Default.Cloud
     }
 }
 
@@ -335,13 +653,22 @@ fun HomeScreen(
 fun HomeScreenPreview() {
     CINetTheme {
         HomeScreen(
-            nickname = "User",
+            nickname = "Maddi",
             scheduleItems = emptyList(),
             manualUpcomingEventsItems = emptyList(),
             displayUpcomingEventsItems = emptyList(),
             onUpdateSchedule = {},
             onUpdateEvents = {},
-            onNavigateToLocation = { _ -> }
+            onMapClick = {},
+            onSettingsClick = {},
+            onCalendarClick = {},
+            onAddClassClick = {},
+            onCIViewClick = {},
+            onArticleClick = {},
+            onSocialClick = {},
+            onNotificationClick = {},
+            onProfileClick = {},
+            onNavigateToLocation = {}
         )
     }
 }

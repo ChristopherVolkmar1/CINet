@@ -1,13 +1,18 @@
 package com.example.cinet.feature.calendar.calendarFiles
 
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
@@ -27,7 +32,9 @@ import com.example.cinet.core.time.*
 @Composable
 fun CalendarScreen(
     onBack: () -> Unit,
-    initialShowClassDialog: Boolean = false
+    initialShowClassDialog: Boolean = false,
+    onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {}
 ) {
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
@@ -188,22 +195,18 @@ fun CalendarScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
             .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp)
+            .padding(top = 18.dp, bottom = 110.dp)
     ) {
-        CalendarHeader(onBack = onBack)
+        CalendarHeader()
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        CalendarModeTabs(
+        CalendarModeSection(
             selectedMode = calendarMode,
-            onModeSelected = { viewModel.updateMode(it) }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        CalendarModeContent(
-            mode = calendarMode,
+            onModeSelected = { viewModel.updateMode(it) },
             currentMonth = currentMonth,
             selectedDate = activeDate,
             activityCountByDate = agendaCountByDate,
@@ -216,7 +219,7 @@ fun CalendarScreen(
             onNextMonth = { viewModel.nextMonth() }
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         CalendarDailyAgendaCard(
             selectedDate = activeDate,
@@ -230,15 +233,25 @@ fun CalendarScreen(
             onEventClick = ::openEventEditor
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        CalendarQuickAccessCards(
-            onClassesClick = { selectedQuickAccessType = CalendarQuickAccessType.CLASSES },
-            onStudyClick = { selectedQuickAccessType = CalendarQuickAccessType.STUDY },
-            onEventsClick = { selectedQuickAccessType = CalendarQuickAccessType.EVENTS }
+        androidx.compose.material3.HorizontalDivider(
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
         )
 
+        Spacer(modifier = Modifier.height(14.dp))
 
+        CalendarQuickAccessCards(
+            onClassesClick = {
+                selectedQuickAccessType = CalendarQuickAccessType.CLASSES
+            },
+            onStudyClick = {
+                selectedQuickAccessType = CalendarQuickAccessType.STUDY
+            },
+            onEventsClick = {
+                selectedQuickAccessType = CalendarQuickAccessType.EVENTS
+            }
+        )
     }
 
     selectedQuickAccessType?.let { quickAccessType ->
@@ -388,7 +401,11 @@ fun CalendarScreen(
                 ) {
                     val classToEdit = editingClass
                     val meetingDaysList = selectedMeetingDays.toList()
-                    val locationName = campusLocation?.name ?: ""
+                    val locationName = when {
+                        campusLocation != null -> campusLocation.name
+                        classToEdit != null -> classToEdit.location
+                        else -> ""
+                    }
 
                     if (classToEdit == null) {
                         viewModel.addClass(
@@ -411,7 +428,7 @@ fun CalendarScreen(
                         ClassReminderScheduler.scheduleNextReminder(
                             context = context,
                             classItem = newClass,
-                            minutesBefore = AppSettings.classReminderMinutesBefore
+                            minutesBefore = AppSettings.classReminderMinutesBefore.toInt()
                         )
                     } else {
                         ClassReminderScheduler.cancelReminder(context, classToEdit)
@@ -436,7 +453,7 @@ fun CalendarScreen(
                         ClassReminderScheduler.scheduleNextReminder(
                             context = context,
                             classItem = updatedClass,
-                            minutesBefore = AppSettings.classReminderMinutesBefore
+                            minutesBefore = AppSettings.classReminderMinutesBefore.toInt()
                         )
                     }
                     showClassDialog = false
@@ -533,6 +550,7 @@ fun CalendarScreen(
 
 
 /** Builds the day-dot map for the content shown in the main agenda card. */
+
 private fun buildAgendaActivityCountByDate(
     context: android.content.Context,
     currentMonth: YearMonth,

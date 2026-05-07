@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.home.news
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -41,7 +42,7 @@ fun CIViewScreen(
                         Text(
                             text = selectedArticleTitle ?: "CI View",
                             maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis
                         ) 
                     },
                     navigationIcon = {

@@ -17,8 +17,8 @@ import java.time.YearMonth
 
 class CalendarViewModel : ViewModel() {
 
-    // Holds the calendar layout currently selected by the user.
-    var mode by mutableStateOf(CalendarMode.WEEK)
+    // Holds the calendar layout currently selected by the user. Defaults to month view.
+    var mode by mutableStateOf(CalendarMode.MONTH)
         private set
 
     // Holds the month currently shown in the calendar header/grid.
