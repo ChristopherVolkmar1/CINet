@@ -68,7 +68,7 @@ fun EventInviteSenderDialog(
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                Button(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         sdf.timeZone = TimeZone.getTimeZone("UTC")
@@ -78,7 +78,7 @@ fun EventInviteSenderDialog(
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                Button(onClick = { showDatePicker = false }) { Text("Cancel") }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -176,7 +176,7 @@ fun EventInviteSenderDialog(
                     ) {
                         Text("Your Events", style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { isCreatingNew = true }) {
+                        Button(onClick = { isCreatingNew = true }) {
                             Text("Create new")
                         }
                     }
