@@ -213,7 +213,7 @@ fun ConversationScreen(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().imePadding()) {
 
                 // Header
                 Row(
@@ -392,7 +392,6 @@ fun ConversationScreen(
                                 {
                                     scope.launch {
                                         repository.respondToInvite(conversation.id, message.id, "declined")
-                                        repository.sendMessage(conversation.id, "Declined your invite.", "text")
                                     }
                                 }
                             } else null
