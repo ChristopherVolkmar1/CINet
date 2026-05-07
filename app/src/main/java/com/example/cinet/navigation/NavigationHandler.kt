@@ -56,6 +56,7 @@ import com.example.cinet.feature.social.ConversationScreen
 import com.example.cinet.feature.social.ConversationsListScreen
 import com.example.cinet.feature.social.NewConversationScreen
 import com.example.cinet.feature.social.SocialScreen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
@@ -241,14 +242,29 @@ private fun MainScaffold(
 
     var manualUpcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
+    // Use a ticker to ensure the home banner updates as time passes
+    var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30000) // Update every 30 seconds
+            currentTimeMillis = System.currentTimeMillis()
+        }
+    }
+
     val displayUpcomingEventsItems = remember(
         manualUpcomingEventsItems,
-        calendarViewModel.campusEventItems
+        calendarViewModel.campusEventItems,
+        calendarViewModel.userEventItems,
+        calendarViewModel.classItems,
+        currentTimeMillis
     ) {
         buildHomeUpcomingEventItems(
-            context,
-            manualUpcomingEventsItems,
-            calendarViewModel.campusEventItems
+            context = context,
+            manualItems = manualUpcomingEventsItems,
+            campusEvents = calendarViewModel.campusEventItems,
+            userEvents = calendarViewModel.userEventItems,
+            classItems = calendarViewModel.classItems,
+            currentTimeMillis = currentTimeMillis
         )
     }
 
