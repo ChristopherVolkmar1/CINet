@@ -138,10 +138,6 @@ private fun HomeScreenContent(
             .padding(horizontal = 24.dp)
             .padding(top = 18.dp, bottom = 24.dp)
     ) {
-        HomeTopBar(
-            onProfileClick = onProfileClick,
-            onSettingsClick = onSettingsClick
-        )
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -179,68 +175,6 @@ private fun HomeScreenContent(
     }
 }
 
-/** Displays the top CINET title and action buttons. */
-@Composable
-private fun HomeTopBar(
-    onProfileClick: () -> Unit,
-    onSettingsClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "CINET",
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 34.sp,
-            letterSpacing = 0.4.sp
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        HeaderIconButton(
-            icon = Icons.Default.Person,
-            contentDescription = "Open profile",
-            onClick = onProfileClick
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        HeaderIconButton(
-            icon = Icons.Default.MoreVert,
-            contentDescription = "Open settings",
-            onClick = onSettingsClick
-        )
-    }
-}
-
-/** Displays one soft circular icon button in the top header. */
-@Composable
-private fun HeaderIconButton(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .size(54.dp)
-            .clickable(onClick = onClick),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-        shadowElevation = 0.dp
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-    }
-}
-
 /** Displays the greeting and subtitle at the top of the home page. */
 @Composable
 private fun WelcomeHeader(nickname: String) {
@@ -255,16 +189,6 @@ private fun WelcomeHeader(nickname: String) {
             lineHeight = 34.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = "Here’s what’s happening on campus",
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
-            fontWeight = FontWeight.Medium,
-            fontSize = 17.sp,
-            lineHeight = 22.sp
         )
     }
 }
