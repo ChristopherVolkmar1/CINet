@@ -1,23 +1,9 @@
 package com.example.cinet.ui.theme
 
 import android.content.res.Configuration
-import android.content.res.Resources
 import android.os.Build
-import androidx.activity.SystemBarStyle.Companion.dark
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,9 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.cinet.feature.map.CampusLocation
-import com.example.cinet.feature.map.DirectionsPopup
-import com.example.cinet.feature.map.RouteDurations
 import com.example.cinet.feature.settings.AppSettings
 
 enum class AppThemeColor(
@@ -80,38 +63,42 @@ enum class AppThemeColor(
 }
 
 fun getDynamicColorScheme(selectedTheme: AppThemeColor, isDark: Boolean): ColorScheme {
-    val primary = if (isDark) selectedTheme.dark else selectedTheme.light
+    val themeColor = if (isDark) selectedTheme.dark else selectedTheme.light
+    val buttonColor = if (isDark) selectedTheme.darkButton else selectedTheme.lightButton
 
     return if (isDark) {
         darkColorScheme(
-            primary = selectedTheme.dark,
-            secondary = CINetBlue,
-            tertiary = CINetTertiaryDark,
-            secondaryContainer = selectedTheme.darkButton,
-            background = Color(0xFF121212),
-            surface = Color(0xFF1E1E1E),
+            primary = themeColor,
             onPrimary = Color.White,
+            secondary = themeColor,
             onSecondary = Color.White,
+            tertiary = CINetTertiaryDark,
             onTertiary = Color.White,
+            secondaryContainer = buttonColor,
+            onSecondaryContainer = Color.White,
+            background = Color(0xFF121212),
             onBackground = Color.White,
+            surface = Color(0xFF1E1E1E),
             onSurface = Color.White
         )
     } else {
         lightColorScheme(
-            primary = selectedTheme.light,
-            secondary = CINetBlue,
+            primary = themeColor,
+            onPrimary = Color.White,
+            secondary = themeColor,
+            onSecondary = Color.White,
             tertiary = CINetTertiaryLight,
-            secondaryContainer = selectedTheme.lightButton,
-            background = CINetBackground,
-            surface = Color.White,
-            onPrimary = Color.Black,
-            onSecondary = Color.Black,
             onTertiary = Color.White,
+            secondaryContainer = buttonColor,
+            onSecondaryContainer = Color.White,
+            background = CINetBackground,
             onBackground = Color.Black,
+            surface = Color.White,
             onSurface = Color.Black
         )
     }
 }
+
 @Composable
 fun ThemeSelector(
     selectedTheme: AppThemeColor,
@@ -177,6 +164,7 @@ fun ThemeSelector(
         }
     }
 }
+
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun Preview() {
@@ -189,7 +177,6 @@ fun Preview() {
         }
     }
 }
-
 
 @Composable
 fun CINetTheme(

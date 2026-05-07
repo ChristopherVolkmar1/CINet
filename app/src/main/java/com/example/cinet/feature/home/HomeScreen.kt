@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +42,7 @@ fun HomeScreen(
     onSettingsClick: () -> Unit = {},
     onCalendarClick: () -> Unit = {},
     onAddClassClick: () -> Unit = {},
+    onClubsClick: () -> Unit = {},
     onCIViewClick: (NewsArticle?) -> Unit = {},
     onArticleClick: (NewsArticle) -> Unit = {},
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
@@ -248,14 +250,14 @@ fun HomeScreen(
         // Quick Actions Row
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
                 onClick = { 
                     val studyRoomsLink = "https://csuci.libcal.com/allspaces"
                     onArticleClick(NewsArticle("Study Rooms", "", "", studyRoomsLink))
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 contentPadding = PaddingValues(vertical = 12.dp)
@@ -263,6 +265,18 @@ fun HomeScreen(
                 Icon(Icons.Default.Language, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Study Rooms")
+            }
+
+            Button(
+                onClick = onClubsClick,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                Icon(Icons.Default.Groups, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Clubs")
             }
         }
 

@@ -44,6 +44,8 @@ import com.example.cinet.feature.auth.ProfileSetupScreen
 import com.example.cinet.feature.auth.viewmodel.AuthViewModel
 import com.example.cinet.feature.calendar.calendarFiles.CalendarScreen
 import com.example.cinet.feature.calendar.calendarFiles.CalendarViewModel
+import com.example.cinet.feature.clubs.ClubItem
+import com.example.cinet.feature.clubs.ClubsScreen
 import com.example.cinet.feature.home.HomeScreen
 import com.example.cinet.feature.home.buildHomeUpcomingEventItems
 import com.example.cinet.feature.map.CampusLocation
@@ -193,6 +195,10 @@ private fun MainScaffold(
     var showCIView by remember { mutableStateOf(false) }
     var selectedNewsArticle by remember { mutableStateOf<NewsArticle?>(null) }
 
+    // Clubs state
+    var showClubs by remember { mutableStateOf(false) }
+    var selectedClub by remember { mutableStateOf<ClubItem?>(null) }
+
     fun loadItems(key: String): List<Pair<String, String>> {
         val saved = sharedPrefs.getString(key, null) ?: return emptyList()
         return saved.split("||").filter { it.contains("|") }.map {
@@ -213,11 +219,14 @@ private fun MainScaffold(
     }
 
     val isShowingNews = showCIView || selectedNewsArticle != null
+    val isShowingClubs = showClubs || selectedClub != null
+    val isOverlayActive = isShowingNews || isShowingClubs
+
     val socialBackStackActive = currentScreen == Screen.Social &&
             (activeConversation != null || selectedProfile != null ||
                     showNewConversation || showSocialScreen)
 
-    BackHandler(enabled = currentScreen != Screen.Home || socialBackStackActive || showProfileEdit || isShowingNews || selectedProfile != null) {
+    BackHandler(enabled = currentScreen != Screen.Home || socialBackStackActive || showProfileEdit || isOverlayActive || selectedProfile != null) {
         when {
             selectedNewsArticle != null -> {
                 if (selectedNewsArticle?.title == "Study Rooms") {
@@ -229,6 +238,8 @@ private fun MainScaffold(
                 }
             }
             showCIView -> showCIView = false
+            selectedClub != null -> selectedClub = null
+            showClubs -> showClubs = false
             activeConversation != null -> activeConversation = null
             showNewConversation -> showNewConversation = false
             selectedProfile != null -> selectedProfile = null
@@ -241,7 +252,7 @@ private fun MainScaffold(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            if (!isShowingNews) {
+            if (!isOverlayActive) {
                 NavigationBar {
                     Screen.entries.forEach { screen ->
                         NavigationBarItem(
@@ -250,6 +261,8 @@ private fun MainScaffold(
                                 currentScreen = screen
                                 showCIView = false
                                 selectedNewsArticle = null
+                                showClubs = false
+                                selectedClub = null
                                 // Tapping Social from any other tab OR while already on Social
                                 // always returns to the Messages (ConversationsListScreen) root.
                                 if (screen == Screen.Social) {
@@ -291,7 +304,7 @@ private fun MainScaffold(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (isShowingNews) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
+                .padding(if (isOverlayActive) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
         ) {
             if (isShowingNews) {
                 CIViewScreen(
@@ -307,6 +320,19 @@ private fun MainScaffold(
                             showCIView = true
                         } else {
                             showCIView = false
+                        }
+                    }
+                )
+            } else if (isShowingClubs) {
+                ClubsScreen(
+                    selectedClubUrl = selectedClub?.url,
+                    selectedClubTitle = selectedClub?.title,
+                    onClubClick = { selectedClub = it },
+                    onBack = {
+                        if (selectedClub != null) {
+                            selectedClub = null
+                        } else {
+                            showClubs = false
                         }
                     }
                 )
@@ -329,6 +355,7 @@ private fun MainScaffold(
                             showAddClassOnCalendar = true
                             currentScreen = Screen.Calendar
                         },
+                        onClubsClick = { showClubs = true },
                         onCIViewClick = { article ->
                             if (article != null) {
                                 selectedNewsArticle = article
