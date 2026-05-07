@@ -139,7 +139,7 @@ fun FilterMenu(
         ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                //color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.secondary,
                 tonalElevation = 6.dp,
             ) {
                 Column(
@@ -216,8 +216,8 @@ fun FilterMenu(
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
-                                    checkedTrackColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    uncheckedTrackColor = Color.DarkGray
+                                    checkedTrackColor = MaterialTheme.colorScheme.secondary,
+                                    uncheckedTrackColor = Color.White
                                 )
                             )
                         }

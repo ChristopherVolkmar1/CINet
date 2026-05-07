@@ -4,18 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,20 +14,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.feature.home.news.NewsRepository
+import com.example.cinet.feature.map.BusScheduleSheet
 import com.example.cinet.ui.theme.CINetTheme
 import java.util.Calendar
 
@@ -80,6 +61,7 @@ fun HomeScreen(
 
     var weatherInfo by remember { mutableStateOf(WeatherInfo("...", "Loading...")) }
     var newsArticles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
+    var showBusScheduleSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         Log.d("HomeScreen", "Home screen launched")
@@ -91,10 +73,11 @@ fun HomeScreen(
         nickname = nickname,
         weatherInfo = weatherInfo,
         newsArticles = newsArticles,
+        nextUpcomingEvent = displayUpcomingEventsItems.firstOrNull(),
         onMapClick = onMapClick,
         onCalendarClick = onCalendarClick,
         onSocialClick = onSocialClick,
-        onNotificationClick = onNotificationClick,
+        onNotificationClick = { showBusScheduleSheet = true },
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
         onSeeAllNewsClick = { onCIViewClick(null) },
@@ -111,6 +94,12 @@ fun HomeScreen(
         },
         modifier = modifier
     )
+
+    if (showBusScheduleSheet) {
+        BusScheduleSheet(
+            onDismiss = { showBusScheduleSheet = false }
+        )
+    }
 }
 
 /** Arranges the home screen from top to bottom. */
@@ -119,6 +108,7 @@ private fun HomeScreenContent(
     nickname: String,
     weatherInfo: WeatherInfo,
     newsArticles: List<NewsArticle>,
+    nextUpcomingEvent: HomeUpcomingEventItem?,
     onMapClick: () -> Unit,
     onCalendarClick: () -> Unit,
     onSocialClick: () -> Unit,
@@ -158,6 +148,12 @@ private fun HomeScreenContent(
             onArticleClick = onArticleClick
         )
 
+        if (nextUpcomingEvent != null) {
+            Spacer(modifier = Modifier.height(14.dp))
+
+            NextUpcomingEventBanner(nextUpcomingEvent = nextUpcomingEvent)
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
@@ -175,7 +171,7 @@ private fun HomeScreenContent(
     }
 }
 
-/** Displays the greeting and subtitle at the top of the home page. */
+/** Displays the greeting and keeps it locked to one line by scaling long names down. */
 @Composable
 private fun WelcomeHeader(nickname: String) {
     val displayName = nickname.ifBlank { "there" }
@@ -185,12 +181,20 @@ private fun WelcomeHeader(nickname: String) {
             text = "Welcome back, $displayName 👋",
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.ExtraBold,
-            fontSize = 28.sp,
-            lineHeight = 34.sp,
-            maxLines = 2,
+            fontSize = greetingFontSizeFor(displayName),
+            maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+/** Chooses a smaller greeting size when the name is longer so the greeting stays on one line. */
+private fun greetingFontSizeFor(displayName: String) = when {
+    displayName.length > 22 -> 20.sp
+    displayName.length > 16 -> 22.sp
+    displayName.length > 10 -> 24.sp
+    else -> 26.sp
 }
 
 /** Displays the weather summary without the "Campus Weather" label. */
@@ -244,6 +248,106 @@ private fun HomeWeatherBanner(
                 )
             }
         }
+    }
+}
+
+/** Displays the next upcoming calendar event using the calendar pill style with the home banner shape. */
+@Composable
+private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(34.dp),
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.42f))
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = nextUpcomingEvent.title,
+                    fontSize = 15.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = nextUpcomingEventTimeText(nextUpcomingEvent),
+                    fontSize = 12.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.90f),
+                        modifier = Modifier.size(13.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Text(
+                        text = nextUpcomingEventLocationText(nextUpcomingEvent),
+                        fontSize = 12.sp,
+                        lineHeight = 14.sp,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Icon(
+                imageVector = Icons.Default.Notifications,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+    }
+}
+
+/** Pulls the date/time part from the Home event description when possible. */
+private fun nextUpcomingEventTimeText(event: HomeUpcomingEventItem): String {
+    return event.description
+        .substringBefore("|")
+        .trim()
+        .ifBlank { if (event.isCampusEvent) "Campus Event" else "Upcoming Event" }
+}
+
+/** Pulls the location part from the Home event description when possible. */
+private fun nextUpcomingEventLocationText(event: HomeUpcomingEventItem): String {
+    val locationText = event.description
+        .substringAfter("|", missingDelimiterValue = "")
+        .trim()
+
+    return locationText.ifBlank {
+        if (event.isCampusEvent) "Campus Event • Reminder on" else "Calendar Event"
     }
 }
 
@@ -440,25 +544,7 @@ private fun QuickActionGrid(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Top
-        ) {
-            QuickActionCircleButton(
-                icon = Icons.Default.Map,
-                title = "Map",
-                onClick = onMapClick
-            )
-
-            QuickActionCircleButton(
-                icon = Icons.Default.CalendarMonth,
-                title = "Calendar",
-                onClick = onCalendarClick
-            )
-
-            QuickActionCircleButton(
-                icon = Icons.Default.Groups,
-                title = "Social",
-                onClick = onSocialClick
-            )
-        }
+        ) { }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -478,8 +564,8 @@ private fun QuickActionGrid(
             )
 
             QuickActionCircleButton(
-                icon = Icons.Default.Notifications,
-                title = "Notifications",
+                icon = Icons.Default.DirectionsBus,
+                title = "Bus Schedule",
                 onClick = onNotificationClick
             )
         }
