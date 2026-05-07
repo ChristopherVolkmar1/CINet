@@ -49,6 +49,7 @@ fun HomeScreen(
     onCalendarClick: () -> Unit = {},
     onAddClassClick: () -> Unit = {},
     onCIViewClick: (NewsArticle?) -> Unit = {},
+    onClubsClick: () -> Unit = {},
     onArticleClick: (NewsArticle) -> Unit = {},
     onSocialClick: () -> Unit = {},
     onNotificationClick: () -> Unit = {},
@@ -77,6 +78,7 @@ fun HomeScreen(
         onMapClick = onMapClick,
         onCalendarClick = onCalendarClick,
         onSocialClick = onSocialClick,
+        onClubsClick = onClubsClick,
         onNotificationClick = { showBusScheduleSheet = true },
         onProfileClick = onProfileClick,
         onSettingsClick = onSettingsClick,
@@ -112,6 +114,7 @@ private fun HomeScreenContent(
     onMapClick: () -> Unit,
     onCalendarClick: () -> Unit,
     onSocialClick: () -> Unit,
+    onClubsClick: () -> Unit,
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
     onSettingsClick: () -> Unit,
@@ -164,6 +167,7 @@ private fun HomeScreenContent(
             onMapClick = onMapClick,
             onCalendarClick = onCalendarClick,
             onSocialClick = onSocialClick,
+            onClubsClick = onClubsClick,
             onStudyRoomsClick = onStudyRoomsClick,
             onProfileClick = onProfileClick,
             onNotificationClick = onNotificationClick
@@ -532,6 +536,7 @@ private fun QuickActionGrid(
     onMapClick: () -> Unit,
     onCalendarClick: () -> Unit,
     onSocialClick: () -> Unit,
+    onClubsClick: () -> Unit,
     onStudyRoomsClick: () -> Unit,
     onProfileClick: () -> Unit,
     onNotificationClick: () -> Unit
@@ -544,13 +549,13 @@ private fun QuickActionGrid(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Top
-        ) { }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Top
         ) {
+            QuickActionCircleButton(
+                icon = Icons.Default.Groups,
+                title = "Clubs",
+                onClick = onClubsClick
+            )
+
             QuickActionCircleButton(
                 icon = Icons.Default.MenuBook,
                 title = "Study Rooms",
@@ -562,7 +567,13 @@ private fun QuickActionGrid(
                 title = "Profile",
                 onClick = onProfileClick
             )
+        }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
+        ) {
             QuickActionCircleButton(
                 icon = Icons.Default.DirectionsBus,
                 title = "Bus Schedule",
@@ -664,6 +675,7 @@ fun HomeScreenPreview() {
             onCalendarClick = {},
             onAddClassClick = {},
             onCIViewClick = {},
+            onClubsClick = {},
             onArticleClick = {},
             onSocialClick = {},
             onNotificationClick = {},
