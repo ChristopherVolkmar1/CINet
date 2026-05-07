@@ -60,6 +60,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 import java.util.Locale
 
 enum class Screen(val label: String, val icon: ImageVector) {
@@ -301,10 +304,18 @@ private fun MainScaffold(
         }
     }
 
+    val density = LocalDensity.current
+    val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+
+    val hideBottomBarForConversationTyping =
+        currentScreen == Screen.Social &&
+                activeConversation != null &&
+                isKeyboardOpen
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            if (!isShowingNews) {
+            if (!isShowingNews && !hideBottomBarForConversationTyping) {
                 NavigationBar {
                     Screen.entries.forEach { screen ->
                         NavigationBarItem(
@@ -363,7 +374,7 @@ private fun MainScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    if (isShowingNews) {
+                    if (isShowingNews || hideBottomBarForConversationTyping) {
                         androidx.compose.foundation.layout.PaddingValues(0.dp)
                     } else {
                         innerPadding
