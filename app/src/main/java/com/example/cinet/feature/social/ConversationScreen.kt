@@ -210,9 +210,7 @@ fun ConversationScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding(),
+            modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -402,6 +400,7 @@ fun ConversationScreen(
                 }
 
                 val textFieldState = rememberTextFieldState()
+
                 MessageBox(
                     state = textFieldState,
                     onSendMessage = {
@@ -414,7 +413,8 @@ fun ConversationScreen(
                         }
                     },
                     studySelected = { showStudyInviteDialog = true },
-                    eventSelected = { showEventInviteDialog = true }
+                    eventSelected = { showEventInviteDialog = true },
+                    modifier = Modifier.imePadding()
                 )
             }
         }

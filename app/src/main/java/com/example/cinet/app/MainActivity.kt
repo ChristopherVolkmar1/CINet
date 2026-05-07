@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -19,8 +18,10 @@ import com.example.cinet.navigation.NavigationHandler
 import com.example.cinet.feature.auth.viewmodel.AuthViewModel
 import com.example.cinet.feature.auth.viewmodel.AuthViewModelFactory
 import com.example.cinet.feature.auth.AuthState
-import androidx.core.view.WindowCompat
 import com.example.cinet.ui.theme.CINetTheme
+import android.view.WindowManager
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 
 class MainActivity : ComponentActivity() {
 
@@ -45,11 +46,11 @@ class MainActivity : ComponentActivity() {
 
         // Read notification tap extras (cold start or task not running)
         pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
+        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         pendingMapLocationName = intent.getStringExtra(EXTRA_OPEN_MAP_FOR_LOCATION)
 
-        enableEdgeToEdge()
-        // Allow the keyboard to resize the layout properly alongside edge-to-edge
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
 
         setContent {
             val authState by authViewModel.authState.collectAsState()
