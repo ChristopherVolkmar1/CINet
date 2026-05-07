@@ -3,6 +3,7 @@ package com.example.cinet.data.remote
 import android.util.Log
 import com.example.cinet.data.model.CampusEvent
 import com.example.cinet.data.model.UserProfile
+import com.example.cinet.ui.theme.AppThemeColor
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -33,6 +34,16 @@ class FirestoreRepository(
                 docRef.update("createdAt", FieldValue.serverTimestamp()).await()
             }
 
+            // Backfill nicknameLower for existing users who pre-date the case-insensitive
+            // search field. Runs once per user (skipped as soon as the field is present).
+            val existingNickname = snapshot.getString("nickname") ?: ""
+            if (existingNickname.isNotEmpty() && snapshot.getString("nicknameLower").isNullOrEmpty()) {
+                docRef.set(
+                    mapOf("nicknameLower" to existingNickname.lowercase()),
+                    SetOptions.merge()
+                ).await()
+            }
+
             var profile = snapshot.toObject(UserProfile::class.java)
                 ?: return Result.failure(Exception("Failed to parse UserProfile"))
 
@@ -45,7 +56,13 @@ class FirestoreRepository(
             if (settingsSnapshot.exists()) {
                 val isDarkMode = settingsSnapshot.getBoolean("isDarkMode") ?: profile.isDarkMode
                 val notificationsEnabled = settingsSnapshot.getBoolean("notificationsEnabled") ?: profile.notificationsEnabled
-                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled)
+                val themeName = settingsSnapshot.getString("selectedTheme") ?: profile.selectedTheme.name
+                val selectedTheme = try {
+                    AppThemeColor.valueOf(themeName)
+                } catch (_: Exception) {
+                    AppThemeColor.Green
+                }
+                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled, selectedTheme = selectedTheme)
             }
 
             Result.success(profile)
@@ -58,15 +75,22 @@ class FirestoreRepository(
         nickname: String,
         major: String,
         pronouns: String,
+        year: String = "",
+        bio: String = "",
+        interests: List<String> = emptyList(),
     ): Result<UserProfile> {
         return try {
             val user = auth.currentUser ?: error("No signed-in user.")
             val docRef = db.collection(FirestoreCollections.USERS).document(user.uid)
 
             val profileUpdate = mapOf(
-                "nickname" to nickname,
-                "major"    to major,
-                "pronouns" to pronouns,
+                "nickname"      to nickname,
+                "nicknameLower" to nickname.lowercase(),
+                "major"         to major,
+                "pronouns"      to pronouns,
+                "year"          to year,
+                "bio"           to bio,
+                "interests"     to interests,
             )
 
             docRef.set(profileUpdate, SetOptions.merge()).await()
@@ -80,7 +104,8 @@ class FirestoreRepository(
 
     suspend fun updateUserSettings(
         isDarkMode: Boolean,
-        notificationsEnabled: Boolean
+        notificationsEnabled: Boolean,
+        selectedTheme: AppThemeColor
     ): Result<Unit> {
         return try {
             val uid = auth.currentUser?.uid ?: error("No signed-in user.")
@@ -90,7 +115,8 @@ class FirestoreRepository(
                 .set(
                     mapOf(
                         "isDarkMode" to isDarkMode,
-                        "notificationsEnabled" to notificationsEnabled
+                        "notificationsEnabled" to notificationsEnabled,
+                        "selectedTheme" to selectedTheme.name
                     ),
                     SetOptions.merge()
                 )

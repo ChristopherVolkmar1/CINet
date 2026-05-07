@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.home.news
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -20,6 +21,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 @Composable
 fun CIViewScreen(
     selectedArticleUrl: String? = null,
+    selectedArticleTitle: String? = null,
     onArticleClick: (NewsArticle) -> Unit,
     onBack: () -> Unit
 ) {
@@ -36,7 +38,13 @@ fun CIViewScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Article") },
+                    title = { 
+                        Text(
+                            text = selectedArticleTitle ?: "CI View",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        ) 
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

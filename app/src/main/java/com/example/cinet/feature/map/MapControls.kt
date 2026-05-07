@@ -1,6 +1,7 @@
 package com.example.cinet.feature.map
 
 import android.content.res.Configuration
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,9 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.ui.theme.CINetTheme
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
@@ -70,7 +70,8 @@ fun MapControls(
     onDismissPopup: () -> Unit,
     onModeSelected: (TravelMode) -> Unit,
     routeDurations: RouteDurations,
-    onShowBusSchedule: () -> Unit = {}
+    onShowBusSchedule: () -> Unit = {},
+    friends: List<UserProfile>
 ) {
     Row(
         modifier = Modifier
@@ -99,7 +100,8 @@ fun MapControls(
             onDismiss = onDismissPopup,
             onModeSelected = onModeSelected,
             routeDurations = routeDurations,
-            onShowBusSchedule = onShowBusSchedule
+            onShowBusSchedule = onShowBusSchedule,
+            friends = friends
         )
     }
 }
@@ -160,9 +162,14 @@ fun FilterMenu(
                         ElevatedButton(
                             onClick = { onFiltersChanged(emptySet()) },
                             contentPadding = PaddingValues(horizontal = 12.dp),
+                            enabled = activeFilters.isNotEmpty(),
                             colors = ButtonDefaults.elevatedButtonColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            )
+                            ),
+                            border = BorderStroke(
+                                width = 2.dp,
+                                if (activeFilters.isNotEmpty()) Color.White.copy(alpha = 0.6f) else Color.Transparent
+                            ),
                         ) {
                             Text(
                                 text = "Clear",
@@ -209,8 +216,8 @@ fun FilterMenu(
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
-                                    checkedTrackColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    uncheckedTrackColor = Color.DarkGray
+                                    checkedTrackColor = MaterialTheme.colorScheme.secondary,
+                                    uncheckedTrackColor = Color.White
                                 )
                             )
                         }
@@ -235,8 +242,8 @@ private fun categoryIconMap(): Map<String, ImageVector> = mapOf(
 
 /** Floating button that smoothly re-centers the camera on the user's current position. */
 @Composable
-fun CenterSelf(
-    user: LatLng,
+fun CenterCamera(
+    location: LatLng,
     cameraPositionState: CameraPositionState
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -251,7 +258,7 @@ fun CenterSelf(
                 onClick = {
                     coroutineScope.launch {
                         cameraPositionState.animate(
-                            update = CameraUpdateFactory.newLatLngZoom(user, 18f),
+                            update = CameraUpdateFactory.newLatLngZoom(location, 18f),
                             durationMs = 1000
                         )
                     }

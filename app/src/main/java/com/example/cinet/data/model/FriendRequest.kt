@@ -8,6 +8,7 @@ data class FriendRequest(
     val senderId: String = "",
     val senderNickname: String = "",
     val receiverId: String = "",
+    val receiverNickname: String = "",
     // status: "pending", "accepted", "declined"
     val status: String = "pending",
     @ServerTimestamp val createdAt: Date? = null,

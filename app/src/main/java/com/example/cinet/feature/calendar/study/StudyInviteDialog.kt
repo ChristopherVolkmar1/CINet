@@ -1,19 +1,34 @@
 package com.example.cinet.feature.calendar.study
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.cinet.feature.calendar.schedule.ScheduleItem
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.core.time.openTimePicker
+import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.feature.calendar.schedule.ScheduleItem
+import com.example.cinet.feature.map.SearchLocationBar
 import java.text.SimpleDateFormat
 import java.util.*
+
+// Category key → display label pairs shown as filter chips above the search bar.
+private val locationCategories = listOf(
+    "academic"         to "Academic",
+    "dining"           to "Dining",
+    "commuter_parking" to "Parking",
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,25 +38,42 @@ fun StudyInviteDialog(
     onDismiss: () -> Unit,
     onSendExisting: (ScheduleItem) -> Unit,
     onSendExistingSession: (StudySession) -> Unit = {},
-    onSendNew: (className: String, assignmentName: String, date: String, time: String) -> Unit,
+    onSendNew: (className: String, assignmentName: String, date: String, time: String, location: String) -> Unit,
+    campusRegistryViewModel: CampusRegistry = viewModel<CampusRegistry>(),
 ) {
     val context = LocalContext.current
+
     // false = pick from existing, true = create new
     var isCreatingNew by remember { mutableStateOf(false) }
     var newClassName by remember { mutableStateOf("") }
     var newAssignmentName by remember { mutableStateOf("") }
     var newDate by remember { mutableStateOf("") }
     var newTime by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
+
+    // Location state — shared ViewModel instead of a private Firestore fetch
+    val campusRegistry by campusRegistryViewModel.campusRegistry.collectAsState()
+    var locationCategory by remember { mutableStateOf("academic") }
+    val locationTextFieldState = rememberTextFieldState()
+
+    // Names in the selected category, filtered by whatever is typed
+    val filteredLocationNames = remember(
+        locationTextFieldState.text, locationCategory, campusRegistry
+    ) {
+        val categoryLocations = campusRegistry[locationCategory] ?: emptyList()
+        categoryLocations
+            .filter { it.name.contains(locationTextFieldState.text.toString(), ignoreCase = true) }
+            .map { it.name }
+    }
 
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                Button(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        // Format to yyyy-MM-dd to match CalendarFirestoreRepository date format
                         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         sdf.timeZone = TimeZone.getTimeZone("UTC")
                         newDate = sdf.format(Date(millis))
@@ -50,7 +82,7 @@ fun StudyInviteDialog(
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                Button(onClick = { showDatePicker = false }) { Text("Cancel") }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -63,7 +95,7 @@ fun StudyInviteDialog(
         text = {
             Column {
                 if (isCreatingNew) {
-                    // Option B — create new study session on the spot
+                    // ── Create new study session on the spot ──────────────────
                     OutlinedTextField(
                         value = newClassName,
                         onValueChange = { newClassName = it },
@@ -72,6 +104,7 @@ fun StudyInviteDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
                         value = newAssignmentName,
                         onValueChange = { newAssignmentName = it },
@@ -80,6 +113,7 @@ fun StudyInviteDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
                         value = newDate,
                         onValueChange = {},
@@ -91,10 +125,13 @@ fun StudyInviteDialog(
                             .clickable { showDatePicker = true }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Pick Date")
-                    }
+
+                    Button(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Pick Date") }
                     Spacer(modifier = Modifier.height(8.dp))
+
                     OutlinedTextField(
                         value = newTime,
                         onValueChange = {},
@@ -103,15 +140,67 @@ fun StudyInviteDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+
                     Button(
                         onClick = { openTimePicker(context) { newTime = it } },
                         modifier = Modifier.fillMaxWidth()
+                    ) { Text("Pick Time") }
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // ── Location: category chips + search bar ─────────────────
+                    Text(
+                        text = "Location (optional)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text("Pick Time")
+                        locationCategories.forEach { (key, label) ->
+                            FilterChip(
+                                selected = locationCategory == key,
+                                onClick = { locationCategory = key },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    SearchLocationBar(
+                        textFieldState = locationTextFieldState,
+                        searchResults = filteredLocationNames,
+                        onSearch = { query ->
+                            locationTextFieldState.edit { replace(0, length, query) }
+                        }
+                    )
+
                 } else {
-                    // Option A — pick from existing calendar items
-                    val hasAnyItems = existingItems.isNotEmpty() || existingStudySessions.isNotEmpty()
+                    // ── Pick from existing calendar items ────────────────────
+                    val hasAnyItems =
+                        existingItems.isNotEmpty() || existingStudySessions.isNotEmpty()
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Your Sessions", style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Button(onClick = { isCreatingNew = true }) {
+                            Text("Create new")
+                        }
+                    }
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search…") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (!hasAnyItems) {
                         Text(
@@ -120,8 +209,18 @@ fun StudyInviteDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else {
-                        LazyColumn {
-                            if (existingItems.isNotEmpty()) {
+                        val filteredItems = existingItems.filter {
+                            searchQuery.isBlank() ||
+                                    it.className.contains(searchQuery, ignoreCase = true) ||
+                                    it.assignmentName.contains(searchQuery, ignoreCase = true)
+                        }
+                        val filteredSessions = existingStudySessions.filter {
+                            searchQuery.isBlank() ||
+                                    it.className.contains(searchQuery, ignoreCase = true) ||
+                                    it.topic.contains(searchQuery, ignoreCase = true)
+                        }
+                        LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                            if (filteredItems.isNotEmpty()) {
                                 item {
                                     Text(
                                         "Assignments",
@@ -129,16 +228,18 @@ fun StudyInviteDialog(
                                         modifier = Modifier.padding(vertical = 4.dp)
                                     )
                                 }
-                                items(existingItems) { item ->
+                                items(filteredItems) { item ->
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 4.dp)
-                                            // Tapping sends immediately without going to create mode
                                             .clickable { onSendExisting(item) }
                                     ) {
                                         Column(modifier = Modifier.padding(12.dp)) {
-                                            Text(text = item.className, style = MaterialTheme.typography.titleSmall)
+                                            Text(
+                                                text = item.className,
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
                                             Text(text = item.assignmentName)
                                             Text(
                                                 text = "Due: ${item.dueTime} on ${item.date}",
@@ -151,7 +252,7 @@ fun StudyInviteDialog(
                                 }
                             }
 
-                            if (existingStudySessions.isNotEmpty()) {
+                            if (filteredSessions.isNotEmpty()) {
                                 item {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
@@ -160,7 +261,7 @@ fun StudyInviteDialog(
                                         modifier = Modifier.padding(vertical = 4.dp)
                                     )
                                 }
-                                items(existingStudySessions) { session ->
+                                items(filteredSessions) { session ->
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -168,7 +269,10 @@ fun StudyInviteDialog(
                                             .clickable { onSendExistingSession(session) }
                                     ) {
                                         Column(modifier = Modifier.padding(12.dp)) {
-                                            Text(text = session.className, style = MaterialTheme.typography.titleSmall)
+                                            Text(
+                                                text = session.className,
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
                                             Text(text = session.topic)
                                             Text(
                                                 text = "${session.startTime} on ${session.date}",
@@ -182,29 +286,31 @@ fun StudyInviteDialog(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { isCreatingNew = true }) {
-                        Text("Create new instead")
-                    }
+
                 }
             }
         },
         confirmButton = {
             if (isCreatingNew) {
-                TextButton(
+                Button(
                     onClick = {
                         if (newClassName.isNotBlank() && newAssignmentName.isNotBlank()
                             && newDate.isNotBlank() && newTime.isNotBlank()
                         ) {
-                            onSendNew(newClassName, newAssignmentName, newDate, newTime)
+                            onSendNew(
+                                newClassName,
+                                newAssignmentName,
+                                newDate,
+                                newTime,
+                                locationTextFieldState.text.toString(),
+                            )
                         }
                     }
                 ) { Text("Send") }
             }
         },
         dismissButton = {
-            // Back returns to picker, Cancel closes entirely
-            TextButton(onClick = {
+            Button(onClick = {
                 if (isCreatingNew) isCreatingNew = false else onDismiss()
             }) {
                 Text(if (isCreatingNew) "Back" else "Cancel")

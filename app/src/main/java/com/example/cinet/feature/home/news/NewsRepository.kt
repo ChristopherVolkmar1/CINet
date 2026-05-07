@@ -1,4 +1,4 @@
-package com.example.cinet
+package com.example.cinet.feature.home.news
 
 import android.util.Xml
 import kotlinx.coroutines.Dispatchers
@@ -8,7 +8,7 @@ import okhttp3.Request
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Locale
 
 /**
  * Repository class to handle fetching and parsing news from the CI View RSS feed.

@@ -36,6 +36,10 @@ fun ConversationsListScreen(
     onOpenConversation: (Conversation) -> Unit,
     onNewConversation: () -> Unit,
     onOpenFriends: () -> Unit,
+    sessionStartTime: Long = 0L,
+    // Maps conversationId -> timestamp when it was last opened this session.
+    // A message arriving AFTER that timestamp shows a dot even for opened convos.
+    openedConversationTimestamps: Map<String, Long> = emptyMap(),
 ) {
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val repository = remember { SocialRepository() }
@@ -150,9 +154,17 @@ fun ConversationsListScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(conversations, key = { it.id }) { conversation ->
+                        // Baseline: the later of sessionStartTime or when this convo
+                        // was last opened. A message after that timestamp = unread.
+                        val openedAt = openedConversationTimestamps[conversation.id] ?: 0L
+                        val baseline = maxOf(sessionStartTime, openedAt)
+                        val hasUnread = (conversation.lastUpdated?.time ?: 0L) > baseline &&
+                                conversation.lastMessage.isNotBlank() &&
+                                conversation.lastSenderId != currentUid
                         ConversationListItem(
                             conversation = conversation,
                             currentUid = currentUid,
+                            hasUnread = hasUnread,
                             onClick = { onOpenConversation(conversation) }
                         )
                         HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
@@ -168,6 +180,7 @@ private fun ConversationListItem(
     conversation: Conversation,
     currentUid: String,
     onClick: () -> Unit,
+    hasUnread: Boolean = false,
 ) {
     val displayName = if (conversation.isGroup) {
         conversation.groupName.ifBlank { "Group Chat" }
@@ -199,6 +212,17 @@ private fun ConversationListItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Unread indicator dot
+        Box(
+            modifier = Modifier
+                .size(if (hasUnread) 9.dp else 9.dp)
+                .clip(CircleShape)
+                .background(
+                    if (hasUnread) MaterialTheme.colorScheme.primary
+                    else androidx.compose.ui.graphics.Color.Transparent
+                )
+        )
+        Spacer(modifier = Modifier.width(8.dp))
         // Avatar
         ConversationAvatar(
             isGroup = conversation.isGroup,
@@ -249,10 +273,8 @@ private fun ConversationAvatar(
     participantCount: Int,
 ) {
     val initial = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    val avatarColor = if (isGroup)
-        MaterialTheme.colorScheme.tertiaryContainer
-    else
-        MaterialTheme.colorScheme.secondaryContainer
+    // Both DM and group avatars use secondaryContainer for consistent green branding
+    val avatarColor = MaterialTheme.colorScheme.secondaryContainer
 
     if (!isGroup && photoUrl.isNotBlank()) {
         AsyncImage(
