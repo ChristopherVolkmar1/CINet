@@ -29,9 +29,10 @@ class MainActivity : ComponentActivity() {
         AuthViewModelFactory(repository)
     }
 
-    // Conversation to open immediately — set from notification tap intent.
-    // Using mutableStateOf so Compose recomposes when onNewIntent updates it.
+    // Destinations to open immediately — set from notification tap intents.
+    // Using mutableStateOf so Compose recomposes when onNewIntent updates them.
     private var pendingConversationId by mutableStateOf<String?>(null)
+    private var pendingMapLocationName by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,8 +42,9 @@ class MainActivity : ComponentActivity() {
             PermissionManager.requestAllPermissions(this)
         }
 
-        // Read conversationId from a notification tap (cold start or task not running)
+        // Read notification tap extras (cold start or task not running)
         pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
+        pendingMapLocationName = intent.getStringExtra(EXTRA_OPEN_MAP_FOR_LOCATION)
 
         enableEdgeToEdge()
 
@@ -79,6 +81,8 @@ class MainActivity : ComponentActivity() {
                     },
                     initialConversationId = pendingConversationId,
                     onConversationOpened = { pendingConversationId = null },
+                    initialMapLocationName = pendingMapLocationName,
+                    onMapLocationOpened = { pendingMapLocationName = null },
                 )
             }
         }
@@ -90,6 +94,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
+        pendingMapLocationName = intent.getStringExtra(EXTRA_OPEN_MAP_FOR_LOCATION)
     }
 
     companion object {
