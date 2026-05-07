@@ -213,7 +213,7 @@ fun ConversationScreen(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Column(modifier = Modifier.fillMaxSize().imePadding()) {
+            Column(modifier = Modifier.fillMaxSize()) {
 
                 // Header
                 Row(
@@ -420,9 +420,7 @@ fun ConversationScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(bottom = 64.dp)
+                .padding(bottom = 80.dp)
                 .padding(horizontal = 16.dp)
         ) { data ->
             Surface(
