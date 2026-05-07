@@ -143,7 +143,11 @@ fun ConversationScreen(
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
-
+    LaunchedEffect(Unit) {
+        myScheduleItems = calendarRepository.loadAssignments()
+        myStudySessions = calendarRepository.loadStudySessions()
+        myEvents = calendarRepository.loadEvents()
+    }
     // Remove Friend confirmation dialog
     if (showRemoveFriendDialog) {
         AlertDialog(
