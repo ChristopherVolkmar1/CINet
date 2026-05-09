@@ -19,7 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.core.time.openTimePicker
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
-import com.example.cinet.feature.map.SearchLocationBar
+import com.example.cinet.feature.map.SearchBar
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -169,7 +169,8 @@ fun StudyInviteDialog(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    SearchLocationBar(
+                    SearchBar(
+                        placeholderText = "Search Location",
                         textFieldState = locationTextFieldState,
                         searchResults = filteredLocationNames,
                         onSearch = { query ->

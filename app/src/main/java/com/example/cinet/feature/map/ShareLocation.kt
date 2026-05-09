@@ -1,14 +1,13 @@
 package com.example.cinet.feature.map
 
 import android.content.res.Configuration
+import android.text.TextUtils.replace
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -17,12 +16,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.BasicAlertDialog
@@ -31,7 +28,6 @@ import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SliderDefaults.Thumb
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +48,7 @@ import com.example.cinet.data.remote.SocialRepository
 import com.example.cinet.feature.social.FriendSelectRow
 import com.example.cinet.ui.theme.CINetTheme
 import kotlinx.coroutines.launch
+import kotlin.collections.find
 
 
 /**
@@ -64,7 +61,10 @@ import kotlinx.coroutines.launch
 // -------------------- Location Sharing --------------------
 
 @Composable
-fun ShareLocation( friends: List<UserProfile>, location: CampusLocation ) {
+fun ShareLocation(
+    friends: List<UserProfile>,
+    location: CampusLocation
+) {
     var showDialog by remember { mutableStateOf(false) }
     Surface(
         onClick = { showDialog = true },
@@ -108,6 +108,8 @@ fun Share(friends: List<UserProfile>, location: CampusLocation, onDismiss: () ->
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val lazyListState = rememberLazyListState()
+    val textFieldState = rememberTextFieldState()
+
     BasicAlertDialog(
         onDismissRequest = onDismiss
     ) {
@@ -132,9 +134,22 @@ fun Share(friends: List<UserProfile>, location: CampusLocation, onDismiss: () ->
                     color = MaterialTheme.colorScheme.onSecondary
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-
+                // Search bar for conversations
+                val query = textFieldState.text.toString()
+                val filteredFriends = if (query.isBlank()) friends else friends.filter {
+                    it.nickname.contains(query, ignoreCase = true)
+                }
+                SearchBar(
+                    placeholderText = "Search friends",
+                    textFieldState = textFieldState,
+                    searchResults = emptyList(),
+                    onSearch = { query ->
+                        textFieldState.edit { replace(0, length, query) }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 LazyColumn(state = lazyListState, modifier = Modifier.heightIn(max = 400.dp)) {
-                    items(friends) { friend ->
+                    items(filteredFriends) { friend ->
                         FriendSelectRow(
                             friend = friend,
                             isSelected = selectedIds.contains(friend.uid),

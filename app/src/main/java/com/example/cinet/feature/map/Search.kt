@@ -2,8 +2,11 @@ package com.example.cinet.feature.map
 
 import android.content.res.Configuration
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,8 +14,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -49,14 +59,22 @@ data class SearchState(
 /** Rounded search bar with an inline dropdown of matching location names. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchLocationBar(
+fun SearchBar(
+    placeholderText: String,
     textFieldState: TextFieldState,
     searchResults: List<String>,
     onSearch: (String) -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     var isFocused by remember { mutableStateOf(false) }
-
+    val density = LocalDensity.current
+    val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+    LaunchedEffect(isKeyboardOpen) {
+        if (!isKeyboardOpen) {
+            isFocused = false
+            focusManager.clearFocus()
+        }
+    }
     val uniqueResults = remember(searchResults) { dedupeSearchResults(searchResults) }
     val showDropdown = isFocused && textFieldState.text.isNotEmpty() && uniqueResults.isNotEmpty()
 
@@ -66,11 +84,14 @@ fun SearchLocationBar(
         shadowElevation = 4.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .imePadding()
             .padding(bottom = 8.dp)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { focusManager.clearFocus() })
+            }
     ) {
         Column {
             SearchInputField(
+                placeholderText = placeholderText,
                 textFieldState = textFieldState,
                 onFocusChanged = { isFocused = it },
                 onSubmit = {
@@ -107,6 +128,7 @@ private fun dedupeSearchResults(results: List<String>): List<String> =
 /** Transparent single-line TextField used as the search input. */
 @Composable
 private fun SearchInputField(
+    placeholderText: String,
     textFieldState: TextFieldState,
     onFocusChanged: (Boolean) -> Unit,
     onSubmit: () -> Unit
@@ -114,7 +136,7 @@ private fun SearchInputField(
     TextField(
         value = textFieldState.text.toString(),
         onValueChange = { textFieldState.edit { replace(0, length, it) } },
-        placeholder = { Text("Search location..", color = Color.Gray) },
+        placeholder = { Text(placeholderText, color = Color.Gray) },
         singleLine = true,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,
@@ -128,6 +150,13 @@ private fun SearchInputField(
             unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         ),
+        leadingIcon = {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = "Search",
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        },
         modifier = Modifier
             .fillMaxWidth()
             .onFocusChanged { onFocusChanged(it.isFocused) },
@@ -156,7 +185,8 @@ private fun SearchSuggestionItem(
 fun PreviewSearch() {
     CINetTheme(darkTheme = true) {
         val textFieldState = rememberTextFieldState()
-        SearchLocationBar(
+        SearchBar(
+            placeholderText = "Search Location",
             textFieldState = textFieldState,
             searchResults = listOf("Aliso Hall", "Bell Tower", "Student Union"),
             onSearch = {},

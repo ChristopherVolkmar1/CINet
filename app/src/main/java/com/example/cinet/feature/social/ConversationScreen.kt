@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -320,6 +321,14 @@ fun ConversationScreen(
                                 onDismissRequest = { expanded = false },
                                 offset = DpOffset(x = 0.dp, y = 4.dp)
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("Search Message") },
+                                    leadingIcon = { Icon(Icons.Default.Search, "Search Message") },
+                                    onClick = {
+                                        expanded = false
+                                        showRemoveFriendDialog = true
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text("Remove Friend") },
                                     leadingIcon = { Icon(Icons.Default.PersonRemove, "Remove Friend") },

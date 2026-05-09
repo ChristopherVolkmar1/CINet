@@ -1,5 +1,6 @@
 package com.example.cinet.feature.social
 
+import android.text.TextUtils.replace
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.People
@@ -24,6 +26,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.remote.SocialRepository
+import com.example.cinet.feature.map.SearchBar
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
@@ -67,7 +70,8 @@ fun ConversationsListScreen(
     LaunchedEffect(Unit) {
         repository.getPendingRequests().onSuccess { pendingRequestCount = it.size }
     }
-
+    // Required for searching
+    val textFieldState = rememberTextFieldState()
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -152,8 +156,33 @@ fun ConversationsListScreen(
                     }
                 }
             } else {
+                val query = textFieldState.text.toString()
+                val filteredConversations = remember(query, conversations) {
+                    if(query.isBlank()) conversations
+                    else conversations.filter { conversation ->
+                        if(conversation.isGroup) {
+                            conversation.groupName.contains(query, ignoreCase = true)
+                        } else {
+                            conversation.participantNicknames
+                                .filterKeys { it != currentUid}
+                                .values
+                                .any {it.contains(query, ignoreCase = true)}
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.padding(8.dp)) {
+                    SearchBar(
+                        placeholderText = "Search conversations...",
+                        textFieldState = textFieldState,
+                        searchResults = emptyList(),
+                        onSearch = { query ->
+                            textFieldState.edit { replace(0, length, query) }
+                        }
+                    )
+                }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(conversations, key = { it.id }) { conversation ->
+                    items(filteredConversations, key = { it.id }) { conversation ->
                         // Baseline: the later of sessionStartTime or when this convo
                         // was last opened. A message after that timestamp = unread.
                         val openedAt = openedConversationTimestamps[conversation.id] ?: 0L

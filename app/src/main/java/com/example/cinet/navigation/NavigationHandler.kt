@@ -2,6 +2,7 @@ package com.example.cinet.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -26,8 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.feature.home.news.CIViewScreen
@@ -64,7 +68,6 @@ import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
-import androidx.compose.ui.platform.LocalDensity
 import java.util.Locale
 
 enum class Screen(val label: String, val icon: ImageVector) {
@@ -339,8 +342,7 @@ private fun MainScaffold(
                                 showClubs = false
                                 selectedClub = null
                                 profileOpenedFromHome = false
-                                // Tapping Social from any other tab OR while already on Social
-                                // always returns to the Messages (ConversationsListScreen) root.
+
                                 if (screen == Screen.Social) {
                                     activeConversation = null
                                     selectedProfile = null
@@ -348,7 +350,6 @@ private fun MainScaffold(
                                     showSocialScreen = false
                                 }
 
-                                // makes the settings button on the nav bar only open the settings
                                 if (screen == Screen.Settings) {
                                     selectedProfile = null
                                     showProfileEdit = false
@@ -390,104 +391,117 @@ private fun MainScaffold(
             }
         }
     ) { innerPadding ->
+
+        val contentPadding = if (isShowingNews || hideBottomBarForConversationTyping) {
+            PaddingValues(0.dp)
+        } else {
+            innerPadding
+        }
+
+        // Outer container holds both the always-rendered map layer and all other screens on top
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(
-                    if (isShowingNews || hideBottomBarForConversationTyping) {
-                        androidx.compose.foundation.layout.PaddingValues(0.dp)
-                    } else {
-                        innerPadding
-                    }
-                )
+                .padding(contentPadding)
         ) {
-            if (isShowingNews) {
-                CIViewScreen(
-                    selectedArticleUrl = selectedNewsArticle?.url,
-                    selectedArticleTitle = selectedNewsArticle?.title,
-                    onArticleClick = { selectedNewsArticle = it },
-                    onBack = {
-                        if (selectedNewsArticle?.title == "Study Rooms") {
-                            selectedNewsArticle = null
-                            showCIView = false
-                        } else if (selectedNewsArticle != null) {
-                            selectedNewsArticle = null
-                            showCIView = true
-                        } else {
-                            showCIView = false
-                        }
-                    }
-                )
-            } else if (isShowingClubs) {
-                ClubsScreen(
-                    selectedClubUrl = selectedClub?.url,
-                    selectedClubTitle = selectedClub?.title,
-                    onClubClick = { selectedClub = it },
-                    onBack = {
-                        if (selectedClub != null) {
-                            selectedClub = null
-                        } else {
-                            showClubs = false
-                        }
-                    }
-                )
-            } else {
-                when (currentScreen) {
-                    Screen.Home -> HomeScreen(
-                        nickname = userProfile.nickname,
-                        scheduleItems = calendarScheduleItems,
-                        manualUpcomingEventsItems = manualUpcomingEventsItems,
-                        displayUpcomingEventsItems = displayUpcomingEventsItems,
-                        onUpdateSchedule = { },
-                        onUpdateEvents = {
-                            manualUpcomingEventsItems = it
-                            saveItems("event_items", it)
-                        },
-                        onMapClick = { currentScreen = Screen.Map },
-                        onSettingsClick = { currentScreen = Screen.Settings },
-                        onCalendarClick = { currentScreen = Screen.Calendar },
-                        onAddClassClick = {
-                            showAddClassOnCalendar = true
-                            currentScreen = Screen.Calendar
-                        },
-                        onClubsClick = { showClubs = true },
-                        onCIViewClick = { article ->
-                            if (article != null) {
-                                selectedNewsArticle = article
-                            } else {
-                                showCIView = true
-                            }
-                        },
-                        onArticleClick = { article ->
-                            selectedNewsArticle = article
-                        },
-                        onSocialClick = {
-                            currentScreen = Screen.Social
-                            activeConversation = null
-                            selectedProfile = null
-                            showNewConversation = false
-                            showSocialScreen = false
-                        },
-                        onNotificationClick = { currentScreen = Screen.Settings },
-                        onProfileClick = {
-                            profileOpenedFromHome = true
-                            selectedProfile = userProfile
-                            currentScreen = Screen.Settings
-                        },
-                        onNavigateToLocation = { locationName ->
-                            val location = campusRegistry.values.flatten()
-                                .find { it.name.equals(locationName, ignoreCase = true) }
 
-                            preSelectedMapLocation = location
-                            autoRouteToPreSelectedMapLocation = false
-                            currentScreen = Screen.Map
+            // ---- MAP LAYER (always in composition, hidden when not active) ----
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = if (currentScreen == Screen.Map) 1f else 0f }
+                    .then(
+                        if (currentScreen != Screen.Map)
+                            Modifier.pointerInput(Unit) { /* block all touches when hidden */ }
+                        else Modifier
+                    )
+            ) {
+                CampusMapScreen(
+                    onBack = { currentScreen = Screen.Home },
+                    preSelectedLocation = preSelectedMapLocation,
+                    autoRouteToPreSelectedLocation = autoRouteToPreSelectedMapLocation,
+                    onFinishedLoading = {
+                        preSelectedMapLocation = null
+                        autoRouteToPreSelectedMapLocation = false
+                    }
+                )
+            }
+
+            // ---- ALL OTHER SCREENS (rendered on top of the map layer) ----
+            if (currentScreen != Screen.Map) {
+                if (isShowingNews) {
+                    CIViewScreen(
+                        selectedArticleUrl = selectedNewsArticle?.url,
+                        selectedArticleTitle = selectedNewsArticle?.title,
+                        onArticleClick = { selectedNewsArticle = it },
+                        onBack = {
+                            if (selectedNewsArticle?.title == "Study Rooms") {
+                                selectedNewsArticle = null
+                                showCIView = false
+                            } else if (selectedNewsArticle != null) {
+                                selectedNewsArticle = null
+                                showCIView = true
+                            } else {
+                                showCIView = false
+                            }
                         }
                     )
-
-                    Screen.Social -> when {
-                        activeConversation != null -> ConversationScreen(
-                            conversation = activeConversation!!,
-                            onBack = { activeConversation = null },
+                } else if (isShowingClubs) {
+                    ClubsScreen(
+                        selectedClubUrl = selectedClub?.url,
+                        selectedClubTitle = selectedClub?.title,
+                        onClubClick = { selectedClub = it },
+                        onBack = {
+                            if (selectedClub != null) {
+                                selectedClub = null
+                            } else {
+                                showClubs = false
+                            }
+                        }
+                    )
+                } else {
+                    when (currentScreen) {
+                        Screen.Home -> HomeScreen(
+                            nickname = userProfile.nickname,
+                            scheduleItems = calendarScheduleItems,
+                            manualUpcomingEventsItems = manualUpcomingEventsItems,
+                            displayUpcomingEventsItems = displayUpcomingEventsItems,
+                            onUpdateSchedule = { },
+                            onUpdateEvents = {
+                                manualUpcomingEventsItems = it
+                                saveItems("event_items", it)
+                            },
+                            onMapClick = { currentScreen = Screen.Map },
+                            onSettingsClick = { currentScreen = Screen.Settings },
+                            onCalendarClick = { currentScreen = Screen.Calendar },
+                            onAddClassClick = {
+                                showAddClassOnCalendar = true
+                                currentScreen = Screen.Calendar
+                            },
+                            onClubsClick = { showClubs = true },
+                            onCIViewClick = { article ->
+                                if (article != null) {
+                                    selectedNewsArticle = article
+                                } else {
+                                    showCIView = true
+                                }
+                            },
+                            onArticleClick = { article ->
+                                selectedNewsArticle = article
+                            },
+                            onSocialClick = {
+                                currentScreen = Screen.Social
+                                activeConversation = null
+                                selectedProfile = null
+                                showNewConversation = false
+                                showSocialScreen = false
+                            },
+                            onNotificationClick = { currentScreen = Screen.Settings },
+                            onProfileClick = {
+                                profileOpenedFromHome = true
+                                selectedProfile = userProfile
+                                currentScreen = Screen.Settings
+                            },
                             onNavigateToLocation = { locationName ->
                                 val location = campusRegistry.values.flatten()
                                     .find { it.name.equals(locationName, ignoreCase = true) }
@@ -498,127 +512,135 @@ private fun MainScaffold(
                             }
                         )
 
-                        selectedProfile != null -> ProfileScreen(
-                            user = if (selectedProfile!!.uid == userProfile.uid) {
+                        Screen.Social -> when {
+                            activeConversation != null -> ConversationScreen(
+                                conversation = activeConversation!!,
+                                onBack = { activeConversation = null },
+                                onNavigateToLocation = { locationName ->
+                                    val location = campusRegistry.values.flatten()
+                                        .find { it.name.equals(locationName, ignoreCase = true) }
+
+                                    preSelectedMapLocation = location
+                                    autoRouteToPreSelectedMapLocation = false
+                                    currentScreen = Screen.Map
+                                }
+                            )
+
+                            selectedProfile != null -> ProfileScreen(
+                                user = if (selectedProfile!!.uid == userProfile.uid) {
+                                    userProfile
+                                } else {
+                                    selectedProfile!!
+                                },
+                                currentUserProfile = userProfile,
+                                onOpenConversation = { activeConversation = it },
+                                onBack = { selectedProfile = null },
+                                onEditProfile = { showProfileEdit = true },
+                            )
+
+                            showNewConversation -> NewConversationScreen(
+                                currentUserProfile = userProfile,
+                                onBack = { showNewConversation = false },
+                                onOpenConversation = {
+                                    showNewConversation = false
+                                    activeConversation = it
+                                }
+                            )
+
+                            showSocialScreen -> SocialScreen(
+                                onOpenProfile = { selectedProfile = it },
+                                onOpenConversation = { friend ->
+                                    socialScope.launch {
+                                        socialRepository.getOrCreateConversation(
+                                            participantIds = listOf(userProfile.uid, friend.uid),
+                                            participantNicknames = mapOf(
+                                                userProfile.uid to userProfile.nickname,
+                                                friend.uid to friend.nickname
+                                            )
+                                        ).onSuccess {
+                                            showSocialScreen = false
+                                            activeConversation = it
+                                        }
+                                    }
+                                }
+                            )
+
+                            else -> {
+                                LaunchedEffect(Unit) {
+                                    sharedPrefs.edit()
+                                        .putLong("last_conversations_visit", System.currentTimeMillis())
+                                        .apply()
+                                }
+
+                                ConversationsListScreen(
+                                    onOpenConversation = {
+                                        openedConversationTimestamps =
+                                            openedConversationTimestamps + (it.id to System.currentTimeMillis())
+                                        activeConversation = it
+                                    },
+                                    onNewConversation = { showNewConversation = true },
+                                    onOpenFriends = { showSocialScreen = true },
+                                    sessionStartTime = lastConversationsVisit,
+                                    openedConversationTimestamps = openedConversationTimestamps,
+                                )
+                            }
+                        }
+
+                        Screen.Map -> { /* handled by the always-rendered map layer above */ }
+
+                        Screen.Calendar -> CalendarScreen(
+                            onBack = {
+                                currentScreen = Screen.Home
+                                showAddClassOnCalendar = false
+                            },
+                            initialShowClassDialog = showAddClassOnCalendar
+                        )
+
+                        Screen.Settings -> if (showProfileEdit) {
+                            ProfileEditScreen(
+                                onBack = { showProfileEdit = false },
+                                onSaved = { authViewModel.silentReloadProfile() },
+                            )
+                        } else if (selectedProfile != null) {
+                            val displayProfile = if (selectedProfile!!.uid == userProfile.uid) {
                                 userProfile
                             } else {
                                 selectedProfile!!
-                            },
-                            currentUserProfile = userProfile,
-                            onOpenConversation = { activeConversation = it },
-                            onBack = { selectedProfile = null },
-                            onEditProfile = { showProfileEdit = true },
-                        )
-
-                        showNewConversation -> NewConversationScreen(
-                            currentUserProfile = userProfile,
-                            onBack = { showNewConversation = false },
-                            onOpenConversation = {
-                                showNewConversation = false
-                                activeConversation = it
-                            }
-                        )
-
-                        showSocialScreen -> SocialScreen(
-                            onOpenProfile = { selectedProfile = it },
-                            onOpenConversation = { friend ->
-                                socialScope.launch {
-                                    socialRepository.getOrCreateConversation(
-                                        participantIds = listOf(userProfile.uid, friend.uid),
-                                        participantNicknames = mapOf(
-                                            userProfile.uid to userProfile.nickname,
-                                            friend.uid to friend.nickname
-                                        )
-                                    ).onSuccess {
-                                        showSocialScreen = false
-                                        activeConversation = it
-                                    }
-                                }
-                            }
-                        )
-
-                        else -> {
-                            LaunchedEffect(Unit) {
-                                sharedPrefs.edit()
-                                    .putLong("last_conversations_visit", System.currentTimeMillis())
-                                    .apply()
                             }
 
-                            ConversationsListScreen(
+                            ProfileScreen(
+                                user = displayProfile,
+                                currentUserProfile = userProfile,
                                 onOpenConversation = {
-                                    openedConversationTimestamps =
-                                        openedConversationTimestamps + (it.id to System.currentTimeMillis())
                                     activeConversation = it
+                                    currentScreen = Screen.Social
                                 },
-                                onNewConversation = { showNewConversation = true },
-                                onOpenFriends = { showSocialScreen = true },
-                                sessionStartTime = lastConversationsVisit,
-                                openedConversationTimestamps = openedConversationTimestamps,
+                                onBack = {
+                                    selectedProfile = null
+                                    if (profileOpenedFromHome) {
+                                        profileOpenedFromHome = false
+                                        currentScreen = Screen.Home
+                                    }
+                                },
+                                onEditProfile = { showProfileEdit = true },
+                            )
+                        } else {
+                            SettingScreen(
+                                onBack = { currentScreen = Screen.Home },
+                                onSignOut = onSignOut,
+                                isDarkMode = userProfile.isDarkMode,
+                                notificationsEnabled = userProfile.notificationsEnabled,
+                                selectedTheme = AppSettings.selectedTheme,
+                                onSettingsChange = { dark, notify, theme ->
+                                    authViewModel.updateSettings(dark, notify, theme)
+                                },
+                                userProfile = userProfile,
+                                onViewProfile = {
+                                    profileOpenedFromHome = false
+                                    selectedProfile = userProfile
+                                },
                             )
                         }
-                    }
-
-                    Screen.Map -> CampusMapScreen(
-                        onBack = { currentScreen = Screen.Home },
-                        preSelectedLocation = preSelectedMapLocation,
-                        autoRouteToPreSelectedLocation = autoRouteToPreSelectedMapLocation,
-                        onFinishedLoading = {
-                            preSelectedMapLocation = null
-                            autoRouteToPreSelectedMapLocation = false
-                        }
-                    )
-
-                    Screen.Calendar -> CalendarScreen(
-                        onBack = {
-                            currentScreen = Screen.Home
-                            showAddClassOnCalendar = false
-                        },
-                        initialShowClassDialog = showAddClassOnCalendar
-                    )
-
-                    Screen.Settings -> if (showProfileEdit) {
-                        ProfileEditScreen(
-                            onBack = { showProfileEdit = false },
-                            onSaved = { authViewModel.silentReloadProfile() },
-                        )
-                    } else if (selectedProfile != null) {
-                        val displayProfile = if (selectedProfile!!.uid == userProfile.uid) {
-                            userProfile
-                        } else {
-                            selectedProfile!!
-                        }
-
-                        ProfileScreen(
-                            user = displayProfile,
-                            currentUserProfile = userProfile,
-                            onOpenConversation = {
-                                activeConversation = it
-                                currentScreen = Screen.Social
-                            },
-                            onBack = { selectedProfile = null
-                                if (profileOpenedFromHome) {
-                                    profileOpenedFromHome = false
-                                    currentScreen = Screen.Home
-                                }
-                                     },
-                            onEditProfile = { showProfileEdit = true },
-                        )
-                    } else {
-                        SettingScreen(
-                            onBack = { currentScreen = Screen.Home },
-                            onSignOut = onSignOut,
-                            isDarkMode = userProfile.isDarkMode,
-                            notificationsEnabled = userProfile.notificationsEnabled,
-                            selectedTheme = AppSettings.selectedTheme,
-                            onSettingsChange = { dark, notify, theme ->
-                                authViewModel.updateSettings(dark, notify, theme)
-                            },
-                            userProfile = userProfile,
-                            onViewProfile = {
-                                profileOpenedFromHome = false
-                                selectedProfile = userProfile
-                            },
-                        )
                     }
                 }
             }
