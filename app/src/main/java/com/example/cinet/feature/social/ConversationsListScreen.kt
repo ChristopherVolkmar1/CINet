@@ -17,10 +17,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -158,16 +162,20 @@ fun ConversationsListScreen(
             } else {
                 val query = textFieldState.text.toString()
                 val filteredConversations = remember(query, conversations) {
-                    if(query.isBlank()) conversations
+                    if (query.isBlank()) conversations
                     else conversations.filter { conversation ->
-                        if(conversation.isGroup) {
+                        // Match by conversation/group name
+                        val nameMatch = if (conversation.isGroup) {
                             conversation.groupName.contains(query, ignoreCase = true)
                         } else {
                             conversation.participantNicknames
-                                .filterKeys { it != currentUid}
+                                .filterKeys { it != currentUid }
                                 .values
-                                .any {it.contains(query, ignoreCase = true)}
+                                .any { it.contains(query, ignoreCase = true) }
                         }
+                        // Also match against the latest message preview
+                        val messageMatch = conversation.lastMessage.contains(query, ignoreCase = true)
+                        nameMatch || messageMatch
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -194,6 +202,7 @@ fun ConversationsListScreen(
                             conversation = conversation,
                             currentUid = currentUid,
                             hasUnread = hasUnread,
+                            highlightQuery = query.trim(),
                             onClick = { onOpenConversation(conversation) }
                         )
                         HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
@@ -210,6 +219,7 @@ private fun ConversationListItem(
     currentUid: String,
     onClick: () -> Unit,
     hasUnread: Boolean = false,
+    highlightQuery: String = "",
 ) {
     val displayName = if (conversation.isGroup) {
         conversation.groupName.ifBlank { "Group Chat" }
@@ -263,20 +273,48 @@ private fun ConversationListItem(
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
+            // Helper: build an AnnotatedString that yellow-highlights every occurrence
+            // of [query] in [text], case-insensitively. Falls back to plain text when
+            // query is blank — same performance as before.
+            @Composable
+            fun highlighted(text: String): androidx.compose.ui.text.AnnotatedString =
+                remember(text, highlightQuery) {
+                    buildAnnotatedString {
+                        if (highlightQuery.isBlank()) {
+                            append(text)
+                        } else {
+                            val lower = text.lowercase()
+                            val q = highlightQuery.lowercase()
+                            var cursor = 0
+                            while (cursor < text.length) {
+                                val hit = lower.indexOf(q, cursor)
+                                if (hit == -1) { append(text.substring(cursor)); break }
+                                append(text.substring(cursor, hit))
+                                withStyle(SpanStyle(
+                                    background = Color(0xFFFFEB3B),
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                )) { append(text.substring(hit, hit + q.length)) }
+                                cursor = hit + q.length
+                            }
+                        }
+                    }
+                }
+
             Text(
-                text = displayName,
+                text = highlighted(displayName),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
             if (conversation.lastMessage.isNotBlank()) {
                 Text(
-                    text = conversation.lastMessage,
+                    text = highlighted(conversation.lastMessage),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

@@ -1,5 +1,8 @@
 package com.example.cinet.feature.social
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
@@ -26,9 +30,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -76,6 +84,44 @@ fun ConversationScreen(
     var otherUserPhotoUrl by remember { mutableStateOf("") }
     var currentUserPhotoUrl by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSearchBar by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Filtered messages — client-side only, no extra Firestore reads.
+    // Matches text content for regular messages; falls back to invite
+    // title/class fields and location name for structured bubble types.
+    val displayedMessages by remember {
+        derivedStateOf {
+            val q = searchQuery.trim()
+            if (q.isBlank()) messages
+            else messages.filter { msg ->
+                when (msg.type) {
+                    "study_invite" -> {
+                        val cls  = msg.metadata["className"] as? String ?: ""
+                        val topic = msg.metadata["topic"]    as? String ?: ""
+                        cls.contains(q, ignoreCase = true) || topic.contains(q, ignoreCase = true)
+                    }
+                    "event_invite" -> {
+                        val name = msg.metadata["name"] as? String ?: ""
+                        name.contains(q, ignoreCase = true)
+                    }
+                    "location_share" -> {
+                        val loc = msg.metadata["locationName"] as? String ?: ""
+                        loc.contains(q, ignoreCase = true)
+                    }
+                    else -> msg.content.contains(q, ignoreCase = true)
+                }
+            }
+        }
+    }
+
+    // When the query changes and results exist, jump to the first match.
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank() && displayedMessages.isNotEmpty()) {
+            val firstIndex = messages.indexOfFirst { it.id == displayedMessages.first().id }
+            if (firstIndex >= 0) listState.animateScrollToItem(firstIndex)
+        }
+    }
 
     // Returns true if the same invite was sent in this conversation within
     // the last 5 minutes, preventing accidental double-sends.
@@ -296,6 +342,14 @@ fun ConversationScreen(
                                     showRenameDialog = true
                                 }
                         )
+                        // Search button for group chats
+                        IconButton(onClick = { showSearchBar = !showSearchBar }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search messages",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
                     } else {
                         Text(
                             text = conversationTitle,
@@ -326,7 +380,7 @@ fun ConversationScreen(
                                     leadingIcon = { Icon(Icons.Default.Search, "Search Message") },
                                     onClick = {
                                         expanded = false
-                                        showRemoveFriendDialog = true
+                                        showSearchBar = true
                                     }
                                 )
                                 DropdownMenuItem(
@@ -344,6 +398,77 @@ fun ConversationScreen(
 
                 HorizontalDivider()
 
+                // ── Search bar — animates in/out below the header divider ──────
+                AnimatedVisibility(
+                    visible = showSearchBar,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    val matchCount = displayedMessages.size
+                    val totalCount = messages.size
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("Search messages…") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Clear search",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(24.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            // Dismiss search entirely
+                            IconButton(onClick = {
+                                showSearchBar = false
+                                searchQuery = ""
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        // Match count pill — only shown when query is active
+                        if (searchQuery.isNotBlank()) {
+                            Text(
+                                text = if (matchCount == 0) "No results"
+                                else "$matchCount of $totalCount message${if (totalCount != 1) "s" else ""}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 20.dp, bottom = 4.dp),
+                            )
+                        }
+                        HorizontalDivider()
+                    }
+                }
+
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -351,7 +476,7 @@ fun ConversationScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(messages) { message ->
+                    items(displayedMessages) { message ->
                         // Per-user check: has THIS user already accepted or declined?
                         // acceptedBy/declinedBy are comma-separated UIDs stored in metadata.
                         val acceptedBy = (message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
@@ -362,6 +487,7 @@ fun ConversationScreen(
                             isCurrentUser = message.senderId == currentUid,
                             currentUid = currentUid,
                             currentUserPhotoUrl = currentUserPhotoUrl,
+                            highlightQuery = searchQuery.trim(),
                             onNavigateToLocation = onNavigateToLocation,
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                                 (message.type == "study_invite" || message.type == "event_invite")) {
@@ -566,6 +692,7 @@ fun MessageBubble(
     isCurrentUser: Boolean,
     currentUid: String = "",
     currentUserPhotoUrl: String = "",
+    highlightQuery: String = "",
     onNavigateToLocation: ((String) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
@@ -657,10 +784,41 @@ fun MessageBubble(
                     color = bubbleColor,
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        // Build an AnnotatedString that bolds + backgrounds any
+                        // portion of the text matching the current search query.
+                        val annotated = remember(message.content, highlightQuery, textColor) {
+                            buildAnnotatedString {
+                                if (highlightQuery.isBlank()) {
+                                    append(message.content)
+                                } else {
+                                    val lower = message.content.lowercase()
+                                    val query = highlightQuery.lowercase()
+                                    var cursor = 0
+                                    while (cursor < message.content.length) {
+                                        val hit = lower.indexOf(query, cursor)
+                                        if (hit == -1) {
+                                            append(message.content.substring(cursor))
+                                            break
+                                        }
+                                        append(message.content.substring(cursor, hit))
+                                        withStyle(
+                                            SpanStyle(
+                                                background = Color(0xFFFFEB3B),
+                                                color = Color.Black,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                        ) {
+                                            append(message.content.substring(hit, hit + query.length))
+                                        }
+                                        cursor = hit + query.length
+                                    }
+                                }
+                            }
+                        }
                         Text(
-                            text = message.content,
+                            text = annotated,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = textColor
+                            color = textColor,
                         )
                     }
                 }
