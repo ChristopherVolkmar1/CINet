@@ -1,6 +1,11 @@
 package com.example.cinet.feature.social
 
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
@@ -16,7 +21,9 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
@@ -39,6 +46,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import android.app.DownloadManager
+import android.content.Intent
+import android.net.Uri as AndroidUri
+import android.os.Environment
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.data.model.Conversation
@@ -64,8 +77,27 @@ fun ConversationScreen(
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val listState = rememberLazyListState()
+    var isUploadingAttachment by remember { mutableStateOf(false) }
+
+    // File picker — any MIME type, consistent with the "images/files" spec
+    val attachmentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            isUploadingAttachment = true
+            scope.launch {
+                repository.sendAttachment(
+                    conversationId = conversation.id,
+                    uri = uri,
+                    context = context,
+                )
+                isUploadingAttachment = false
+            }
+        }
+    }
 
     var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
     var conversationCount by remember { mutableIntStateOf(0) }
@@ -86,6 +118,8 @@ fun ConversationScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showSearchBar by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    // null = preview closed; non-null = show full-screen image preview for this message
+    var previewMessage by remember { mutableStateOf<Message?>(null) }
 
     // Filtered messages — client-side only, no extra Firestore reads.
     // Matches text content for regular messages; falls back to invite
@@ -108,6 +142,10 @@ fun ConversationScreen(
                     "location_share" -> {
                         val loc = msg.metadata["locationName"] as? String ?: ""
                         loc.contains(q, ignoreCase = true)
+                    }
+                    "attachment" -> {
+                        val name = msg.metadata["fileName"] as? String ?: ""
+                        name.contains(q, ignoreCase = true)
                     }
                     else -> msg.content.contains(q, ignoreCase = true)
                 }
@@ -489,6 +527,7 @@ fun ConversationScreen(
                             currentUserPhotoUrl = currentUserPhotoUrl,
                             highlightQuery = searchQuery.trim(),
                             onNavigateToLocation = onNavigateToLocation,
+                            onPreviewImage = { previewMessage = it },
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                                 (message.type == "study_invite" || message.type == "event_invite")) {
                                 {
@@ -536,6 +575,14 @@ fun ConversationScreen(
 
                 val textFieldState = rememberTextFieldState()
 
+                // Show a slim progress bar while an attachment is uploading
+                if (isUploadingAttachment) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+
                 MessageBox(
                     state = textFieldState,
                     onSendMessage = {
@@ -549,6 +596,9 @@ fun ConversationScreen(
                     },
                     studySelected = { showStudyInviteDialog = true },
                     eventSelected = { showEventInviteDialog = true },
+                    onAttachmentClick = {
+                        if (!isUploadingAttachment) attachmentLauncher.launch("*/*")
+                    },
                     modifier = Modifier.imePadding()
                 )
             }
@@ -575,6 +625,23 @@ fun ConversationScreen(
             }
         }
     } // outer Box
+
+    // Dismiss preview on back gesture
+    BackHandler(enabled = previewMessage != null) { previewMessage = null }
+
+    // Full-screen image preview overlay
+    AnimatedVisibility(
+        visible = previewMessage != null,
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        previewMessage?.let { msg ->
+            ImagePreviewOverlay(
+                message = msg,
+                onDismiss = { previewMessage = null },
+            )
+        }
+    }
 
     if (showStudyInviteDialog) {
         StudyInviteDialog(
@@ -694,6 +761,7 @@ fun MessageBubble(
     currentUserPhotoUrl: String = "",
     highlightQuery: String = "",
     onNavigateToLocation: ((String) -> Unit)? = null,
+    onPreviewImage: ((Message) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
 ) {
@@ -763,6 +831,12 @@ fun MessageBubble(
                     message = message,
                     isCurrentUser = isCurrentUser,
                     onNavigateToLocation = onNavigateToLocation
+                )
+            } else if (message.type == "attachment") {
+                AttachmentBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onPreviewImage = onPreviewImage,
                 )
             } else {
                 val bubbleColor = if (isCurrentUser)
@@ -1091,6 +1165,242 @@ fun LocationShareBubble(
                 ) {
                     Text("View on Map")
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Renders an attachment message bubble.
+ *
+ * • Image MIME types  → inline [AsyncImage] (Coil), tap to open in system viewer
+ * • All other types   → compact file card with [AttachFile] icon, file name, and an
+ *                       "Open" button that fires [Intent.ACTION_VIEW]
+ *
+ * Shape, alignment, and sizing are consistent with the rest of the bubble family.
+ */
+@Composable
+fun AttachmentBubble(
+    message: Message,
+    isCurrentUser: Boolean,
+    onPreviewImage: ((Message) -> Unit)? = null,
+) {
+    val context = LocalContext.current
+    val url      = message.metadata["url"]      as? String ?: ""
+    val fileName = message.metadata["fileName"] as? String ?: "attachment"
+    val mimeType = message.metadata["mimeType"] as? String ?: "application/octet-stream"
+
+    val cardShape = RoundedCornerShape(
+        topStart    = if (isCurrentUser) 16.dp else 4.dp,
+        topEnd      = if (isCurrentUser) 4.dp  else 16.dp,
+        bottomStart = 16.dp,
+        bottomEnd   = 16.dp,
+    )
+
+    fun openUrl() {
+        if (url.isBlank()) return
+        val intent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(Intent.createChooser(intent, null))
+    }
+
+    if (mimeType.startsWith("image/")) {
+        // ── Image bubble — tap opens full-screen preview ──────────────────────────
+        Surface(
+            shape = cardShape,
+            color = if (isCurrentUser)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+                .widthIn(min = 120.dp, max = 260.dp)
+                .clickable {
+                    if (onPreviewImage != null) onPreviewImage(message) else openUrl()
+                },
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(url)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = fileName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 240.dp)
+                    .clip(cardShape),
+            )
+        }
+    } else {
+        // ── Generic file card ─────────────────────────────────────────────────────
+        Card(
+            shape = cardShape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.widthIn(min = 200.dp, max = 280.dp),
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                // Header row — icon + "ATTACHMENT" label
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "ATTACHMENT",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                    thickness = 0.5.dp,
+                )
+                Spacer(Modifier.height(8.dp))
+                // File name — truncate long names with ellipsis at end
+                Text(
+                    text = fileName,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(10.dp))
+                // Open button
+                Button(
+                    onClick = { openUrl() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Open")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Full-screen image preview overlay, shown when the user taps an image attachment.
+ *
+ * Layout (mirrors Discord's viewer):
+ *   • Near-black background — tap it to dismiss
+ *   • Image fills available space with ContentScale.Fit (no cropping)
+ *   • Floating top toolbar: [✕ close]  [filename]  [↓ download]
+ *
+ * Download uses DownloadManager so the file lands in the device's Downloads
+ * folder and a system notification confirms completion — no extra permissions
+ * needed on API 29+ (Android 10+).
+ */
+@Composable
+fun ImagePreviewOverlay(
+    message: Message,
+    onDismiss: () -> Unit,
+) {
+    val context  = LocalContext.current
+    val url      = message.metadata["url"]      as? String ?: ""
+    val fileName = message.metadata["fileName"] as? String ?: "image"
+    val mimeType = message.metadata["mimeType"] as? String ?: "image/*"
+
+    fun downloadImage() {
+        if (url.isBlank()) return
+        runCatching {
+            val request = DownloadManager.Request(AndroidUri.parse(url))
+                .setTitle(fileName)
+                .setDescription("Downloading via CINet")
+                .setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                )
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                .setMimeType(mimeType)
+            val dm = context.getSystemService(DownloadManager::class.java)
+            dm.enqueue(request)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xF0000000)) // ~94 % opaque black
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Image — consume clicks so tapping the photo doesn't dismiss the overlay
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(true)
+                .build(),
+            contentDescription = fileName,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 64.dp) // clear space for toolbar at top
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = { /* consume — don't dismiss */ },
+                ),
+        )
+
+        // ── Floating top toolbar ─────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .background(Color(0x88000000)) // translucent black scrim
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Close
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close preview",
+                    tint = Color.White,
+                )
+            }
+
+            // Filename — truncated in the middle of the toolbar
+            Text(
+                text = fileName,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp),
+            )
+
+            // Download
+            IconButton(onClick = { downloadImage() }) {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = "Download image",
+                    tint = Color.White,
+                )
             }
         }
     }
