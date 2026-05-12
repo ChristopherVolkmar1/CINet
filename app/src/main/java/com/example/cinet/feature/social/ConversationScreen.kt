@@ -50,6 +50,7 @@ import android.app.DownloadManager
 import android.content.Intent
 import android.net.Uri as AndroidUri
 import android.os.Environment
+import android.provider.OpenableColumns
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
@@ -68,6 +69,16 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+/**
+ * A file the user has selected but not yet sent.
+ * Shown as a preview above the message box (2-step send flow).
+ */
+private data class PendingAttachment(
+    val uri: AndroidUri,
+    val fileName: String,
+    val mimeType: String,
+)
+
 @Composable
 fun ConversationScreen(
     conversation: Conversation,
@@ -81,21 +92,25 @@ fun ConversationScreen(
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val listState = rememberLazyListState()
     var isUploadingAttachment by remember { mutableStateOf(false) }
+    // Holds a picked file that hasn't been sent yet — shown as a preview
+    // above the message box. Cleared on send or on the user pressing X.
+    var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
 
-    // File picker — any MIME type, consistent with the "images/files" spec
+    // File picker — resolves metadata client-side, stores as pending so the
+    // user sees a preview before the file is actually uploaded or sent.
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            isUploadingAttachment = true
-            scope.launch {
-                repository.sendAttachment(
-                    conversationId = conversation.id,
-                    uri = uri,
-                    context = context,
-                )
-                isUploadingAttachment = false
+            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            var fileName = "attachment"
+            runCatching {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val col = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (col >= 0 && cursor.moveToFirst()) fileName = cursor.getString(col)
+                }
             }
+            pendingAttachment = PendingAttachment(uri, fileName, mimeType)
         }
     }
 
@@ -575,7 +590,22 @@ fun ConversationScreen(
 
                 val textFieldState = rememberTextFieldState()
 
-                // Show a slim progress bar while an attachment is uploading
+                // ── Step 1: pending attachment preview ───────────────────────────
+                // Shown after the user picks a file but before they tap Send.
+                AnimatedVisibility(
+                    visible = pendingAttachment != null,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    pendingAttachment?.let { pa ->
+                        PendingAttachmentPreview(
+                            attachment = pa,
+                            onCancel = { pendingAttachment = null },
+                        )
+                    }
+                }
+
+                // Upload progress bar — shown only during the actual upload
                 if (isUploadingAttachment) {
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
@@ -583,21 +613,45 @@ fun ConversationScreen(
                     )
                 }
 
+                // ── Step 2: send ─────────────────────────────────────────────────
+                // If a pending attachment exists, Send uploads + sends it.
+                // Otherwise Send behaves as normal text send.
                 MessageBox(
                     state = textFieldState,
                     onSendMessage = {
-                        val content = textFieldState.text.toString().trim()
-                        if (content.isNotBlank()) {
+                        val pa = pendingAttachment
+                        if (pa != null) {
+                            val caption = textFieldState.text.toString().trim()
+                            pendingAttachment = null
+                            textFieldState.clearText()
+                            isUploadingAttachment = true
                             scope.launch {
-                                repository.sendMessage(conversation.id, content)
-                                textFieldState.clearText()
+                                repository.sendAttachment(
+                                    conversationId = conversation.id,
+                                    uri = pa.uri,
+                                    context = context,
+                                    caption = caption,
+                                )
+                                isUploadingAttachment = false
+                            }
+                        } else {
+                            val content = textFieldState.text.toString().trim()
+                            if (content.isNotBlank()) {
+                                scope.launch {
+                                    repository.sendMessage(conversation.id, content)
+                                    textFieldState.clearText()
+                                }
                             }
                         }
                     },
                     studySelected = { showStudyInviteDialog = true },
                     eventSelected = { showEventInviteDialog = true },
                     onAttachmentClick = {
-                        if (!isUploadingAttachment) attachmentLauncher.launch("*/*")
+                        // Don't allow picking a new file while one is already
+                        // staged or being uploaded
+                        if (pendingAttachment == null && !isUploadingAttachment) {
+                            attachmentLauncher.launch("*/*")
+                        }
                     },
                     modifier = Modifier.imePadding()
                 )
@@ -1189,6 +1243,7 @@ fun AttachmentBubble(
     val url      = message.metadata["url"]      as? String ?: ""
     val fileName = message.metadata["fileName"] as? String ?: "attachment"
     val mimeType = message.metadata["mimeType"] as? String ?: "application/octet-stream"
+    val caption  = message.metadata["caption"]  as? String ?: ""
 
     val cardShape = RoundedCornerShape(
         topStart    = if (isCurrentUser) 16.dp else 4.dp,
@@ -1219,18 +1274,38 @@ fun AttachmentBubble(
                     if (onPreviewImage != null) onPreviewImage(message) else openUrl()
                 },
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(url)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = fileName,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp, max = 240.dp)
-                    .clip(cardShape),
-            )
+            Column {
+                // Round bottom corners only when there's no caption below the image
+                val imageShape = if (caption.isNotBlank()) RoundedCornerShape(
+                    topStart    = if (isCurrentUser) 16.dp else 4.dp,
+                    topEnd      = if (isCurrentUser) 4.dp  else 16.dp,
+                    bottomStart = 0.dp,
+                    bottomEnd   = 0.dp,
+                ) else cardShape
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(url)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = fileName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 240.dp)
+                        .clip(imageShape),
+                )
+                if (caption.isNotBlank()) {
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isCurrentUser)
+                            MaterialTheme.colorScheme.onPrimary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
         }
     } else {
         // ── Generic file card ─────────────────────────────────────────────────────
@@ -1290,6 +1365,20 @@ fun AttachmentBubble(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text("Open")
+                }
+                // Caption — shown below the Open button when the sender added one
+                if (caption.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f),
+                        thickness = 0.5.dp,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
                 }
             }
         }
@@ -1400,6 +1489,93 @@ fun ImagePreviewOverlay(
                     imageVector = Icons.Default.Download,
                     contentDescription = "Download image",
                     tint = Color.White,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Preview card shown above the message box after the user picks a file
+ * but before they tap Send (the 2-step attachment send flow).
+ *
+ * • Images  → thumbnail (loaded from the local URI via Coil) + filename
+ * • Files   → AttachFile icon + filename
+ * • ✕ button cancels the pending attachment without sending anything
+ */
+@Composable
+private fun PendingAttachmentPreview(
+    attachment: PendingAttachment,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 4.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (attachment.mimeType.startsWith("image/")) {
+                // Thumbnail loaded directly from the local URI — no network needed
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(attachment.uri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = attachment.fileName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(10.dp)),
+                )
+            } else {
+                // Generic file icon in a small container
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = attachment.fileName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (attachment.mimeType.startsWith("image/")) "Image · tap ➤ to send"
+                    else "File · tap ➤ to send",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                )
+            }
+
+            // Cancel — clears the pending attachment without sending
+            IconButton(onClick = onCancel) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cancel attachment",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

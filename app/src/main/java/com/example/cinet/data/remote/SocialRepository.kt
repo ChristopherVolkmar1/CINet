@@ -277,6 +277,7 @@ class SocialRepository(
             )
 
             if (!isGroup) {
+                // DM path: find any existing active DM with exactly these participants.
                 val existingConversation = findExistingDirectConversation(participantIds)
                 if (existingConversation != null) {
                     Log.d(
@@ -284,6 +285,20 @@ class SocialRepository(
                         "Found existing conversation: ${existingConversation.id}"
                     )
                     return Result.success(existingConversation)
+                }
+            } else {
+                // Group path: deduplicate by exact participant set + group name.
+                // Without this check, network timeouts after a successful Firestore
+                // write let the creator tap "Create" again, producing a second group
+                // document. Creator ends up in G2 while other members reply in G1 —
+                // making replies appear "individual" from the creator's perspective.
+                val existingGroup = findExistingGroupConversation(participantIds, groupName)
+                if (existingGroup != null) {
+                    Log.d(
+                        "SocialRepository",
+                        "Found existing group conversation: ${existingGroup.id}"
+                    )
+                    return Result.success(existingGroup)
                 }
             }
 
@@ -347,13 +362,14 @@ class SocialRepository(
      * Picks a file URI, uploads it to Firebase Storage at
      *   conversations/{conversationId}/attachments/{messageId}
      * then sends a Message with type="attachment" and metadata keys:
-     *   url, fileName, mimeType.
-     * The last-message preview is "📎 <fileName>".
+     *   url, fileName, mimeType, caption.
+     * The last-message preview is the caption when provided, otherwise "📎 <fileName>".
      */
     suspend fun sendAttachment(
         conversationId: String,
         uri: Uri,
         context: Context,
+        caption: String = "",
     ): Result<Unit> {
         return try {
             val currentUser = getCurrentUserProfile()
@@ -369,19 +385,25 @@ class SocialRepository(
 
             val downloadUrl = uploadToStorage(conversationId, messageId, uri)
 
+            // Use the caption as the message content if provided so conversation list
+            // previews and search both show the caption text rather than just the filename.
+            val trimmedCaption = caption.trim()
+            val content = trimmedCaption.ifBlank { "📎 $fileName" }
+
             val message = buildMessage(
                 sender = currentUser,
-                content = "📎 $fileName",
+                content = content,
                 type = "attachment",
                 metadata = mapOf(
                     "url"      to downloadUrl,
                     "fileName" to fileName,
                     "mimeType" to mimeType,
+                    "caption"  to trimmedCaption,
                 ),
                 overrideId = messageId,
             )
             saveMessage(conversationId, message)
-            updateConversationLastMessage(conversationId, "📎 $fileName")
+            updateConversationLastMessage(conversationId, content)
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -697,6 +719,29 @@ class SocialRepository(
             .toObjects(Conversation::class.java)
             .firstOrNull {
                 !it.isGroup &&
+                        it.participantIds.size == participantIds.size &&
+                        it.participantIds.containsAll(participantIds)
+            }
+    }
+
+    /**
+     * Looks for an existing group conversation with exactly these participants and
+     * the same group name. Used to deduplicate group creation — if a Firestore write
+     * succeeds but the response times out, retrying would otherwise create a second
+     * identical group, splitting replies across two conversations.
+     */
+    private suspend fun findExistingGroupConversation(
+        participantIds: List<String>,
+        groupName: String,
+    ): Conversation? {
+        return db.collection("conversations")
+            .whereArrayContains("participantIds", currentUid)
+            .get()
+            .await()
+            .toObjects(Conversation::class.java)
+            .firstOrNull {
+                it.isGroup &&
+                        it.groupName.equals(groupName.trim(), ignoreCase = false) &&
                         it.participantIds.size == participantIds.size &&
                         it.participantIds.containsAll(participantIds)
             }
