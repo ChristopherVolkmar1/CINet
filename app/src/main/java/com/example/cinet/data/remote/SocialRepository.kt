@@ -1,5 +1,8 @@
 package com.example.cinet.data.remote
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
@@ -13,11 +16,13 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 
 class SocialRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
 ) {
 
     /** Returns the current signed-in user's uid. */
@@ -334,6 +339,53 @@ class SocialRepository(
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SocialRepository", "sendMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Picks a file URI, uploads it to Firebase Storage at
+     *   conversations/{conversationId}/attachments/{messageId}
+     * then sends a Message with type="attachment" and metadata keys:
+     *   url, fileName, mimeType.
+     * The last-message preview is "📎 <fileName>".
+     */
+    suspend fun sendAttachment(
+        conversationId: String,
+        uri: Uri,
+        context: Context,
+    ): Result<Unit> {
+        return try {
+            val currentUser = getCurrentUserProfile()
+            // Reserve the Firestore doc ID first so we can use it as the Storage file name.
+            val messageId = db.collection("conversations")
+                .document(conversationId)
+                .collection("messages")
+                .document()
+                .id
+
+            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val fileName = resolveFileName(context, uri)
+
+            val downloadUrl = uploadToStorage(conversationId, messageId, uri)
+
+            val message = buildMessage(
+                sender = currentUser,
+                content = "📎 $fileName",
+                type = "attachment",
+                metadata = mapOf(
+                    "url"      to downloadUrl,
+                    "fileName" to fileName,
+                    "mimeType" to mimeType,
+                ),
+                overrideId = messageId,
+            )
+            saveMessage(conversationId, message)
+            updateConversationLastMessage(conversationId, "📎 $fileName")
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "sendAttachment failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -679,8 +731,9 @@ class SocialRepository(
         content: String,
         type: String,
         metadata: Map<String, String>,
+        overrideId: String? = null,
     ): Message {
-        val messageId = db.collection("conversations")
+        val messageId = overrideId ?: db.collection("conversations")
             .document()
             .id
 
@@ -789,5 +842,33 @@ class SocialRepository(
             time = time,
             location = location,
         )
+    }
+
+    /** Uploads [uri] to Storage and returns the HTTPS download URL. */
+    private suspend fun uploadToStorage(
+        conversationId: String,
+        messageId: String,
+        uri: Uri,
+    ): String {
+        val ref = storage.reference
+            .child("conversations/$conversationId/attachments/$messageId")
+        ref.putFile(uri).await()
+        return ref.downloadUrl.await().toString()
+    }
+
+    /**
+     * Resolves a human-readable file name from a content URI using
+     * [OpenableColumns.DISPLAY_NAME]. Falls back to "attachment" if the
+     * column is unavailable (e.g. a file:// URI without a name segment).
+     */
+    private fun resolveFileName(context: Context, uri: Uri): String {
+        var name = "attachment"
+        runCatching {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val col = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (col >= 0 && cursor.moveToFirst()) name = cursor.getString(col)
+            }
+        }
+        return name
     }
 }
