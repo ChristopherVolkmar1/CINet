@@ -70,6 +70,8 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.browser:browser:1.8.0")
+    implementation("com.google.firebase:firebase-storage:22.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services")
     implementation(libs.okhttp)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
