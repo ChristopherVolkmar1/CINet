@@ -588,6 +588,22 @@ private fun MainScaffold(
                                     onNewConversation = { showNewConversation = true },
                                     onOpenFriends = { showSocialScreen = true },
                                     openedConversationTimestamps = openedConversationTimestamps,
+                                    // On fresh install or emulator wipe SharedPrefs is empty,
+                                    // so every conversation would incorrectly show as unread.
+                                    // Seed all existing conversation IDs with "now" so only
+                                    // genuinely new messages (arriving after this moment)
+                                    // produce dots going forward.
+                                    onSeedTimestamps = { ids ->
+                                        val now = System.currentTimeMillis()
+                                        val seeded = ids.associateWith { now }
+                                        openedConversationTimestamps =
+                                            openedConversationTimestamps + seeded
+                                        val editor = sharedPrefs.edit()
+                                        ids.forEach { id ->
+                                            editor.putLong("opened_conv_$id", now)
+                                        }
+                                        editor.apply()
+                                    },
                                 )
                             }
                         }

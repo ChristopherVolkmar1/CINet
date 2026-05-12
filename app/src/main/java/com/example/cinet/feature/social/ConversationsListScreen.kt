@@ -46,6 +46,10 @@ fun ConversationsListScreen(
     // Maps conversationId -> timestamp when it was last opened this session.
     // A message arriving AFTER that timestamp shows a dot even for opened convos.
     openedConversationTimestamps: Map<String, Long> = emptyMap(),
+    // Called once on fresh install / emulator wipe when openedConversationTimestamps
+    // is empty but conversations already exist. Seeds all conversation IDs with "now"
+    // so existing threads don't incorrectly appear unread after a data clear.
+    onSeedTimestamps: (List<String>) -> Unit = {},
 ) {
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val repository = remember { SocialRepository() }
@@ -53,6 +57,20 @@ fun ConversationsListScreen(
     var conversations by remember { mutableStateOf<List<Conversation>>(emptyList()) }
     var pendingRequestCount by remember { mutableIntStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
+
+    // Fresh-install / emulator-wipe guard. If openedConversationTimestamps is empty
+    // when conversations first arrive, it means SharedPrefs was cleared (wipe, reinstall,
+    // or first launch with pre-existing Firestore data). Seed every loaded conversation
+    // with "now" so none of them show a stale unread dot.
+    // hasSeeded ensures we only do this once per composition lifecycle — we don't want
+    // to wipe dots for genuinely new messages that arrive after the initial load.
+    var hasSeeded by remember { mutableStateOf(false) }
+    LaunchedEffect(conversations) {
+        if (!hasSeeded && conversations.isNotEmpty() && openedConversationTimestamps.isEmpty()) {
+            onSeedTimestamps(conversations.map { it.id })
+            hasSeeded = true
+        }
+    }
 
     // Real-time listener — updates automatically when messages arrive
     DisposableEffect(currentUid) {

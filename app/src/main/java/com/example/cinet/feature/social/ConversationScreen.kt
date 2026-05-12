@@ -1334,22 +1334,22 @@ fun AttachmentBubble(
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
                     )
                 }
-                Spacer(Modifier.height(6.dp))
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
-                    thickness = 0.5.dp,
-                )
-                Spacer(Modifier.height(8.dp))
-                // File name — truncate long names with ellipsis at end
+                // File name sits directly under the label, above the divider
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = fileName,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     maxLines = 2,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(6.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                    thickness = 0.5.dp,
+                )
+                Spacer(Modifier.height(8.dp))
                 // Open button
                 Button(
                     onClick = { openUrl() },
