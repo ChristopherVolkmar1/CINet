@@ -176,15 +176,18 @@ private fun MainScaffold(
         context.getSharedPreferences("cinet_prefs", android.content.Context.MODE_PRIVATE)
     }
 
-    var lastConversationsVisit by remember {
+    var openedConversationTimestamps by remember {
+        // Persisted per-conversation open timestamps so unread dots survive app restarts.
+        // Each entry is stored as "opened_conv_{id}" -> Long in cinet_prefs.
+        // A dot disappears when the user opens that conversation, and stays gone across
+        // relaunches unless a genuinely new message arrives after the stored timestamp.
         mutableStateOf(
-            sharedPrefs.getLong("last_conversations_visit", 0L).let { saved ->
-                if (saved == 0L) System.currentTimeMillis() else saved
-            }
+            sharedPrefs.all
+                .filter { it.key.startsWith("opened_conv_") }
+                .mapKeys { it.key.removePrefix("opened_conv_") }
+                .mapValues { (it.value as? Long) ?: 0L }
         )
     }
-
-    var openedConversationTimestamps by remember { mutableStateOf(mapOf<String, Long>()) }
 
     LaunchedEffect(initialConversationId) {
         val id = initialConversationId ?: return@LaunchedEffect
@@ -199,8 +202,13 @@ private fun MainScaffold(
 
             if (conversation != null) {
                 currentScreen = Screen.Social
+                val now = System.currentTimeMillis()
                 openedConversationTimestamps =
-                    openedConversationTimestamps + (conversation.id to System.currentTimeMillis())
+                    openedConversationTimestamps + (conversation.id to now)
+                // Persist so the dot stays gone after the app is restarted.
+                sharedPrefs.edit()
+                    .putLong("opened_conv_${conversation.id}", now)
+                    .apply()
                 activeConversation = conversation
                 onConversationOpened()
             }
@@ -566,21 +574,19 @@ private fun MainScaffold(
                             )
 
                             else -> {
-                                LaunchedEffect(Unit) {
-                                    sharedPrefs.edit()
-                                        .putLong("last_conversations_visit", System.currentTimeMillis())
-                                        .apply()
-                                }
-
                                 ConversationsListScreen(
                                     onOpenConversation = {
+                                        val now = System.currentTimeMillis()
                                         openedConversationTimestamps =
-                                            openedConversationTimestamps + (it.id to System.currentTimeMillis())
+                                            openedConversationTimestamps + (it.id to now)
+                                        // Persist so the dot stays gone across app restarts.
+                                        sharedPrefs.edit()
+                                            .putLong("opened_conv_${it.id}", now)
+                                            .apply()
                                         activeConversation = it
                                     },
                                     onNewConversation = { showNewConversation = true },
                                     onOpenFriends = { showSocialScreen = true },
-                                    sessionStartTime = lastConversationsVisit,
                                     openedConversationTimestamps = openedConversationTimestamps,
                                 )
                             }

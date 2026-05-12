@@ -43,7 +43,6 @@ fun ConversationsListScreen(
     onOpenConversation: (Conversation) -> Unit,
     onNewConversation: () -> Unit,
     onOpenFriends: () -> Unit,
-    sessionStartTime: Long = 0L,
     // Maps conversationId -> timestamp when it was last opened this session.
     // A message arriving AFTER that timestamp shows a dot even for opened convos.
     openedConversationTimestamps: Map<String, Long> = emptyMap(),
@@ -63,6 +62,10 @@ fun ConversationsListScreen(
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     conversations = snapshot.toObjects(Conversation::class.java)
+                        // active=false means the conversation was deactivated (e.g. after
+                        // unfriending). Don't show these — they caused duplicate "User A"
+                        // rows alongside group chats, confusing which thread to reply in.
+                        .filter { it.active }
                         .sortedByDescending { it.lastUpdated?.time ?: 0L }
                     isLoading = false
                 }
@@ -191,11 +194,12 @@ fun ConversationsListScreen(
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(filteredConversations, key = { it.id }) { conversation ->
-                        // Baseline: the later of sessionStartTime or when this convo
-                        // was last opened. A message after that timestamp = unread.
+                        // A dot appears when the last message arrived after the last time
+                        // this conversation was opened. openedAt is loaded from SharedPrefs
+                        // so dots survive app restarts and only clear when the conversation
+                        // is actually opened — not just because the list was viewed.
                         val openedAt = openedConversationTimestamps[conversation.id] ?: 0L
-                        val baseline = maxOf(sessionStartTime, openedAt)
-                        val hasUnread = (conversation.lastUpdated?.time ?: 0L) > baseline &&
+                        val hasUnread = (conversation.lastUpdated?.time ?: 0L) > openedAt &&
                                 conversation.lastMessage.isNotBlank() &&
                                 conversation.lastSenderId != currentUid
                         ConversationListItem(
