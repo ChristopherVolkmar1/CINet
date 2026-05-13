@@ -1,5 +1,13 @@
 package com.example.cinet.feature.social
 
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,23 +21,38 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import android.app.DownloadManager
+import android.content.Intent
+import android.net.Uri as AndroidUri
+import android.os.Environment
+import android.provider.OpenableColumns
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.data.model.Conversation
@@ -46,6 +69,16 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+/**
+ * A file the user has selected but not yet sent.
+ * Shown as a preview above the message box (2-step send flow).
+ */
+private data class PendingAttachment(
+    val uri: AndroidUri,
+    val fileName: String,
+    val mimeType: String,
+)
+
 @Composable
 fun ConversationScreen(
     conversation: Conversation,
@@ -55,8 +88,31 @@ fun ConversationScreen(
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val listState = rememberLazyListState()
+    var isUploadingAttachment by remember { mutableStateOf(false) }
+    // Holds a picked file that hasn't been sent yet — shown as a preview
+    // above the message box. Cleared on send or on the user pressing X.
+    var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
+
+    // File picker — resolves metadata client-side, stores as pending so the
+    // user sees a preview before the file is actually uploaded or sent.
+    val attachmentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            var fileName = "attachment"
+            runCatching {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val col = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (col >= 0 && cursor.moveToFirst()) fileName = cursor.getString(col)
+                }
+            }
+            pendingAttachment = PendingAttachment(uri, fileName, mimeType)
+        }
+    }
 
     var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
     var conversationCount by remember { mutableIntStateOf(0) }
@@ -75,6 +131,50 @@ fun ConversationScreen(
     var otherUserPhotoUrl by remember { mutableStateOf("") }
     var currentUserPhotoUrl by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSearchBar by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    // null = preview closed; non-null = show full-screen image preview for this message
+    var previewMessage by remember { mutableStateOf<Message?>(null) }
+
+    // Filtered messages — client-side only, no extra Firestore reads.
+    // Matches text content for regular messages; falls back to invite
+    // title/class fields and location name for structured bubble types.
+    val displayedMessages by remember {
+        derivedStateOf {
+            val q = searchQuery.trim()
+            if (q.isBlank()) messages
+            else messages.filter { msg ->
+                when (msg.type) {
+                    "study_invite" -> {
+                        val cls  = msg.metadata["className"] as? String ?: ""
+                        val topic = msg.metadata["topic"]    as? String ?: ""
+                        cls.contains(q, ignoreCase = true) || topic.contains(q, ignoreCase = true)
+                    }
+                    "event_invite" -> {
+                        val name = msg.metadata["name"] as? String ?: ""
+                        name.contains(q, ignoreCase = true)
+                    }
+                    "location_share" -> {
+                        val loc = msg.metadata["locationName"] as? String ?: ""
+                        loc.contains(q, ignoreCase = true)
+                    }
+                    "attachment" -> {
+                        val name = msg.metadata["fileName"] as? String ?: ""
+                        name.contains(q, ignoreCase = true)
+                    }
+                    else -> msg.content.contains(q, ignoreCase = true)
+                }
+            }
+        }
+    }
+
+    // When the query changes and results exist, jump to the first match.
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank() && displayedMessages.isNotEmpty()) {
+            val firstIndex = messages.indexOfFirst { it.id == displayedMessages.first().id }
+            if (firstIndex >= 0) listState.animateScrollToItem(firstIndex)
+        }
+    }
 
     // Returns true if the same invite was sent in this conversation within
     // the last 5 minutes, preventing accidental double-sends.
@@ -295,6 +395,14 @@ fun ConversationScreen(
                                     showRenameDialog = true
                                 }
                         )
+                        // Search button for group chats
+                        IconButton(onClick = { showSearchBar = !showSearchBar }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search messages",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
                     } else {
                         Text(
                             text = conversationTitle,
@@ -321,6 +429,14 @@ fun ConversationScreen(
                                 offset = DpOffset(x = 0.dp, y = 4.dp)
                             ) {
                                 DropdownMenuItem(
+                                    text = { Text("Search Message") },
+                                    leadingIcon = { Icon(Icons.Default.Search, "Search Message") },
+                                    onClick = {
+                                        expanded = false
+                                        showSearchBar = true
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Remove Friend") },
                                     leadingIcon = { Icon(Icons.Default.PersonRemove, "Remove Friend") },
                                     onClick = {
@@ -335,6 +451,77 @@ fun ConversationScreen(
 
                 HorizontalDivider()
 
+                // ── Search bar — animates in/out below the header divider ──────
+                AnimatedVisibility(
+                    visible = showSearchBar,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    val matchCount = displayedMessages.size
+                    val totalCount = messages.size
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("Search messages…") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Clear search",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(24.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            // Dismiss search entirely
+                            IconButton(onClick = {
+                                showSearchBar = false
+                                searchQuery = ""
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        // Match count pill — only shown when query is active
+                        if (searchQuery.isNotBlank()) {
+                            Text(
+                                text = if (matchCount == 0) "No results"
+                                else "$matchCount of $totalCount message${if (totalCount != 1) "s" else ""}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 20.dp, bottom = 4.dp),
+                            )
+                        }
+                        HorizontalDivider()
+                    }
+                }
+
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -342,7 +529,7 @@ fun ConversationScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(messages) { message ->
+                    items(displayedMessages) { message ->
                         // Per-user check: has THIS user already accepted or declined?
                         // acceptedBy/declinedBy are comma-separated UIDs stored in metadata.
                         val acceptedBy = (message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
@@ -353,7 +540,9 @@ fun ConversationScreen(
                             isCurrentUser = message.senderId == currentUid,
                             currentUid = currentUid,
                             currentUserPhotoUrl = currentUserPhotoUrl,
+                            highlightQuery = searchQuery.trim(),
                             onNavigateToLocation = onNavigateToLocation,
+                            onPreviewImage = { previewMessage = it },
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                                 (message.type == "study_invite" || message.type == "event_invite")) {
                                 {
@@ -401,19 +590,69 @@ fun ConversationScreen(
 
                 val textFieldState = rememberTextFieldState()
 
+                // ── Step 1: pending attachment preview ───────────────────────────
+                // Shown after the user picks a file but before they tap Send.
+                AnimatedVisibility(
+                    visible = pendingAttachment != null,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    pendingAttachment?.let { pa ->
+                        PendingAttachmentPreview(
+                            attachment = pa,
+                            onCancel = { pendingAttachment = null },
+                        )
+                    }
+                }
+
+                // Upload progress bar — shown only during the actual upload
+                if (isUploadingAttachment) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+
+                // ── Step 2: send ─────────────────────────────────────────────────
+                // If a pending attachment exists, Send uploads + sends it.
+                // Otherwise Send behaves as normal text send.
                 MessageBox(
                     state = textFieldState,
                     onSendMessage = {
-                        val content = textFieldState.text.toString().trim()
-                        if (content.isNotBlank()) {
+                        val pa = pendingAttachment
+                        if (pa != null) {
+                            val caption = textFieldState.text.toString().trim()
+                            pendingAttachment = null
+                            textFieldState.clearText()
+                            isUploadingAttachment = true
                             scope.launch {
-                                repository.sendMessage(conversation.id, content)
-                                textFieldState.clearText()
+                                repository.sendAttachment(
+                                    conversationId = conversation.id,
+                                    uri = pa.uri,
+                                    context = context,
+                                    caption = caption,
+                                )
+                                isUploadingAttachment = false
+                            }
+                        } else {
+                            val content = textFieldState.text.toString().trim()
+                            if (content.isNotBlank()) {
+                                scope.launch {
+                                    repository.sendMessage(conversation.id, content)
+                                    textFieldState.clearText()
+                                }
                             }
                         }
                     },
                     studySelected = { showStudyInviteDialog = true },
                     eventSelected = { showEventInviteDialog = true },
+                    onAttachmentClick = {
+                        // Don't allow picking a new file while one is already
+                        // staged or being uploaded
+                        if (pendingAttachment == null && !isUploadingAttachment) {
+                            attachmentLauncher.launch("*/*")
+                        }
+                    },
                     modifier = Modifier.imePadding()
                 )
             }
@@ -440,6 +679,23 @@ fun ConversationScreen(
             }
         }
     } // outer Box
+
+    // Dismiss preview on back gesture
+    BackHandler(enabled = previewMessage != null) { previewMessage = null }
+
+    // Full-screen image preview overlay
+    AnimatedVisibility(
+        visible = previewMessage != null,
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        previewMessage?.let { msg ->
+            ImagePreviewOverlay(
+                message = msg,
+                onDismiss = { previewMessage = null },
+            )
+        }
+    }
 
     if (showStudyInviteDialog) {
         StudyInviteDialog(
@@ -557,7 +813,9 @@ fun MessageBubble(
     isCurrentUser: Boolean,
     currentUid: String = "",
     currentUserPhotoUrl: String = "",
+    highlightQuery: String = "",
     onNavigateToLocation: ((String) -> Unit)? = null,
+    onPreviewImage: ((Message) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
 ) {
@@ -628,6 +886,12 @@ fun MessageBubble(
                     isCurrentUser = isCurrentUser,
                     onNavigateToLocation = onNavigateToLocation
                 )
+            } else if (message.type == "attachment") {
+                AttachmentBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onPreviewImage = onPreviewImage,
+                )
             } else {
                 val bubbleColor = if (isCurrentUser)
                     MaterialTheme.colorScheme.primary
@@ -648,10 +912,41 @@ fun MessageBubble(
                     color = bubbleColor,
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        // Build an AnnotatedString that bolds + backgrounds any
+                        // portion of the text matching the current search query.
+                        val annotated = remember(message.content, highlightQuery, textColor) {
+                            buildAnnotatedString {
+                                if (highlightQuery.isBlank()) {
+                                    append(message.content)
+                                } else {
+                                    val lower = message.content.lowercase()
+                                    val query = highlightQuery.lowercase()
+                                    var cursor = 0
+                                    while (cursor < message.content.length) {
+                                        val hit = lower.indexOf(query, cursor)
+                                        if (hit == -1) {
+                                            append(message.content.substring(cursor))
+                                            break
+                                        }
+                                        append(message.content.substring(cursor, hit))
+                                        withStyle(
+                                            SpanStyle(
+                                                background = Color(0xFFFFEB3B),
+                                                color = Color.Black,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                        ) {
+                                            append(message.content.substring(hit, hit + query.length))
+                                        }
+                                        cursor = hit + query.length
+                                    }
+                                }
+                            }
+                        }
                         Text(
-                            text = message.content,
+                            text = annotated,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = textColor
+                            color = textColor,
                         )
                     }
                 }
@@ -924,6 +1219,364 @@ fun LocationShareBubble(
                 ) {
                     Text("View on Map")
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Renders an attachment message bubble.
+ *
+ * • Image MIME types  → inline [AsyncImage] (Coil), tap to open in system viewer
+ * • All other types   → compact file card with [AttachFile] icon, file name, and an
+ *                       "Open" button that fires [Intent.ACTION_VIEW]
+ *
+ * Shape, alignment, and sizing are consistent with the rest of the bubble family.
+ */
+@Composable
+fun AttachmentBubble(
+    message: Message,
+    isCurrentUser: Boolean,
+    onPreviewImage: ((Message) -> Unit)? = null,
+) {
+    val context = LocalContext.current
+    val url      = message.metadata["url"]      as? String ?: ""
+    val fileName = message.metadata["fileName"] as? String ?: "attachment"
+    val mimeType = message.metadata["mimeType"] as? String ?: "application/octet-stream"
+    val caption  = message.metadata["caption"]  as? String ?: ""
+
+    val cardShape = RoundedCornerShape(
+        topStart    = if (isCurrentUser) 16.dp else 4.dp,
+        topEnd      = if (isCurrentUser) 4.dp  else 16.dp,
+        bottomStart = 16.dp,
+        bottomEnd   = 16.dp,
+    )
+
+    fun openUrl() {
+        if (url.isBlank()) return
+        val intent = Intent(Intent.ACTION_VIEW, AndroidUri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(Intent.createChooser(intent, null))
+    }
+
+    if (mimeType.startsWith("image/")) {
+        // ── Image bubble — tap opens full-screen preview ──────────────────────────
+        Surface(
+            shape = cardShape,
+            color = if (isCurrentUser)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+                .widthIn(min = 120.dp, max = 260.dp)
+                .clickable {
+                    if (onPreviewImage != null) onPreviewImage(message) else openUrl()
+                },
+        ) {
+            Column {
+                // Round bottom corners only when there's no caption below the image
+                val imageShape = if (caption.isNotBlank()) RoundedCornerShape(
+                    topStart    = if (isCurrentUser) 16.dp else 4.dp,
+                    topEnd      = if (isCurrentUser) 4.dp  else 16.dp,
+                    bottomStart = 0.dp,
+                    bottomEnd   = 0.dp,
+                ) else cardShape
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(url)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = fileName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 240.dp)
+                        .clip(imageShape),
+                )
+                if (caption.isNotBlank()) {
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isCurrentUser)
+                            MaterialTheme.colorScheme.onPrimary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
+    } else {
+        // ── Generic file card ─────────────────────────────────────────────────────
+        Card(
+            shape = cardShape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            modifier = Modifier.widthIn(min = 200.dp, max = 280.dp),
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                // Header row — icon + "ATTACHMENT" label
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(15.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "ATTACHMENT",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                    )
+                }
+                // File name sits directly under the label, above the divider
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = fileName,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(6.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                    thickness = 0.5.dp,
+                )
+                Spacer(Modifier.height(8.dp))
+                // Open button
+                Button(
+                    onClick = { openUrl() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                    ),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("Open")
+                }
+                // Caption — shown below the Open button when the sender added one
+                if (caption.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f),
+                        thickness = 0.5.dp,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Full-screen image preview overlay, shown when the user taps an image attachment.
+ *
+ * Layout (mirrors Discord's viewer):
+ *   • Near-black background — tap it to dismiss
+ *   • Image fills available space with ContentScale.Fit (no cropping)
+ *   • Floating top toolbar: [✕ close]  [filename]  [↓ download]
+ *
+ * Download uses DownloadManager so the file lands in the device's Downloads
+ * folder and a system notification confirms completion — no extra permissions
+ * needed on API 29+ (Android 10+).
+ */
+@Composable
+fun ImagePreviewOverlay(
+    message: Message,
+    onDismiss: () -> Unit,
+) {
+    val context  = LocalContext.current
+    val url      = message.metadata["url"]      as? String ?: ""
+    val fileName = message.metadata["fileName"] as? String ?: "image"
+    val mimeType = message.metadata["mimeType"] as? String ?: "image/*"
+
+    fun downloadImage() {
+        if (url.isBlank()) return
+        runCatching {
+            val request = DownloadManager.Request(AndroidUri.parse(url))
+                .setTitle(fileName)
+                .setDescription("Downloading via CINet")
+                .setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                )
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                .setMimeType(mimeType)
+            val dm = context.getSystemService(DownloadManager::class.java)
+            dm.enqueue(request)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xF0000000)) // ~94 % opaque black
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Image — consume clicks so tapping the photo doesn't dismiss the overlay
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(true)
+                .build(),
+            contentDescription = fileName,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 64.dp) // clear space for toolbar at top
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = { /* consume — don't dismiss */ },
+                ),
+        )
+
+        // ── Floating top toolbar ─────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .background(Color(0x88000000)) // translucent black scrim
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Close
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close preview",
+                    tint = Color.White,
+                )
+            }
+
+            // Filename — truncated in the middle of the toolbar
+            Text(
+                text = fileName,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp),
+            )
+
+            // Download
+            IconButton(onClick = { downloadImage() }) {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = "Download image",
+                    tint = Color.White,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Preview card shown above the message box after the user picks a file
+ * but before they tap Send (the 2-step attachment send flow).
+ *
+ * • Images  → thumbnail (loaded from the local URI via Coil) + filename
+ * • Files   → AttachFile icon + filename
+ * • ✕ button cancels the pending attachment without sending anything
+ */
+@Composable
+private fun PendingAttachmentPreview(
+    attachment: PendingAttachment,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 4.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (attachment.mimeType.startsWith("image/")) {
+                // Thumbnail loaded directly from the local URI — no network needed
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(attachment.uri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = attachment.fileName,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(10.dp)),
+                )
+            } else {
+                // Generic file icon in a small container
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = attachment.fileName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (attachment.mimeType.startsWith("image/")) "Image · tap ➤ to send"
+                    else "File · tap ➤ to send",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                )
+            }
+
+            // Cancel — clears the pending attachment without sending
+            IconButton(onClick = onCancel) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cancel attachment",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

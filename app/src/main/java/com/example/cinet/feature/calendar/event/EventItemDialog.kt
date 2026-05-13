@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.map.CampusLocation
-import com.example.cinet.feature.map.SearchLocationBar
+import com.example.cinet.feature.map.SearchBar
 
 // Category key → display label pairs shown as filter chips above the search bar.
 private val locationCategories = listOf(
@@ -106,7 +106,8 @@ fun EventItemDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // Search bar — results come from the selected category only
-                SearchLocationBar(
+                SearchBar(
+                    placeholderText = "Search Location",
                     textFieldState = textFieldState,
                     searchResults = filteredNames,
                     onSearch = { query ->

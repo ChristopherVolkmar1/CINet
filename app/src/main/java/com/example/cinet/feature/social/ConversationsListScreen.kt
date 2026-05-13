@@ -1,5 +1,6 @@
 package com.example.cinet.feature.social
 
+import android.text.TextUtils.replace
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.People
@@ -15,15 +17,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.remote.SocialRepository
+import com.example.cinet.feature.map.SearchBar
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
@@ -36,10 +43,13 @@ fun ConversationsListScreen(
     onOpenConversation: (Conversation) -> Unit,
     onNewConversation: () -> Unit,
     onOpenFriends: () -> Unit,
-    sessionStartTime: Long = 0L,
     // Maps conversationId -> timestamp when it was last opened this session.
     // A message arriving AFTER that timestamp shows a dot even for opened convos.
     openedConversationTimestamps: Map<String, Long> = emptyMap(),
+    // Called once on fresh install / emulator wipe when openedConversationTimestamps
+    // is empty but conversations already exist. Seeds all conversation IDs with "now"
+    // so existing threads don't incorrectly appear unread after a data clear.
+    onSeedTimestamps: (List<String>) -> Unit = {},
 ) {
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val repository = remember { SocialRepository() }
@@ -47,6 +57,20 @@ fun ConversationsListScreen(
     var conversations by remember { mutableStateOf<List<Conversation>>(emptyList()) }
     var pendingRequestCount by remember { mutableIntStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
+
+    // Fresh-install / emulator-wipe guard. If openedConversationTimestamps is empty
+    // when conversations first arrive, it means SharedPrefs was cleared (wipe, reinstall,
+    // or first launch with pre-existing Firestore data). Seed every loaded conversation
+    // with "now" so none of them show a stale unread dot.
+    // hasSeeded ensures we only do this once per composition lifecycle — we don't want
+    // to wipe dots for genuinely new messages that arrive after the initial load.
+    var hasSeeded by remember { mutableStateOf(false) }
+    LaunchedEffect(conversations) {
+        if (!hasSeeded && conversations.isNotEmpty() && openedConversationTimestamps.isEmpty()) {
+            onSeedTimestamps(conversations.map { it.id })
+            hasSeeded = true
+        }
+    }
 
     // Real-time listener — updates automatically when messages arrive
     DisposableEffect(currentUid) {
@@ -56,6 +80,10 @@ fun ConversationsListScreen(
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     conversations = snapshot.toObjects(Conversation::class.java)
+                        // active=false means the conversation was deactivated (e.g. after
+                        // unfriending). Don't show these — they caused duplicate "User A"
+                        // rows alongside group chats, confusing which thread to reply in.
+                        .filter { it.active }
                         .sortedByDescending { it.lastUpdated?.time ?: 0L }
                     isLoading = false
                 }
@@ -67,7 +95,8 @@ fun ConversationsListScreen(
     LaunchedEffect(Unit) {
         repository.getPendingRequests().onSuccess { pendingRequestCount = it.size }
     }
-
+    // Required for searching
+    val textFieldState = rememberTextFieldState()
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -152,19 +181,50 @@ fun ConversationsListScreen(
                     }
                 }
             } else {
+                val query = textFieldState.text.toString()
+                val filteredConversations = remember(query, conversations) {
+                    if (query.isBlank()) conversations
+                    else conversations.filter { conversation ->
+                        // Match by conversation/group name
+                        val nameMatch = if (conversation.isGroup) {
+                            conversation.groupName.contains(query, ignoreCase = true)
+                        } else {
+                            conversation.participantNicknames
+                                .filterKeys { it != currentUid }
+                                .values
+                                .any { it.contains(query, ignoreCase = true) }
+                        }
+                        // Also match against the latest message preview
+                        val messageMatch = conversation.lastMessage.contains(query, ignoreCase = true)
+                        nameMatch || messageMatch
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(modifier = Modifier.padding(8.dp)) {
+                    SearchBar(
+                        placeholderText = "Search conversations...",
+                        textFieldState = textFieldState,
+                        searchResults = emptyList(),
+                        onSearch = { query ->
+                            textFieldState.edit { replace(0, length, query) }
+                        }
+                    )
+                }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(conversations, key = { it.id }) { conversation ->
-                        // Baseline: the later of sessionStartTime or when this convo
-                        // was last opened. A message after that timestamp = unread.
+                    items(filteredConversations, key = { it.id }) { conversation ->
+                        // A dot appears when the last message arrived after the last time
+                        // this conversation was opened. openedAt is loaded from SharedPrefs
+                        // so dots survive app restarts and only clear when the conversation
+                        // is actually opened — not just because the list was viewed.
                         val openedAt = openedConversationTimestamps[conversation.id] ?: 0L
-                        val baseline = maxOf(sessionStartTime, openedAt)
-                        val hasUnread = (conversation.lastUpdated?.time ?: 0L) > baseline &&
+                        val hasUnread = (conversation.lastUpdated?.time ?: 0L) > openedAt &&
                                 conversation.lastMessage.isNotBlank() &&
                                 conversation.lastSenderId != currentUid
                         ConversationListItem(
                             conversation = conversation,
                             currentUid = currentUid,
                             hasUnread = hasUnread,
+                            highlightQuery = query.trim(),
                             onClick = { onOpenConversation(conversation) }
                         )
                         HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
@@ -181,6 +241,7 @@ private fun ConversationListItem(
     currentUid: String,
     onClick: () -> Unit,
     hasUnread: Boolean = false,
+    highlightQuery: String = "",
 ) {
     val displayName = if (conversation.isGroup) {
         conversation.groupName.ifBlank { "Group Chat" }
@@ -234,20 +295,48 @@ private fun ConversationListItem(
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
+            // Helper: build an AnnotatedString that yellow-highlights every occurrence
+            // of [query] in [text], case-insensitively. Falls back to plain text when
+            // query is blank — same performance as before.
+            @Composable
+            fun highlighted(text: String): androidx.compose.ui.text.AnnotatedString =
+                remember(text, highlightQuery) {
+                    buildAnnotatedString {
+                        if (highlightQuery.isBlank()) {
+                            append(text)
+                        } else {
+                            val lower = text.lowercase()
+                            val q = highlightQuery.lowercase()
+                            var cursor = 0
+                            while (cursor < text.length) {
+                                val hit = lower.indexOf(q, cursor)
+                                if (hit == -1) { append(text.substring(cursor)); break }
+                                append(text.substring(cursor, hit))
+                                withStyle(SpanStyle(
+                                    background = Color(0xFFFFEB3B),
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                )) { append(text.substring(hit, hit + q.length)) }
+                                cursor = hit + q.length
+                            }
+                        }
+                    }
+                }
+
             Text(
-                text = displayName,
+                text = highlighted(displayName),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
             if (conversation.lastMessage.isNotBlank()) {
                 Text(
-                    text = conversation.lastMessage,
+                    text = highlighted(conversation.lastMessage),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

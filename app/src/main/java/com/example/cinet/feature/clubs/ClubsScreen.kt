@@ -1,5 +1,6 @@
 package com.example.cinet.feature.clubs
 
+import android.text.TextUtils.replace
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Groups
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.cinet.feature.map.SearchBar
 
 // clubs stuff - Zack
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +35,7 @@ fun ClubsScreen(
     var clubs by remember { mutableStateOf<List<ClubItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
+    val textFieldState = rememberTextFieldState() // Search text field
     LaunchedEffect(Unit) {
         clubs = clubsRepository.fetchClubs()
         isLoading = false
@@ -127,16 +131,35 @@ fun ClubsScreen(
                     }
                 }
             } else {
-                LazyColumn(
+                val query = textFieldState.text.toString()
+                val filteredList = if (query.isBlank()) clubs else clubs.filter {
+                    it.title.contains(query, ignoreCase = true)
+                }
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(padding)
                 ) {
-                    items(clubs) { club ->
-                        ClubListItem(club = club) {
-                            onClubClick(club)
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        SearchBar(
+                            placeholderText = "Search clubs...",
+                            textFieldState = textFieldState,
+                            searchResults = emptyList(),
+                            onSearch = { query ->
+                                textFieldState.edit { replace(0, length, query) }
+                            }
+                        )
+                    }
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(filteredList) { club ->
+                            ClubListItem(club = club) {
+                                onClubClick(club)
+                            }
                         }
                     }
                 }

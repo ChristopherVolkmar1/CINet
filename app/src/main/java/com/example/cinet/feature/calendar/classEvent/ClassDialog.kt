@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.map.CampusLocation
-import com.example.cinet.feature.map.SearchLocationBar
+import com.example.cinet.feature.map.SearchBar
 
 @Composable
 fun ClassDialog(
@@ -161,7 +161,8 @@ fun ClassDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    SearchLocationBar(
+                    SearchBar(
+                        placeholderText = "Search Location",
                         textFieldState = textFieldState,
                         searchResults = academicNames,
                         onSearch = { query ->

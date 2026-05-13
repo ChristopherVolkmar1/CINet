@@ -88,7 +88,8 @@ fun MapControls(
         Spacer(modifier = Modifier.width(12.dp))
 
         Box(Modifier.weight(1f)) {
-            SearchLocationBar(
+            SearchBar(
+                placeholderText = "Search Location",
                 textFieldState = searchState.textFieldState,
                 searchResults = searchState.results,
                 onSearch = searchState.onSearch
@@ -139,7 +140,6 @@ fun FilterMenu(
         ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.secondary,
                 tonalElevation = 6.dp,
             ) {
                 Column(

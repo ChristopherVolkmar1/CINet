@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.DropdownMenu
@@ -46,6 +47,7 @@ fun MessageBox(
     onSendMessage: () -> Unit,
     studySelected: () -> Unit,
     eventSelected: () -> Unit,
+    onAttachmentClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -75,7 +77,8 @@ fun MessageBox(
                 expanded = showMenu,
                 onDismiss = { showMenu = false },
                 onStudyClick = studySelected,
-                onEventClick = eventSelected
+                onEventClick = eventSelected,
+                onAttachmentClick = onAttachmentClick,
             )
         }
         // Message bar section
@@ -131,30 +134,39 @@ fun AddAttachment(
     expanded: Boolean,
     onStudyClick: () -> Unit,
     onEventClick: () -> Unit,
+    onAttachmentClick: () -> Unit,
     onDismiss: () -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        offset = DpOffset(x = 0.dp, y = -8.dp)
     ) {
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss,
-            offset = DpOffset(x = 0.dp, y = -8.dp)
-        ) {
-            DropdownMenuItem(
-                text = { Text("Study Invite")},
-                leadingIcon = { Icon(Icons.Default.School, "Study Invite") },
-                onClick = {
-                    onStudyClick()
-                    onDismiss()
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Event Invite")},
-                leadingIcon = { Icon(Icons.Default.Event, "Event Invite") },
-                onClick = {
-                    onEventClick()
-                    onDismiss()
-                }
-            )
-        }
+        DropdownMenuItem(
+            text = { Text("Study Invite")},
+            leadingIcon = { Icon(Icons.Default.School, "Study Invite") },
+            onClick = {
+                onStudyClick()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Event Invite")},
+            leadingIcon = { Icon(Icons.Default.Event, "Event Invite") },
+            onClick = {
+                onEventClick()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Attach File") },
+            leadingIcon = { Icon(Icons.Default.AttachFile, contentDescription = "Attach File") },
+            onClick = {
+                onAttachmentClick()
+                onDismiss()
+            }
+        )
+    }
 }
 
 @Preview(showBackground = true, showSystemUi = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -170,7 +182,8 @@ fun PreviewMessageBox() {
                 state = textFieldState,
                 onSendMessage = { },
                 studySelected = { },
-                eventSelected = { }
+                eventSelected = { },
+                onAttachmentClick = { },
             )
         }
     }

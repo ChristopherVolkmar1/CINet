@@ -1,5 +1,8 @@
 package com.example.cinet.data.remote
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
@@ -13,11 +16,13 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 
 class SocialRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
 ) {
 
     /** Returns the current signed-in user's uid. */
@@ -272,6 +277,7 @@ class SocialRepository(
             )
 
             if (!isGroup) {
+                // DM path: find any existing active DM with exactly these participants.
                 val existingConversation = findExistingDirectConversation(participantIds)
                 if (existingConversation != null) {
                     Log.d(
@@ -279,6 +285,20 @@ class SocialRepository(
                         "Found existing conversation: ${existingConversation.id}"
                     )
                     return Result.success(existingConversation)
+                }
+            } else {
+                // Group path: deduplicate by exact participant set + group name.
+                // Without this check, network timeouts after a successful Firestore
+                // write let the creator tap "Create" again, producing a second group
+                // document. Creator ends up in G2 while other members reply in G1 —
+                // making replies appear "individual" from the creator's perspective.
+                val existingGroup = findExistingGroupConversation(participantIds, groupName)
+                if (existingGroup != null) {
+                    Log.d(
+                        "SocialRepository",
+                        "Found existing group conversation: ${existingGroup.id}"
+                    )
+                    return Result.success(existingGroup)
                 }
             }
 
@@ -334,6 +354,60 @@ class SocialRepository(
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SocialRepository", "sendMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Picks a file URI, uploads it to Firebase Storage at
+     *   conversations/{conversationId}/attachments/{messageId}
+     * then sends a Message with type="attachment" and metadata keys:
+     *   url, fileName, mimeType, caption.
+     * The last-message preview is the caption when provided, otherwise "📎 <fileName>".
+     */
+    suspend fun sendAttachment(
+        conversationId: String,
+        uri: Uri,
+        context: Context,
+        caption: String = "",
+    ): Result<Unit> {
+        return try {
+            val currentUser = getCurrentUserProfile()
+            // Reserve the Firestore doc ID first so we can use it as the Storage file name.
+            val messageId = db.collection("conversations")
+                .document(conversationId)
+                .collection("messages")
+                .document()
+                .id
+
+            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val fileName = resolveFileName(context, uri)
+
+            val downloadUrl = uploadToStorage(conversationId, messageId, uri)
+
+            // Use the caption as the message content if provided so conversation list
+            // previews and search both show the caption text rather than just the filename.
+            val trimmedCaption = caption.trim()
+            val content = trimmedCaption.ifBlank { "📎 $fileName" }
+
+            val message = buildMessage(
+                sender = currentUser,
+                content = content,
+                type = "attachment",
+                metadata = mapOf(
+                    "url"      to downloadUrl,
+                    "fileName" to fileName,
+                    "mimeType" to mimeType,
+                    "caption"  to trimmedCaption,
+                ),
+                overrideId = messageId,
+            )
+            saveMessage(conversationId, message)
+            updateConversationLastMessage(conversationId, content)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "sendAttachment failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -650,6 +724,29 @@ class SocialRepository(
             }
     }
 
+    /**
+     * Looks for an existing group conversation with exactly these participants and
+     * the same group name. Used to deduplicate group creation — if a Firestore write
+     * succeeds but the response times out, retrying would otherwise create a second
+     * identical group, splitting replies across two conversations.
+     */
+    private suspend fun findExistingGroupConversation(
+        participantIds: List<String>,
+        groupName: String,
+    ): Conversation? {
+        return db.collection("conversations")
+            .whereArrayContains("participantIds", currentUid)
+            .get()
+            .await()
+            .toObjects(Conversation::class.java)
+            .firstOrNull {
+                it.isGroup &&
+                        it.groupName.equals(groupName.trim(), ignoreCase = false) &&
+                        it.participantIds.size == participantIds.size &&
+                        it.participantIds.containsAll(participantIds)
+            }
+    }
+
     /** Creates and saves a new conversation document. */
     private suspend fun createConversation(
         participantIds: List<String>,
@@ -679,8 +776,9 @@ class SocialRepository(
         content: String,
         type: String,
         metadata: Map<String, String>,
+        overrideId: String? = null,
     ): Message {
-        val messageId = db.collection("conversations")
+        val messageId = overrideId ?: db.collection("conversations")
             .document()
             .id
 
@@ -789,5 +887,33 @@ class SocialRepository(
             time = time,
             location = location,
         )
+    }
+
+    /** Uploads [uri] to Storage and returns the HTTPS download URL. */
+    private suspend fun uploadToStorage(
+        conversationId: String,
+        messageId: String,
+        uri: Uri,
+    ): String {
+        val ref = storage.reference
+            .child("conversations/$conversationId/attachments/$messageId")
+        ref.putFile(uri).await()
+        return ref.downloadUrl.await().toString()
+    }
+
+    /**
+     * Resolves a human-readable file name from a content URI using
+     * [OpenableColumns.DISPLAY_NAME]. Falls back to "attachment" if the
+     * column is unavailable (e.g. a file:// URI without a name segment).
+     */
+    private fun resolveFileName(context: Context, uri: Uri): String {
+        var name = "attachment"
+        runCatching {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val col = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (col >= 0 && cursor.moveToFirst()) name = cursor.getString(col)
+            }
+        }
+        return name
     }
 }
