@@ -22,6 +22,7 @@ import com.example.cinet.ui.theme.CINetTheme
 import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
+import com.example.cinet.data.remote.canvas.CanvasTokenStore
 
 class MainActivity : ComponentActivity() {
 
@@ -78,7 +79,9 @@ class MainActivity : ComponentActivity() {
             ) {
                 NavigationHandler(
                     authState = authState,
-                    onSignOut = { authViewModel.signOut() },
+                    onSignOut = {
+                        CanvasTokenStore(this@MainActivity).clear()
+                        authViewModel.signOut() },
                     onRetry = { authViewModel.retryProfileLoad() },
                     onSaveProfile = { nickname, major, pronouns ->
                         authViewModel.saveProfile(nickname, major, pronouns)

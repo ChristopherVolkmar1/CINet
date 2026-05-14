@@ -54,7 +54,8 @@ class CalendarFirestoreRepository(
                 startTime = startTime,
                 endTime = endTime,
                 location = location,
-                remindersEnabled = doc.getBoolean("remindersEnabled") ?: true
+                remindersEnabled = doc.getBoolean("remindersEnabled") ?: true,
+                canvasId = doc.getString("canvasId")
             )
         }
     }
@@ -81,7 +82,8 @@ class CalendarFirestoreRepository(
                 classId = classId,
                 className = className,
                 assignmentName = assignmentName,
-                dueTime = dueTime
+                dueTime = dueTime,
+                canvasId = doc.getString("canvasId")
             )
         }
     }
@@ -258,7 +260,22 @@ class CalendarFirestoreRepository(
             val name = doc.getString("name") ?: return@mapNotNull null
             val time = doc.getString("time") ?: return@mapNotNull null
             val location = doc.getString("location") ?: ""
-            EventItem(id = doc.id, date = date, name = name, time = time, location = location, source = EventSource.USER)
+            val storedSource = doc.getString("source")
+            val source = when (storedSource) {
+                EventSource.CANVAS.name -> EventSource.CANVAS
+                EventSource.CAMPUS.name -> EventSource.CAMPUS
+                else -> EventSource.USER
+            }
+            EventItem(
+                id = doc.id,
+                date = date,
+                name = name,
+                time = time,
+                location = location,
+                source = source,
+                canvasId = doc.getString("canvasId")
+            )
+
         }
     }
 
@@ -299,4 +316,129 @@ class CalendarFirestoreRepository(
         val uid = getUid()
         db.collection("users").document(uid).collection("events").document(eventId).delete().await()
     }
+    // =======================================================================
+    // Canvas-sync helpers
+    // -----------------------------------------------------------------------
+    // These are used by CanvasSyncService when importing courses, assignments,
+    // and calendar events from Canvas. They mirror the manual add/update
+    // methods above but also persist the `canvasId` field, which lets re-syncs
+    // find and update existing rows instead of creating duplicates.
+    // =======================================================================
+
+    /**
+     * Creates a new class row stamped with [canvasId].
+     * Meeting days, times, and location are left blank — Canvas doesn't expose
+     * them reliably from /courses, so users fill them in manually after import.
+     */
+    suspend fun addCanvasClass(name: String, canvasId: String): ClassItem {
+        val uid = getUid()
+        val data = mapOf(
+            "name" to name,
+            "meetingDays" to emptyList<String>(),
+            "startTime" to "",
+            "endTime" to "",
+            "location" to "",
+            "remindersEnabled" to true,
+            "canvasId" to canvasId
+        )
+        val docRef = db.collection("users").document(uid).collection("classes").add(data).await()
+        Log.d("FirestoreDebug", "Added Canvas class: $name canvasId=$canvasId docId=${docRef.id}")
+        return ClassItem(
+            id = docRef.id,
+            name = name,
+            meetingDays = emptyList(),
+            startTime = "",
+            endTime = "",
+            location = "",
+            remindersEnabled = true,
+            canvasId = canvasId
+        )
+    }
+
+    /**
+     * Partial update of just the class name. Used on re-sync to keep Canvas's
+     * latest course code without clobbering user-entered meeting days/times.
+     */
+    suspend fun updateCanvasClassName(classId: String, name: String) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("classes").document(classId)
+            .update("name", name)
+            .await()
+    }
+
+    /** Insert path for a Canvas-synced assignment. */
+    suspend fun addCanvasAssignment(
+        date: String,
+        classId: String,
+        className: String,
+        assignmentName: String,
+        dueTime: String,
+        canvasId: String
+    ) {
+        val uid = getUid()
+        val data = mapOf(
+            "date" to date,
+            "classId" to classId,
+            "className" to className,
+            "assignmentName" to assignmentName,
+            "dueTime" to dueTime,
+            "canvasId" to canvasId
+        )
+        db.collection("users").document(uid).collection("assignments").add(data).await()
+    }
+
+    /** Update path for a Canvas-synced assignment. Overwrites all fields. */
+    suspend fun updateCanvasAssignment(
+        assignmentId: String,
+        date: String,
+        classId: String,
+        className: String,
+        assignmentName: String,
+        dueTime: String,
+        canvasId: String
+    ) {
+        val uid = getUid()
+        val data = mapOf(
+            "date" to date,
+            "classId" to classId,
+            "className" to className,
+            "assignmentName" to assignmentName,
+            "dueTime" to dueTime,
+            "canvasId" to canvasId
+        )
+        db.collection("users").document(uid).collection("assignments").document(assignmentId)
+            .set(data)
+            .await()
+    }
+
+    /**
+     * Idempotent upsert for a Canvas calendar event. Performs a query for
+     * existing docs matching [canvasId], updates if found, otherwise inserts.
+     */
+    suspend fun upsertCanvasEvent(
+        canvasId: String,
+        date: String,
+        name: String,
+        time: String,
+        location: String
+    ) {
+        val uid = getUid()
+        val collection = db.collection("users").document(uid).collection("events")
+
+        val existing = collection.whereEqualTo("canvasId", canvasId).limit(1).get().await()
+        val data = mapOf(
+            "date" to date,
+            "name" to name,
+            "time" to time,
+            "location" to location,
+            "source" to EventSource.CANVAS.name,
+            "canvasId" to canvasId
+        )
+        if (existing.isEmpty) {
+            collection.add(data).await()
+        } else {
+            collection.document(existing.documents.first().id).set(data).await()
+        }
+    }
 }
+

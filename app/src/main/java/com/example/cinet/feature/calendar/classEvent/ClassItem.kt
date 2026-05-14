@@ -8,4 +8,5 @@ data class ClassItem(
     val endTime: String,
     val location: String,
     val remindersEnabled: Boolean = true, // per-class reminder toggle
+    val canvasId: String? = null,
 )

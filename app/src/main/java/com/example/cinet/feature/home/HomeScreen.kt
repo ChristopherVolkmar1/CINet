@@ -664,7 +664,7 @@ private fun weatherIconFor(condition: String): ImageVector {
 fun HomeScreenPreview() {
     CINetTheme {
         HomeScreen(
-            nickname = "Maddi",
+            nickname = "username",
             scheduleItems = emptyList(),
             manualUpcomingEventsItems = emptyList(),
             displayUpcomingEventsItems = emptyList(),

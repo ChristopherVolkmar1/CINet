@@ -6,5 +6,6 @@ data class ScheduleItem(
     val classId: String,
     val className: String,
     val assignmentName: String,
-    val dueTime: String
+    val dueTime: String,
+    val canvasId: String? = null,
 )
