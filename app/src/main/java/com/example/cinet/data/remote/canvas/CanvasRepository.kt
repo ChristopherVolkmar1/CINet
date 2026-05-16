@@ -16,8 +16,11 @@ import org.json.JSONObject
  * parsing is defensive — `optString`/`optLong` are used everywhere so a
  * single malformed item never crashes the whole sync.
  *
- * Methods are `suspend` and dispatched on IO. The single full-sync entry
- * point is [fetchAll], which fans out the per-type fetches in parallel.
+ * The course list is sourced from /users/self/favorites/courses rather
+ * than /courses, so CINet only ingests the courses the student has
+ * starred on Canvas's "All Courses" page. This both matches the user's
+ * intent ("only show what I starred") and avoids importing every
+ * historical/training/TA enrollment they're technically still in.
  */
 class CanvasRepository(
     private val api: CanvasApiClient
@@ -27,11 +30,11 @@ class CanvasRepository(
      * Fetches every data type CINet imports in parallel.
      *
      * Per-course assignments and announcements are gathered after the
-     * course list resolves, since they need the course IDs.
+     * favorited-course list resolves, since they need the course IDs.
      */
     suspend fun fetchAll(): CanvasSyncSnapshot = withContext(Dispatchers.IO) {
-        // Courses first — assignment and announcement queries depend on these IDs.
-        val courses = fetchCourses()
+        // Favorites first — assignment and announcement queries depend on these IDs.
+        val courses = fetchFavoriteCourses()
         val courseIds = courses.map { it.id }
 
         coroutineScope {
@@ -55,13 +58,15 @@ class CanvasRepository(
     // ---- individual endpoints --------------------------------------------
 
     /**
-     * Active enrollments only — graduated/withdrawn courses are excluded by Canvas
-     * when enrollment_state=active is supplied.
+     * Returns the user's starred courses (the star toggle on Canvas's
+     * "All Courses" page). Pagination is handled by [CanvasApiClient].
+     *
+     * If the user has no favorites, returns an empty list — sync will then
+     * do nothing, which is correct: nothing was starred, nothing imports.
      */
-    fun fetchCourses(): List<CanvasCourse> {
+    fun fetchFavoriteCourses(): List<CanvasCourse> {
         val array = api.getJsonArrayPaginated(
-            path = "courses",
-            query = listOf("enrollment_state" to "active")
+            path = "users/self/favorites/courses"
         )
         return array.mapObjects { json ->
             val id = json.optLong("id", -1L)
@@ -125,6 +130,7 @@ class CanvasRepository(
                     title = json.optString("title"),
                     startAtIso = json.optStringOrNull("start_at"),
                     endAtIso = json.optStringOrNull("end_at"),
+                    allDayDate = json.optStringOrNull("all_day_date"),
                     locationName = json.optString("location_name"),
                     allDay = json.optBoolean("all_day", false),
                     htmlUrl = json.optString("html_url")

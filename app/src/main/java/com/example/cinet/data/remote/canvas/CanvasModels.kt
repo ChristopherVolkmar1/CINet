@@ -36,6 +36,7 @@ data class CanvasCalendarEvent(
     /** ISO-8601 UTC start time, or null for all-day events with only a date. */
     val startAtIso: String?,
     val endAtIso: String?,
+    val allDayDate: String?,
     val locationName: String,
     val allDay: Boolean,
     val htmlUrl: String

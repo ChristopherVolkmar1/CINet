@@ -88,8 +88,8 @@ class CanvasSyncViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    /** Pulls all Canvas data and merges into Firestore. */
-    fun onSyncNow() {
+    /** Pulls all Canvas data, merges it into Firestore, then notifies the calendar to reload. */
+    fun onSyncNow(onSyncComplete: () -> Unit = {}) {
         if (!tokenStore.hasToken()) {
             _uiState.update { it.copy(statusMessage = "Connect Canvas before syncing.") }
             return
@@ -105,6 +105,7 @@ class CanvasSyncViewModel(application: Application) : AndroidViewModel(applicati
                         statusMessage = formatSummary(result)
                     )
                 }
+                onSyncComplete()
             }.onFailure { ex ->
                 _uiState.update {
                     it.copy(

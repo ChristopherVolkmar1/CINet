@@ -23,6 +23,7 @@ import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import com.example.cinet.data.remote.canvas.CanvasTokenStore
+import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
 
 class MainActivity : ComponentActivity() {
 
@@ -52,6 +53,8 @@ class MainActivity : ComponentActivity() {
         pendingMapLocationName = intent.getStringExtra(EXTRA_OPEN_MAP_FOR_LOCATION)
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+
+        CanvasDisplaySettings.init(this)
 
         setContent {
             val authState by authViewModel.authState.collectAsState()

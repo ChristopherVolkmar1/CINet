@@ -39,6 +39,11 @@ fun CalendarScreen(
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
+    LaunchedEffect(Unit) {
+        viewModel.refreshClasses()
+        viewModel.refreshAssignments()
+        viewModel.refreshEvents()
+    }
 
     val classItems = viewModel.classItems
     val currentMonth = viewModel.currentMonth
@@ -48,6 +53,7 @@ fun CalendarScreen(
     var reminderRefreshKey by remember { mutableStateOf(0) }
     val agendaCountByDate = remember(
         classItems,
+        viewModel.scheduleItems,
         viewModel.studySessions,
         viewModel.userEventItems,
         viewModel.campusEventItems,
@@ -58,6 +64,7 @@ fun CalendarScreen(
             context = context,
             currentMonth = currentMonth,
             classes = classItems,
+            assignments = viewModel.scheduleItems,
             studySessions = viewModel.studySessions,
             customEvents = viewModel.userEventItems,
             campusEvents = viewModel.campusEventItems
@@ -66,6 +73,7 @@ fun CalendarScreen(
 
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
     val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
+    val assignmentsForSelectedDate = viewModel.getItemsForSelectedDate()
     val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
     val customEventsForSelectedDate = viewModel.getCustomEventsForSelectedDate()
     val reminderEventsForSelectedDate = remember(eventsForSelectedDate, reminderRefreshKey) {
@@ -225,11 +233,13 @@ fun CalendarScreen(
             selectedDate = activeDate,
             classes = classesForSelectedDate,
             studySessions = studySessionsForSelectedDate,
+            assignments = assignmentsForSelectedDate,
             events = customEventsForSelectedDate,
             reminderCampusEvents = reminderEventsForSelectedDate,
             onTodayClick = { viewModel.onDateSelected(today) },
             onClassClick = ::openClassEditor,
             onStudySessionClick = ::openStudySessionEditor,
+            onAssignmentClick = ::openAssignmentEditor,
             onEventClick = ::openEventEditor
         )
 
@@ -555,12 +565,14 @@ private fun buildAgendaActivityCountByDate(
     context: android.content.Context,
     currentMonth: YearMonth,
     classes: List<ClassItem>,
+    assignments: List<ScheduleItem>,
     studySessions: List<StudySession>,
     customEvents: List<EventItem>,
     campusEvents: List<EventItem>
 ): Map<LocalDate, Int> {
     val counts = mutableMapOf<LocalDate, Int>()
 
+    addDatesToAgendaCountMap(counts, assignments.map { it.date })
     addDatesToAgendaCountMap(counts, studySessions.map { it.date })
     addDatesToAgendaCountMap(counts, customEvents.map { it.date })
     addDatesToAgendaCountMap(

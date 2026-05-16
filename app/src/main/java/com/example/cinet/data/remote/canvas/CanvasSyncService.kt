@@ -3,7 +3,6 @@ package com.example.cinet.data.remote.canvas
 import android.util.Log
 import com.example.cinet.feature.calendar.calendarFiles.CalendarFirestoreRepository
 import com.example.cinet.feature.calendar.classEvent.ClassItem
-import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
@@ -18,20 +17,27 @@ import java.time.format.DateTimeFormatter
  * already there. Sync is keyed by `canvasId` so re-running the same sync is
  * idempotent (updates existing rows instead of duplicating).
  *
+ * Source of truth: the user's Canvas favorites list (the star toggle on
+ * Canvas's "All Courses" page). Only starred courses are imported and their
+ * assignments fetched. A previously-synced course that is no longer starred
+ * has its Firestore doc flipped to `isFavorite = false` — the doc isn't
+ * deleted (so manual meeting-day edits aren't lost), but the calendar UI
+ * filters it out.
+ *
  * Merge semantics:
  *   - Classes: when the same canvasId is already in Firestore, we update only
- *     the `name` field. Anything the user filled in manually after import
- *     (meeting days, start/end time, location) is preserved.
+ *     the `name` and `isFavorite` fields. Anything the user filled in
+ *     manually after import (meeting days, start/end time, location) is
+ *     preserved.
  *   - Assignments: all fields refresh, since Canvas is the system of record.
  *     If users manually edited a Canvas-synced assignment, the next sync will
- *     overwrite their edit — call that out in the UI before kicking off.
+ *     overwrite their edit.
  *   - Events: all fields refresh (events are entirely Canvas-owned).
  *   - Todos & announcements: stored in dedicated collections
- *     (`canvasTodos`, `canvasAnnouncements`) keyed by Canvas id; existing
- *     docs are overwritten, missing ones are inserted.
+ *     (`canvasTodos`, `canvasAnnouncements`) keyed by Canvas id.
  *
  * Deletions in Canvas do NOT propagate — we never delete Firestore rows
- * automatically. A future "tidy" action could prune orphans on demand.
+ * automatically. Un-starring is a hide-not-delete operation.
  */
 class CanvasSyncService(
     private val canvasRepo: CanvasRepository,
@@ -45,15 +51,18 @@ class CanvasSyncService(
         val snapshot = canvasRepo.fetchAll()
         val skipped = mutableListOf<String>()
 
-        // Existing classes — used to look up Firestore doc ids by canvasId so
-        // we can attach assignments to the right class.
+        // Existing classes — used both to detect previously-synced courses no
+        // longer favorited, and to look up Firestore doc ids by canvasId so
+        // assignments can be attached to the right class.
         val existingClasses = calendarRepo.loadClasses()
         val classByCanvasId: MutableMap<Long, ClassItem> = existingClasses
             .mapNotNull { ci -> ci.canvasId?.toLongOrNull()?.let { it to ci } }
             .toMap()
             .toMutableMap()
 
-        // -- Courses --------------------------------------------------------
+        val favoriteIds: Set<Long> = snapshot.courses.map { it.id }.toSet()
+
+        // -- Courses: upsert favorites, mark unfavorited Canvas docs as hidden -
         var coursesImported = 0
         for (course in snapshot.courses) {
             val existing = classByCanvasId[course.id]
@@ -62,12 +71,18 @@ class CanvasSyncService(
                 if (existing == null) {
                     val created = calendarRepo.addCanvasClass(
                         name = displayName,
-                        canvasId = course.id.toString()
+                        canvasId = course.id.toString(),
+                        isFavorite = true
                     )
                     classByCanvasId[course.id] = created
                 } else {
-                    // Only refresh the name — keep user-entered meeting days/times.
-                    calendarRepo.updateCanvasClassName(existing.id, displayName)
+                    // Refresh name and ensure isFavorite is true — covers the
+                    // "user un-favorited then re-favorited" round trip.
+                    calendarRepo.updateCanvasClassNameAndFavorite(
+                        classId = existing.id,
+                        name = displayName,
+                        isFavorite = true
+                    )
                 }
                 coursesImported++
             } catch (ex: Exception) {
@@ -76,7 +91,25 @@ class CanvasSyncService(
             }
         }
 
-        // -- Assignments ----------------------------------------------------
+        // Flip previously-favorited Canvas classes that are no longer in the
+        // favorites list to isFavorite=false. The doc stays in Firestore so
+        // any manual meeting-day edits are preserved against a future re-star.
+        var coursesHidden = 0
+        for ((canvasCourseId, classItem) in classByCanvasId) {
+            if (canvasCourseId !in favoriteIds && classItem.isFavorite) {
+                try {
+                    calendarRepo.updateCanvasClassFavorite(classItem.id, isFavorite = false)
+                    coursesHidden++
+                } catch (ex: Exception) {
+                    Log.w(TAG, "Failed to mark ${classItem.id} as unfavorited", ex)
+                }
+            }
+        }
+        if (coursesHidden > 0) {
+            skipped += "$coursesHidden previously-imported course(s) un-starred in Canvas (now hidden)"
+        }
+
+        // -- Assignments: only for currently-favorited courses -----------------
         val existingAssignments = calendarRepo.loadAssignments()
         val assignmentByCanvasId = existingAssignments
             .mapNotNull { it.canvasId?.let { cid -> cid to it } }
@@ -84,7 +117,11 @@ class CanvasSyncService(
 
         var assignmentsImported = 0
         for (assignment in snapshot.assignments) {
-            // Skip assignments without a due date — the calendar UI requires one.
+            // CanvasRepository already only fetched assignments for favorited
+            // courses, but double-check defensively in case the favorites
+            // list and assignment list disagree mid-sync.
+            if (assignment.courseId !in favoriteIds) continue
+
             val dueIso = assignment.dueAtIso
             if (dueIso == null) {
                 skipped += "Assignment '${assignment.name}' (no due date)"
@@ -96,7 +133,12 @@ class CanvasSyncService(
                 continue
             }
 
-            val (dateStr, timeStr) = formatIsoForCalendar(dueIso)
+            val pair = formatIsoForCalendar(dueIso)
+            if (pair == null) {
+                skipped += "Assignment '${assignment.name}' (bad due date format)"
+                continue
+            }
+            val (dateStr, timeStr) = pair
             val canvasAssignmentKey = "assignment_${assignment.id}"
 
             try {
@@ -128,15 +170,21 @@ class CanvasSyncService(
             }
         }
 
-        // -- Calendar events ------------------------------------------------
+        // -- Calendar events ---------------------------------------------------
         var eventsImported = 0
         for (event in snapshot.calendarEvents) {
-            val iso = event.startAtIso
-            if (iso == null) {
+            val pair: Pair<String, String>? = when {
+                event.allDay && !event.allDayDate.isNullOrBlank() ->
+                    event.allDayDate to "All Day"
+                event.startAtIso != null ->
+                    formatIsoForCalendar(event.startAtIso, event.allDay)
+                else -> null
+            }
+            if (pair == null) {
                 skipped += "Event '${event.title}' (no start time)"
                 continue
             }
-            val (dateStr, timeStr) = formatIsoForCalendar(iso, allDay = event.allDay)
+            val (dateStr, timeStr) = pair
             val canvasEventKey = "event_${event.id}"
 
             try {
@@ -154,7 +202,7 @@ class CanvasSyncService(
             }
         }
 
-        // -- Todos & announcements ------------------------------------------
+        // -- Todos & announcements --------------------------------------------
         val todosImported = writeTodos(snapshot.todos)
         val announcementsImported = writeAnnouncements(snapshot.announcements)
 
@@ -176,8 +224,6 @@ class CanvasSyncService(
         var written = 0
         val collection = db.collection("users").document(uid).collection("canvasTodos")
         for (todo in todos) {
-            // Stable doc id so re-syncs overwrite cleanly. Falls back to a hash
-            // of url when assignmentId is missing (e.g. quiz to-dos).
             val docId = todo.assignmentId?.let { "assignment_$it" }
                 ?: "todo_${todo.htmlUrl.hashCode()}"
             try {
@@ -230,11 +276,8 @@ class CanvasSyncService(
      * rest of the app uses:
      *   - date string: yyyy-MM-dd in the device's local zone (matches LocalDate.toString())
      *   - time string: hh:mm AM/PM (matches formatPickedTime in TimePickerUtils)
-     *
-     * For all-day events, the time component is the literal string "All Day"
-     * so it renders sensibly without a clock value.
      */
-    private fun formatIsoForCalendar(iso: String, allDay: Boolean = false): Pair<String, String> {
+    private fun formatIsoForCalendar(iso: String, allDay: Boolean = false): Pair<String, String>? {
         return try {
             val instant = Instant.parse(iso)
             val local = instant.atZone(ZoneId.systemDefault())
@@ -243,19 +286,13 @@ class CanvasSyncService(
             date to time
         } catch (ex: Exception) {
             Log.w(TAG, "Unparseable ISO timestamp: $iso", ex)
-            // Fall back to today so the row is at least visible somewhere.
-            val now = java.time.LocalDateTime.now()
-            now.format(DATE_FMT) to (if (allDay) "All Day" else now.format(TIME_FMT))
+            null
         }
     }
 
     companion object {
         private const val TAG = "CanvasSyncService"
         private val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-        // 12-hour with literal "AM"/"PM", matching formatPickedTime("%02d:%02d %s").
-        // Locale.US is pinned because that's what the hardcoded picker uses;
-        // without it, devices set to e.g. German would render "vorm./nachm." and
-        // break time string comparisons elsewhere in the app.
         private val TIME_FMT: DateTimeFormatter =
             DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.US)
     }

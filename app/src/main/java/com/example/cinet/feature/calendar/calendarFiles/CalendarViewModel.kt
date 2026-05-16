@@ -11,6 +11,7 @@ import com.example.cinet.feature.calendar.event.CampusEventFeedRepository
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.example.cinet.feature.calendar.study.StudySession
+import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -323,6 +324,7 @@ class CalendarViewModel : ViewModel() {
         val formattedDate = formatDate(date)
         return scheduleItems
             .filter { it.date == formattedDate }
+            .filterNot { isHiddenByCanvasFilters(it) }
             .sortedBy { parseTimeToSortableValue(it.dueTime) }
     }
 
@@ -332,8 +334,19 @@ class CalendarViewModel : ViewModel() {
         return orderedDays.associateWith { day ->
             classItems
                 .filter { it.meetingDays.contains(day) }
+                .filterNot { isHiddenByCanvasFilters(it) }
                 .sortedBy { parseTimeToSortableValue(it.startTime) }
         }.filterValues { it.isNotEmpty() }
+    }
+
+    // Returns Canvas-imported classes that don't yet have meeting days set.
+    // These can't be placed on a specific calendar day, so the UI shows them in
+    // a dedicated subsection regardless of which date is selected.
+    fun getUnscheduledCanvasClasses(): List<ClassItem> {
+        if (!CanvasDisplaySettings.showCanvasInCalendar) return emptyList()
+        return classItems
+            .filter { it.canvasId != null && it.meetingDays.isEmpty() }
+            .filterNot { isHiddenByCanvasFilters(it) }
     }
 
     // Returns only the classes that meet on the selected day.
@@ -352,6 +365,7 @@ class CalendarViewModel : ViewModel() {
 
         return classItems
             .filter { it.meetingDays.contains(dayName) }
+            .filterNot { isHiddenByCanvasFilters(it) }
             .sortedBy { parseTimeToSortableValue(it.startTime) }
     }
 
@@ -370,6 +384,7 @@ class CalendarViewModel : ViewModel() {
         val formattedDate = formatDate(date)
         return allEventItems()
             .filter { it.date == formattedDate }
+            .filterNot { isHiddenByCanvasFilters(it) }     // NEW
             .sortedBy { parseTimeToSortableValue(it.time) }
     }
 
@@ -379,6 +394,7 @@ class CalendarViewModel : ViewModel() {
         val formattedDate = formatDate(date)
         return userEventItems
             .filter { it.date == formattedDate }
+            .filterNot { isHiddenByCanvasFilters(it) }     // NEW
             .sortedBy { parseTimeToSortableValue(it.time) }
     }
 
@@ -415,6 +431,15 @@ class CalendarViewModel : ViewModel() {
         addDatedItemsToCountMap(counts, allEventItems().map { it.date })
         addClassOccurrencesToCountMap(counts)
         return counts
+    }
+
+
+    // Reloads all Firestore-backed calendar items after another screen changes calendar data.
+    fun refreshAllSavedCalendarItems() {
+        refreshClasses()
+        refreshAssignments()
+        refreshStudySessions()
+        refreshEvents()
     }
 
     // Reloads the user's class list from Firestore.
@@ -567,5 +592,29 @@ class CalendarViewModel : ViewModel() {
     // Sorts classes by their starting time for consistent display.
     private fun sortClassesByTime(classes: List<ClassItem>): List<ClassItem> {
         return classes.sortedBy { parseTimeToSortableValue(it.startTime) }
+    }
+
+    // Returns true when a Canvas-sourced class should be hidden from the calendar:
+// either the master Canvas toggle is off, or the user has un-starred this
+// course on Canvas. Manual entries (canvasId == null) are never hidden here.
+    private fun isHiddenByCanvasFilters(classItem: ClassItem): Boolean {
+        if (classItem.canvasId == null) return false
+        if (!CanvasDisplaySettings.showCanvasInCalendar) return true
+        return !classItem.isFavorite
+    }
+
+    // Same logic but for assignments: cascade from the parent class's state.
+    private fun isHiddenByCanvasFilters(scheduleItem: ScheduleItem): Boolean {
+        if (scheduleItem.canvasId == null) return false
+        if (!CanvasDisplaySettings.showCanvasInCalendar) return true
+        val parent = classItems.firstOrNull { it.id == scheduleItem.classId } ?: return false
+        return parent.canvasId != null && !parent.isFavorite
+    }
+
+    // New in Step 4: hides Canvas calendar events when the master toggle is off.
+    private fun isHiddenByCanvasFilters(event: EventItem): Boolean {
+        if (event.canvasId == null) return false
+        return !CanvasDisplaySettings.showCanvasInCalendar
+
     }
 }
