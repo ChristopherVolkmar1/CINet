@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CalendarToday
@@ -51,12 +50,14 @@ import android.content.Intent
 import android.net.Uri as AndroidUri
 import android.os.Environment
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.text.style.TextOverflow
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.Message
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.SocialRepository
 import com.example.cinet.feature.calendar.calendarFiles.CalendarFirestoreRepository
 import com.example.cinet.feature.calendar.event.EventItem
@@ -64,6 +65,8 @@ import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.example.cinet.feature.calendar.study.StudySession
 import com.example.cinet.feature.calendar.study.StudyInviteDialog
 import com.example.cinet.feature.calendar.event.EventInviteSenderDialog
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -84,6 +87,7 @@ fun ConversationScreen(
     conversation: Conversation,
     onBack: () -> Unit,
     onNavigateToLocation: ((String) -> Unit)? = null,
+    onNavigateToCoordinates: ((Double, Double, String, String) -> Unit)? = null,
 ) {
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
@@ -135,7 +139,7 @@ fun ConversationScreen(
     var searchQuery by remember { mutableStateOf("") }
     // null = preview closed; non-null = show full-screen image preview for this message
     var previewMessage by remember { mutableStateOf<Message?>(null) }
-
+    var currentUserNickname by remember { mutableStateOf("") }
     // Filtered messages — client-side only, no extra Firestore reads.
     // Matches text content for regular messages; falls back to invite
     // title/class fields and location name for structured bubble types.
@@ -207,6 +211,8 @@ fun ConversationScreen(
         val currentSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(currentUid).get().await()
         currentUserPhotoUrl = currentSnapshot.getString("photoUrl") ?: ""
+
+        currentUserNickname = currentSnapshot.getString("nickname") ?: ""  // add
     }
 
     DisposableEffect(conversation.id) {
@@ -242,6 +248,24 @@ fun ConversationScreen(
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    }
+
+    // User location
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var userLocation by remember { mutableStateOf<LatLng?>(null) }
+    try {
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            location?.let { userLocation = LatLng(it.latitude, it.longitude) }
+        }
+    } catch (_: SecurityException) {
+        Log.e("Location", "No Permission")
+    }
+    var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        repository.getFriends().onSuccess {
+            friends = it
+        }
     }
 
     // Remove Friend confirmation dialog
@@ -542,6 +566,7 @@ fun ConversationScreen(
                             currentUserPhotoUrl = currentUserPhotoUrl,
                             highlightQuery = searchQuery.trim(),
                             onNavigateToLocation = onNavigateToLocation,
+                            onNavigateToCoordinates = onNavigateToCoordinates,
                             onPreviewImage = { previewMessage = it },
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                                 (message.type == "study_invite" || message.type == "event_invite")) {
@@ -651,6 +676,35 @@ fun ConversationScreen(
                         // staged or being uploaded
                         if (pendingAttachment == null && !isUploadingAttachment) {
                             attachmentLauncher.launch("*/*")
+                        }
+                    },
+                    sendUserLocation = {
+                        scope.launch {
+                            val fiveMinutesAgo = System.currentTimeMillis() - 5 * 60 * 1000L
+                            val recentlySent = messages.any { msg ->
+                                msg.type == "location_share" &&
+                                        msg.senderId == currentUid &&
+                                        (msg.createdAt?.time ?: 0L) >= fiveMinutesAgo
+                            }
+                            if (recentlySent) {
+                                snackbarHostState.showSnackbar("You already shared your location recently — try again in a few minutes.")
+                                return@launch
+                            }
+                            val location = userLocation
+                            if (location != null) {
+                                repository.sendMessage(
+                                    conversationId = conversation.id,
+                                    content = "Shared their location.",
+                                    type = "location_share",
+                                    metadata = mapOf(
+                                        "lat" to location.latitude.toString(),
+                                        "lng" to location.longitude.toString(),
+                                        "locationName" to "Current Location",
+                                        "senderNickname" to currentUserNickname,
+                                        "senderPhotoUrl" to currentUserPhotoUrl
+                                    )
+                                )
+                            }
                         }
                     },
                     modifier = Modifier.imePadding()
@@ -815,6 +869,7 @@ fun MessageBubble(
     currentUserPhotoUrl: String = "",
     highlightQuery: String = "",
     onNavigateToLocation: ((String) -> Unit)? = null,
+    onNavigateToCoordinates: ((Double, Double, String, String) -> Unit)? = null,
     onPreviewImage: ((Message) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
@@ -884,7 +939,8 @@ fun MessageBubble(
                 LocationShareBubble(
                     message = message,
                     isCurrentUser = isCurrentUser,
-                    onNavigateToLocation = onNavigateToLocation
+                    onNavigateToLocation = onNavigateToLocation,
+                    onNavigateToCoordinates = onNavigateToCoordinates
                 )
             } else if (message.type == "attachment") {
                 AttachmentBubble(
@@ -1150,11 +1206,11 @@ fun InviteBubble(
                         Button(
                             onClick = onAccept,
                             modifier = Modifier.weight(1f),
-                        ) { Text("Accept") }
+                        ) { Text("Accept", color = MaterialTheme.colorScheme.onSecondaryContainer) }
                         OutlinedButton(
                             onClick = onDecline,
                             modifier = Modifier.weight(1f),
-                        ) { Text("Decline") }
+                        ) { Text("Decline", color = MaterialTheme.colorScheme.onSecondaryContainer) }
                     }
                 }
             }
@@ -1165,9 +1221,14 @@ fun InviteBubble(
 fun LocationShareBubble(
     message: Message,
     isCurrentUser: Boolean,
-    onNavigateToLocation: ((String) -> Unit)? = null
+    onNavigateToLocation: ((String) -> Unit)? = null,
+    onNavigateToCoordinates: ((Double, Double, String, String) -> Unit)? = null,
 ) {
     val locationName = message.metadata["locationName"] as? String ?: ""
+    val lat = (message.metadata["lat"] as? String)?.toDoubleOrNull()
+    val lng = (message.metadata["lng"] as? String)?.toDoubleOrNull()
+    val senderNickname = message.metadata["senderNickname"] as? String ?: "Friend"
+    val senderPhotoUrl = message.metadata["senderPhotoUrl"] as? String ?: ""
     val cardShape = RoundedCornerShape(
         topStart = if (isCurrentUser) 16.dp else 4.dp,
         topEnd = if (isCurrentUser) 4.dp else 16.dp,
@@ -1176,48 +1237,55 @@ fun LocationShareBubble(
     )
     Card(
         shape = cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.widthIn(min = 220.dp, max = 280.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(15.dp)
-                )
-                Spacer(Modifier.width(6.dp))
+        Row(modifier = Modifier.padding(8.dp)) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "LOCATION SHARE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "LOCATION SHARE",
-                    style = MaterialTheme.typography.labelSmall,
+                    text = locationName,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f)
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
-                thickness = 0.5.dp
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = locationName,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            if (locationName.isNotBlank() && onNavigateToLocation != null) {
+            Spacer(Modifier.width(6.dp))
+
+            if (lat != null && lng != null && onNavigateToCoordinates != null) {
+                Button(
+                    onClick = { onNavigateToCoordinates(lat, lng, senderNickname, senderPhotoUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) { Text("View", color = MaterialTheme.colorScheme.onSecondaryContainer) }
+            } else if (locationName.isNotBlank() && onNavigateToLocation != null) {
                 Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = { onNavigateToLocation(locationName) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text("View on Map")
+                    Text("View", color = MaterialTheme.colorScheme.onSecondaryContainer)
                 }
             }
         }

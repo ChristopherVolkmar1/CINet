@@ -69,6 +69,7 @@ import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
+import com.google.firebase.firestore.GeoPoint
 import java.util.Locale
 
 enum class Screen(val label: String, val icon: ImageVector) {
@@ -418,13 +419,18 @@ private fun MainScaffold(
         ) {
 
             // ---- MAP LAYER (always in composition, hidden when not active) ----
+            var sharedLocations by remember { mutableStateOf<List<CampusLocation>>(emptyList()) }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = if (currentScreen == Screen.Map) 1f else 0f }
                     .then(
                         if (currentScreen != Screen.Map)
-                            Modifier.pointerInput(Unit) { /* block all touches when hidden */ }
+                            Modifier.pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) { awaitPointerEvent() }
+                                }
+                            }
                         else Modifier
                     )
             ) {
@@ -435,6 +441,10 @@ private fun MainScaffold(
                     onFinishedLoading = {
                         preSelectedMapLocation = null
                         autoRouteToPreSelectedMapLocation = false
+                    },
+                    extraLocations = sharedLocations,
+                    onRemoveExtraLocation = { location ->
+                        sharedLocations = sharedLocations - location
                     }
                 )
             }
@@ -533,6 +543,23 @@ private fun MainScaffold(
                                         .find { it.name.equals(locationName, ignoreCase = true) }
 
                                     preSelectedMapLocation = location
+                                    autoRouteToPreSelectedMapLocation = false
+                                    currentScreen = Screen.Map
+                                },
+                                onNavigateToCoordinates = { lat, lng, nickname, photoUrl  ->
+                                    val sharedLocation = CampusLocation(
+                                        name = "$nickname's Location",
+                                        category = "SHARED",
+                                        description = photoUrl,
+                                        coordinates = GeoPoint(lat, lng)
+                                    )
+                                    val alreadyExists = sharedLocations.any {
+                                        it.coordinates.latitude == lat && it.coordinates.longitude == lng
+                                    }
+                                    if (!alreadyExists) {
+                                        sharedLocations = sharedLocations + sharedLocation
+                                    }
+                                    preSelectedMapLocation = sharedLocation
                                     autoRouteToPreSelectedMapLocation = false
                                     currentScreen = Screen.Map
                                 }
