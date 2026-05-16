@@ -12,6 +12,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -157,7 +159,7 @@ fun ProfileScreen(
                     ProfileInfoCard(
                         icon = {
                             Icon(
-                                Icons.Default.Person,
+                                Icons.Default.Star,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -165,6 +167,20 @@ fun ProfileScreen(
                         },
                         label = "Major",
                         value = user.major
+                    )
+                }
+                if (user.minor.isNotBlank()) {
+                    ProfileInfoCard(
+                        icon = {
+                            Icon(
+                                Icons.Default.StarBorder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        label = "Minor",
+                        value = user.minor
                     )
                 }
                 if (user.year.isNotBlank()) {

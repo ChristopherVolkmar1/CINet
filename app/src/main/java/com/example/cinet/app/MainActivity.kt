@@ -80,8 +80,8 @@ class MainActivity : ComponentActivity() {
                     authState = authState,
                     onSignOut = { authViewModel.signOut() },
                     onRetry = { authViewModel.retryProfileLoad() },
-                    onSaveProfile = { nickname, major, pronouns ->
-                        authViewModel.saveProfile(nickname, major, pronouns)
+                    onSaveProfile = { nickname, major, minor, pronouns ->
+                        authViewModel.saveProfile(nickname, major, minor, pronouns)
                     },
                     initialConversationId = pendingConversationId,
                     onConversationOpened = { pendingConversationId = null },

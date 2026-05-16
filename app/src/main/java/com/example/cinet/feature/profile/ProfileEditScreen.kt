@@ -45,6 +45,12 @@ fun ProfileEditScreen(
 
     var nickname by remember(profile) { mutableStateOf(profile?.nickname ?: "") }
     var major by remember(profile) { mutableStateOf(profile?.major ?: "") }
+    var minor by remember(profile) { mutableStateOf(profile?.minor ?: "") }
+    val context = LocalContext.current
+    val programList = loadProgramsFromRaw(context).sortedBy { it.name }
+    val majorList = programList.filter { it.type == "Major" }
+    val minorList = programList.filter { it.type == "Minor" }
+
     var pronouns by remember(profile) { mutableStateOf(profile?.pronouns ?: "") }
     var year by remember(profile) { mutableStateOf(profile?.year ?: "") }
     var bio by remember(profile) { mutableStateOf(profile?.bio ?: "") }
@@ -52,7 +58,10 @@ fun ProfileEditScreen(
         mutableStateOf(profile?.interests?.toSet() ?: emptySet())
     }
     var yearExpanded by remember { mutableStateOf(false) }
-
+    var majorExpanded by remember { mutableStateOf(false) }
+    var minorExpanded by remember { mutableStateOf(false) }
+    val validMajor = majorList.any { it.name == major }
+    val validMinor = minorList.any { it.name == minor} || minor.isBlank()
     // Navigate back automatically once save succeeds
     LaunchedEffect(state) {
         if (state is ProfileEditState.Success) {
@@ -129,13 +138,84 @@ fun ProfileEditScreen(
             )
 
             // Major
-            OutlinedTextField(
-                value = major,
-                onValueChange = { major = it },
-                label = { Text("Major") },
-                singleLine = true,
+            ExposedDropdownMenuBox(
+                expanded = majorExpanded,
+                onExpandedChange = { majorExpanded = it },
                 modifier = Modifier.fillMaxWidth()
-            )
+            ) {
+                OutlinedTextField(
+                    value = major,
+                    onValueChange = {major = it},
+                    isError = major.isNotBlank() && !validMajor,
+                    supportingText = {
+                        if(major.isNotBlank() && !validMajor)
+                            Text("Please select a valid major.")
+                    },
+                    readOnly = false,
+                    label = { Text("Major") },
+                    placeholder = { Text("Select your major") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = majorExpanded)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryEditable)
+                )
+                val filtering = majorList.filter { it.name.contains(major, ignoreCase = true) }
+                if (filtering.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = majorExpanded,
+                        onDismissRequest = { majorExpanded = false }
+                    ) {
+                        filtering.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.name) },
+                                onClick = { major = option.name; majorExpanded = false }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Minor
+            ExposedDropdownMenuBox(
+                expanded = minorExpanded,
+                onExpandedChange = { minorExpanded = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = minor,
+                    onValueChange = {minor = it},
+                    isError = minor.isNotBlank() && !validMinor,
+                    supportingText = {
+                        if(minor.isNotBlank() && !validMinor)
+                            Text("Please select a valid minor.")
+                    },
+                    readOnly = false,
+                    label = { Text("Minor") },
+                    placeholder = { Text("Select your minor") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = minorExpanded)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryEditable)
+                )
+                val filtering = minorList.filter { it.name.contains(minor, ignoreCase = true) }
+                if (filtering.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = minorExpanded,
+                        onDismissRequest = { minorExpanded = false }
+                    ) {
+                        filtering.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.name) },
+                                onClick = { minor = option.name; minorExpanded = false }
+                            )
+                        }
+                    }
+                }
+            }
 
             // Pronouns
             OutlinedTextField(
@@ -232,13 +312,14 @@ fun ProfileEditScreen(
                     viewModel.saveProfile(
                         nickname = nickname,
                         major = major,
+                        minor = minor,
                         pronouns = pronouns,
                         year = year,
                         bio = bio,
                         interests = selectedInterests.toList()
                     )
                 },
-                enabled = state !is ProfileEditState.Loading && nickname.isNotBlank(),
+                enabled = state !is ProfileEditState.Loading && nickname.isNotBlank() && validMajor && validMinor,
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             ) {
                 if (state is ProfileEditState.Loading) {
