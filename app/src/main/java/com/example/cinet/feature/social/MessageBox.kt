@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ fun MessageBox(
     studySelected: () -> Unit,
     eventSelected: () -> Unit,
     onAttachmentClick: () -> Unit,
+    sendUserLocation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -58,7 +60,7 @@ fun MessageBox(
         verticalAlignment = Alignment.Bottom
     ) {
         // Study/Event invite pop up buttons
-        Box() {
+        Box {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
@@ -79,6 +81,7 @@ fun MessageBox(
                 onStudyClick = studySelected,
                 onEventClick = eventSelected,
                 onAttachmentClick = onAttachmentClick,
+                sendUserLocation = sendUserLocation
             )
         }
         // Message bar section
@@ -127,6 +130,7 @@ fun MessageBox(
                 )
             }
         }
+        Spacer(modifier = Modifier.padding(bottom = 8.dp))
     }
 }
 @Composable
@@ -135,12 +139,13 @@ fun AddAttachment(
     onStudyClick: () -> Unit,
     onEventClick: () -> Unit,
     onAttachmentClick: () -> Unit,
+    sendUserLocation: () -> Unit,
     onDismiss: () -> Unit
 ) {
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
-        offset = DpOffset(x = 0.dp, y = -8.dp)
+        offset = DpOffset(x = 0.dp, y = (-8).dp)
     ) {
         DropdownMenuItem(
             text = { Text("Study Invite")},
@@ -155,6 +160,14 @@ fun AddAttachment(
             leadingIcon = { Icon(Icons.Default.Event, "Event Invite") },
             onClick = {
                 onEventClick()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Share your location") },
+            leadingIcon = { Icon(Icons.Default.ShareLocation, contentDescription = "Share your location") },
+            onClick = {
+                sendUserLocation()
                 onDismiss()
             }
         )
@@ -184,6 +197,7 @@ fun PreviewMessageBox() {
                 studySelected = { },
                 eventSelected = { },
                 onAttachmentClick = { },
+                sendUserLocation = { }
             )
         }
     }

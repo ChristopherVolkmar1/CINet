@@ -16,5 +16,7 @@
   { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [{ "color": "#d59563" }] },
   { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#17263c" }] },
   { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#515c6d" }] },
-  { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [{ "color": "#17263c" }] }
+  { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [{ "color": "#17263c" }] },
+  { "featureType": "landscape.man_made.building", "elementType": "geometry.fill", "stylers": [{ "color": "#2e3f5f" }] },
+  { "featureType": "landscape.man_made.building", "elementType": "geometry.stroke", "stylers": [{ "color": "#6b82a8" }] }
 ]
