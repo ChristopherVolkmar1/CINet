@@ -10,6 +10,7 @@ data class UserProfile(
     val nickname: String = "",
     val nicknameLower: String = "",  // lowercase copy used for case-insensitive search
     val major: String = "",
+    val minor: String = "",
     val pronouns: String = "",
     val year: String = "",           // Freshman / Sophomore / Junior / Senior / Graduate / Transfer
     val bio: String = "",            // short free-text blurb

@@ -74,6 +74,7 @@ class FirestoreRepository(
     suspend fun saveProfileDetails(
         nickname: String,
         major: String,
+        minor: String,
         pronouns: String,
         year: String = "",
         bio: String = "",
@@ -87,6 +88,7 @@ class FirestoreRepository(
                 "nickname"      to nickname,
                 "nicknameLower" to nickname.lowercase(),
                 "major"         to major,
+                "minor"         to minor,
                 "pronouns"      to pronouns,
                 "year"          to year,
                 "bio"           to bio,

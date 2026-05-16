@@ -84,7 +84,7 @@ fun NavigationHandler(
     authState: AuthState,
     onSignOut: () -> Unit,
     onRetry: () -> Unit,
-    onSaveProfile: (String, String, String) -> Unit,
+    onSaveProfile: (String, String, String, String) -> Unit,
     initialConversationId: String? = null,
     onConversationOpened: () -> Unit = {},
     initialMapLocationName: String? = null,
