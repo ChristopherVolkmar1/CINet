@@ -1,6 +1,5 @@
 package com.example.cinet.feature.social
 
-import android.text.TextUtils.replace
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -236,7 +235,7 @@ fun ConversationsListScreen(
 }
 
 @Composable
-private fun ConversationListItem(
+fun ConversationListItem(
     conversation: Conversation,
     currentUid: String,
     onClick: () -> Unit,
@@ -351,6 +350,64 @@ private fun ConversationListItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+fun ConversationLocationItem(
+    conversation: Conversation,
+    currentUid: String,
+    onClick: () -> Unit,
+    hasUnread: Boolean = false,
+    highlightQuery: String = "",
+) {
+    val displayName = if (conversation.isGroup) {
+        conversation.groupName.ifBlank { "Group Chat" }
+    } else {
+        conversation.participantNicknames.entries
+            .firstOrNull { it.key != currentUid }?.value ?: "Unknown"
+    }
+
+    val otherUid = if (!conversation.isGroup) {
+        conversation.participantIds.firstOrNull { it != currentUid } ?: ""
+    } else ""
+
+    // For DMs, try to load the other user's photo
+    var otherPhotoUrl by remember(otherUid) { mutableStateOf("") }
+    LaunchedEffect(otherUid) {
+        if (otherUid.isNotBlank()) {
+            try {
+                val snap = FirebaseFirestore.getInstance()
+                    .collection("users").document(otherUid).get().await()
+                otherPhotoUrl = snap.getString("photoUrl") ?: ""
+            } catch (_: Exception) {}
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp)
+            .padding(end = 48.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar
+        ConversationAvatar(
+            isGroup = conversation.isGroup,
+            displayName = displayName,
+            photoUrl = otherPhotoUrl,
+            participantCount = conversation.participantIds.size
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = displayName,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

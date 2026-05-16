@@ -94,7 +94,8 @@ fun getDynamicColorScheme(selectedTheme: AppThemeColor, isDark: Boolean): ColorS
             onSecondary = Color.White,
             onTertiary = Color.White,
             onBackground = Color.White,
-            onSurface = Color.White
+            onSurface = Color.White,
+            error = selectedTheme.darkButton
         )
     } else {
         lightColorScheme(
@@ -108,7 +109,8 @@ fun getDynamicColorScheme(selectedTheme: AppThemeColor, isDark: Boolean): ColorS
             onSecondary = Color.White,
             onTertiary = Color.White,
             onBackground = Color.Black,
-            onSurface = Color.Black
+            onSurface = Color.Black,
+            error = Color.Red
         )
     }
 }

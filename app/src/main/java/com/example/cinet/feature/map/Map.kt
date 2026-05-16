@@ -47,7 +47,9 @@ fun CampusMapScreen(
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
     preSelectedLocation: CampusLocation? = null,
     autoRouteToPreSelectedLocation: Boolean = false,
-    onFinishedLoading: () -> Unit = {}
+    onFinishedLoading: () -> Unit = {},
+    extraLocations: List<CampusLocation> = emptyList(),
+    onRemoveExtraLocation: ((CampusLocation) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val textFieldState = rememberTextFieldState()
@@ -192,7 +194,7 @@ fun CampusMapScreen(
             mapProperties = mapProperties,
             cameraPositionState = cameraPositionState,
             focusManager = focusManager,
-            markers = markersToDraw,
+            markers = markersToDraw + extraLocations,
             polylinePoints = polylinePoints,
             coroutineScope = coroutineScope,
             onMarkerSelected = { selectedLocation = it },
@@ -230,7 +232,9 @@ fun CampusMapScreen(
             onModeSelected = requestRoute,
             routeDurations = durations,
             onShowBusSchedule = { showBusSheet = true },
-            friends = friends
+            friends = friends,
+            onRemoveLocation = onRemoveExtraLocation,
+            photoUrl = selectedLocation?.description ?: ""
         )
 
         userLatLng?.let { user ->
@@ -268,7 +272,8 @@ private fun rememberCampusMapProperties(
     remember(hasPermission, mapStyle) {
         MapProperties(
             isMyLocationEnabled = hasPermission,
-            mapStyleOptions = mapStyle
+            mapStyleOptions = mapStyle,
+            isBuildingEnabled = true
         )
     }
 
@@ -529,7 +534,8 @@ private fun CampusMapLayer(
         onMapClick = { focusManager.clearFocus() },
         uiSettings = MapUiSettings(
             myLocationButtonEnabled = false,
-            zoomControlsEnabled = true
+            zoomControlsEnabled = true,
+            tiltGesturesEnabled = true
         )
     ) {
         markers.forEach { location ->
@@ -583,6 +589,7 @@ private fun CampusMarker(
                     "TRANSIT" -> R.drawable.bus_stop
                     "COMMUTER_PARKING" -> R.drawable.parking
                     "DINING" -> R.drawable.dining
+                    "SHARED" -> R.drawable.person
                     else -> R.drawable.unlisted
                 },
                 backgroundColor = primaryColor

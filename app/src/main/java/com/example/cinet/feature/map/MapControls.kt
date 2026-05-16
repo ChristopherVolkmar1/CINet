@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.School
@@ -71,7 +72,9 @@ fun MapControls(
     onModeSelected: (TravelMode) -> Unit,
     routeDurations: RouteDurations,
     onShowBusSchedule: () -> Unit = {},
-    friends: List<UserProfile>
+    friends: List<UserProfile>,
+    onRemoveLocation: ((CampusLocation) -> Unit)? = null,
+    photoUrl: String = ""
 ) {
     Row(
         modifier = Modifier
@@ -80,7 +83,7 @@ fun MapControls(
         verticalAlignment = Alignment.Top
     ) {
         FilterMenu(
-            categories = campusRegistry.keys.map { it.uppercase() }.toSet() + "TRANSIT",
+            categories = campusRegistry.keys.map { it.uppercase() }.toSet() + "TRANSIT" + "SHARED",
             activeFilters = activeFilters,
             onFiltersChanged = onFiltersChanged
         )
@@ -102,7 +105,9 @@ fun MapControls(
             onModeSelected = onModeSelected,
             routeDurations = routeDurations,
             onShowBusSchedule = onShowBusSchedule,
-            friends = friends
+            friends = friends,
+            onRemoveLocation = onRemoveLocation,
+            photoUrl = photoUrl
         )
     }
 }
@@ -140,6 +145,7 @@ fun FilterMenu(
         ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.primary,
                 tonalElevation = 6.dp,
             ) {
                 Column(
@@ -235,7 +241,8 @@ private fun categoryIconMap(): Map<String, ImageVector> = mapOf(
     "ACADEMIC" to Icons.Default.School,
     "COMMUTER_PARKING" to Icons.Default.LocalParking,
     "DINING" to Icons.Default.Restaurant,
-    "TRANSIT" to Icons.Default.DirectionsBus
+    "TRANSIT" to Icons.Default.DirectionsBus,
+    "SHARED" to Icons.Default.PersonPin
 )
 
 // -------------------- Overlay: center-self button --------------------
@@ -274,7 +281,7 @@ fun CenterCamera(
 @Composable
 fun PreviewFilter() {
     CINetTheme(darkTheme = true) {
-        val sampleCategories = setOf("ACADEMIC", "DINING", "TRANSIT", "COMMUTER_PARKING")
+        val sampleCategories = setOf("ACADEMIC", "DINING", "TRANSIT", "COMMUTER_PARKING", "SHARED")
         var activeFilters by remember { mutableStateOf(setOf("ACADEMIC")) }
 
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
