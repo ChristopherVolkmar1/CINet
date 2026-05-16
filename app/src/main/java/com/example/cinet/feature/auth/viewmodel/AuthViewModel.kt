@@ -65,10 +65,10 @@ class AuthViewModel(
     }
 
     // Saves the user's profile details to Firestore and updates state
-    fun saveProfile(nickname: String, major: String, pronouns: String) {
+    fun saveProfile(nickname: String, major: String, minor: String, pronouns: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
-            repository.saveProfileDetails(nickname, major, pronouns)
+            repository.saveProfileDetails(nickname, major, minor, pronouns)
                 .onSuccess { _authState.value = AuthState.Authenticated(it) }
                 .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
         }

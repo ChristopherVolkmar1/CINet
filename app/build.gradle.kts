@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
     id("com.google.gms.google-services")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -106,4 +107,6 @@ dependencies {
     implementation(libs.slf4j.simple)
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 }
