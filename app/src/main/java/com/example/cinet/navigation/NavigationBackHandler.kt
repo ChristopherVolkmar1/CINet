@@ -11,17 +11,20 @@ import com.example.cinet.feature.home.news.NewsArticle
 @Composable
 internal fun NavigationBackHandler(
     currentScreen: Screen,
+    backStackSize: Int,
     activeConversation: Conversation?,
     selectedProfile: UserProfile?,
     showNewConversation: Boolean,
     showSocialScreen: Boolean,
     showProfileEdit: Boolean,
     showCanvasScreen: Boolean,
+    showAddClassOnCalendar: Boolean,
     showCIView: Boolean,
     selectedNewsArticle: NewsArticle?,
     showClubs: Boolean,
     selectedClub: ClubItem?,
     onHideCanvas: () -> Unit,
+    onHideAddClass: () -> Unit,
     onClearSelectedNewsArticle: () -> Unit,
     onShowCIView: () -> Unit,
     onHideCIView: () -> Unit,
@@ -32,25 +35,33 @@ internal fun NavigationBackHandler(
     onClearSelectedProfile: () -> Unit,
     onHideSocialScreen: () -> Unit,
     onHideProfileEdit: () -> Unit,
-    onGoHome: () -> Unit,
+    onGoBack: () -> Unit,
 ) {
-    val socialBackStackActive = currentScreen == Screen.Social &&
-            (activeConversation != null || selectedProfile != null ||
-                    showNewConversation || showSocialScreen)
+    val isSubPageActive = activeConversation != null ||
+            selectedProfile != null ||
+            showNewConversation ||
+            showSocialScreen ||
+            showProfileEdit ||
+            showCanvasScreen ||
+            showAddClassOnCalendar ||
+            showCIView ||
+            selectedNewsArticle != null ||
+            showClubs ||
+            selectedClub != null
 
-    BackHandler(
-        enabled = currentScreen != Screen.Home ||
-                socialBackStackActive ||
-                showProfileEdit ||
-                showCanvasScreen ||
-                showCIView ||
-                selectedNewsArticle != null ||
-                showClubs ||
-                selectedClub != null ||
-                selectedProfile != null
-    ) {
+    val isAtRoot = backStackSize <= 1 && !isSubPageActive
+
+    BackHandler(enabled = !isAtRoot) {
         when {
+            // Priority 1: Dialogs and deepest terminal screens
             showCanvasScreen -> onHideCanvas()
+            showProfileEdit -> onHideProfileEdit()
+            showAddClassOnCalendar -> onHideAddClass()
+            
+            // Priority 2: Main content pages (Chat, Article, Club details)
+            // We clear the active conversation first to support "Profile -> Chat -> Back to Profile"
+            activeConversation != null -> onClearActiveConversation()
+            
             selectedNewsArticle != null -> {
                 if (selectedNewsArticle.title == "Study Rooms") {
                     onClearSelectedNewsArticle()
@@ -60,15 +71,19 @@ internal fun NavigationBackHandler(
                     onShowCIView()
                 }
             }
-            showCIView -> onHideCIView()
             selectedClub != null -> onClearSelectedClub()
-            showClubs -> onHideClubs()
-            activeConversation != null -> onClearActiveConversation()
-            showNewConversation -> onHideNewConversation()
+
+            // Priority 3: Detail views
             selectedProfile != null -> onClearSelectedProfile()
+
+            // Priority 4: Functional sub-lists (New Chat, Friends List, News List, Clubs List)
+            showNewConversation -> onHideNewConversation()
             showSocialScreen -> onHideSocialScreen()
-            showProfileEdit -> onHideProfileEdit()
-            else -> onGoHome()
+            showCIView -> onHideCIView()
+            showClubs -> onHideClubs()
+
+            // Priority 5: Global backstack (Tab history)
+            else -> onGoBack()
         }
     }
 }

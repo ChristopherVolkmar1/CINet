@@ -28,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.feature.home.news.NewsRepository
 import com.example.cinet.feature.map.BusScheduleSheet
@@ -55,7 +56,8 @@ fun HomeScreen(
     onNotificationClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
-    onNavigateToLocation: (String) -> Unit
+    onNavigateToLocation: (String) -> Unit,
+    onOpenChatFromHome: (UserProfile) -> Unit = {}
 ) {
     val context = LocalContext.current
     val newsRepository = remember { NewsRepository() }
@@ -705,7 +707,8 @@ fun HomeScreenPreview() {
             onSocialClick = {},
             onNotificationClick = {},
             onProfileClick = {},
-            onNavigateToLocation = {}
+            onNavigateToLocation = {},
+            onOpenChatFromHome = {}
         )
     }
 }

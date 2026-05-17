@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.example.cinet.feature.home.HomeScreen
 import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.feature.home.HomeUpcomingEventItem
+import com.example.cinet.data.model.UserProfile
 
 // Shows the home page and passes home navigation actions back to MainScaffold.
 @Composable
@@ -24,6 +25,7 @@ internal fun NavigationHomeRoute(
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
     onNavigateToLocation: (String) -> Unit,
+    onOpenChatFromHome: (UserProfile) -> Unit,
 ) {
     HomeScreen(
         nickname = nickname,
@@ -42,6 +44,7 @@ internal fun NavigationHomeRoute(
         onSocialClick = onSocialClick,
         onNotificationClick = onNotificationClick,
         onProfileClick = onProfileClick,
-        onNavigateToLocation = onNavigateToLocation
+        onNavigateToLocation = onNavigateToLocation,
+        onOpenChatFromHome = onOpenChatFromHome
     )
 }
