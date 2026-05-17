@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.data.model.Conversation
-import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.SocialRepository
 import com.example.cinet.feature.map.SearchBar
 import com.google.firebase.auth.FirebaseAuth
@@ -55,11 +54,15 @@ fun ConversationsListScreen(
     val repository = remember { SocialRepository() }
 
     var conversations by remember { mutableStateOf<List<Conversation>>(emptyList()) }
-    var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var pendingRequestCount by remember { mutableIntStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Fresh-install / emulator-wipe guard.
+    // Fresh-install / emulator-wipe guard. If openedConversationTimestamps is empty
+    // when conversations first arrive, it means SharedPrefs was cleared (wipe, reinstall,
+    // or first launch with pre-existing Firestore data). Seed every loaded conversation
+    // with "now" so none of them show a stale unread dot.
+    // hasSeeded ensures we only do this once per composition lifecycle — we don't want
+    // to wipe dots for genuinely new messages that arrive after the initial load.
     var hasSeeded by remember { mutableStateOf(false) }
     LaunchedEffect(conversations) {
         if (!hasSeeded && conversations.isNotEmpty() && openedConversationTimestamps.isEmpty()) {
@@ -76,6 +79,9 @@ fun ConversationsListScreen(
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     conversations = snapshot.toObjects(Conversation::class.java)
+                        // active=false means the conversation was deactivated (e.g. after
+                        // unfriending). Don't show these — they caused duplicate "User A"
+                        // rows alongside group chats, confusing which thread to reply in.
                         .filter { it.active }
                         .sortedByDescending { it.lastUpdated?.time ?: 0L }
                     isLoading = false
@@ -84,17 +90,10 @@ fun ConversationsListScreen(
         onDispose { listener.remove() }
     }
 
-    // One-shot load for pending request badge and friends for local nicknames
+    // One-shot load for pending request badge
     LaunchedEffect(Unit) {
         repository.getPendingRequests().onSuccess { pendingRequestCount = it.size }
-        repository.getFriends().onSuccess { friends = it }
     }
-
-    // Map friends to their local nicknames for fast lookup
-    val localNicknames = remember(friends) {
-        friends.associate { it.uid to it.localNickname }.filterValues { it != null }
-    }
-
     // Required for searching
     val textFieldState = rememberTextFieldState()
     Surface(
@@ -182,18 +181,17 @@ fun ConversationsListScreen(
                 }
             } else {
                 val query = textFieldState.text.toString()
-                val filteredConversations = remember(query, conversations, localNicknames) {
+                val filteredConversations = remember(query, conversations) {
                     if (query.isBlank()) conversations
                     else conversations.filter { conversation ->
                         // Match by conversation/group name
                         val nameMatch = if (conversation.isGroup) {
                             conversation.groupName.contains(query, ignoreCase = true)
                         } else {
-                            val otherUid = conversation.participantIds.firstOrNull { it != currentUid }
-                            val nickname = localNicknames[otherUid] 
-                                ?: conversation.participantNicknames.filterKeys { it != currentUid }.values.firstOrNull() 
-                                ?: ""
-                            nickname.contains(query, ignoreCase = true)
+                            conversation.participantNicknames
+                                .filterKeys { it != currentUid }
+                                .values
+                                .any { it.contains(query, ignoreCase = true) }
                         }
                         // Also match against the latest message preview
                         val messageMatch = conversation.lastMessage.contains(query, ignoreCase = true)
@@ -213,20 +211,19 @@ fun ConversationsListScreen(
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(filteredConversations, key = { it.id }) { conversation ->
+                        // A dot appears when the last message arrived after the last time
+                        // this conversation was opened. openedAt is loaded from SharedPrefs
+                        // so dots survive app restarts and only clear when the conversation
+                        // is actually opened — not just because the list was viewed.
                         val openedAt = openedConversationTimestamps[conversation.id] ?: 0L
                         val hasUnread = (conversation.lastUpdated?.time ?: 0L) > openedAt &&
                                 conversation.lastMessage.isNotBlank() &&
                                 conversation.lastSenderId != currentUid
-                                
-                        val otherUid = if (!conversation.isGroup) conversation.participantIds.firstOrNull { it != currentUid } else null
-                        val localNickname = otherUid?.let { localNicknames[it] }
-
                         ConversationListItem(
                             conversation = conversation,
                             currentUid = currentUid,
                             hasUnread = hasUnread,
                             highlightQuery = query.trim(),
-                            localNickname = localNickname,
                             onClick = { onOpenConversation(conversation) }
                         )
                         HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
@@ -244,12 +241,11 @@ fun ConversationListItem(
     onClick: () -> Unit,
     hasUnread: Boolean = false,
     highlightQuery: String = "",
-    localNickname: String? = null,
 ) {
     val displayName = if (conversation.isGroup) {
         conversation.groupName.ifBlank { "Group Chat" }
     } else {
-        localNickname ?: conversation.participantNicknames.entries
+        conversation.participantNicknames.entries
             .firstOrNull { it.key != currentUid }?.value ?: "Unknown"
     }
 
@@ -279,7 +275,7 @@ fun ConversationListItem(
         // Unread indicator dot
         Box(
             modifier = Modifier
-                .size(9.dp)
+                .size(if (hasUnread) 9.dp else 9.dp)
                 .clip(CircleShape)
                 .background(
                     if (hasUnread) MaterialTheme.colorScheme.primary
@@ -298,6 +294,9 @@ fun ConversationListItem(
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
+            // Helper: build an AnnotatedString that yellow-highlights every occurrence
+            // of [query] in [text], case-insensitively. Falls back to plain text when
+            // query is blank — same performance as before.
             @Composable
             fun highlighted(text: String): androidx.compose.ui.text.AnnotatedString =
                 remember(text, highlightQuery) {
@@ -420,6 +419,7 @@ private fun ConversationAvatar(
     participantCount: Int,
 ) {
     val initial = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    // Both DM and group avatars use secondaryContainer for consistent green branding
     val avatarColor = MaterialTheme.colorScheme.secondaryContainer
 
     if (!isGroup && photoUrl.isNotBlank()) {

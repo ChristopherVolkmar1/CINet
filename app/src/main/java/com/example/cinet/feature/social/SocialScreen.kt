@@ -1,6 +1,5 @@
 package com.example.cinet.feature.social
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,7 +32,6 @@ import kotlinx.coroutines.tasks.await
 fun SocialScreen(
     onOpenProfile: (UserProfile) -> Unit,
     onOpenConversation: (UserProfile) -> Unit,
-    onBack: () -> Unit,
 ) {
     val repository = remember { SocialRepository() }
     val scope = rememberCoroutineScope()
@@ -55,15 +53,6 @@ fun SocialScreen(
         repository.getSentRequests().onSuccess { sentRequests = it }
         isLoading = false
         isRefreshing = false
-    }
-
-    // Explicit back button handling for the social friends list
-    BackHandler(enabled = true) {
-        if (searchQuery.isNotEmpty()) {
-            searchQuery = ""
-        } else {
-            onBack()
-        }
     }
 
     // Auto-search when query changes; clear results when field is emptied
@@ -352,8 +341,7 @@ fun UserRow(
         Spacer(modifier = Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
-            val displayName = user.localNickname ?: user.nickname
-            Text(text = displayName, style = MaterialTheme.typography.bodyLarge)
+            Text(text = user.nickname, style = MaterialTheme.typography.bodyLarge)
             Text(
                 text = "${user.major} · ${user.pronouns}",
                 style = MaterialTheme.typography.bodySmall,

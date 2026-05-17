@@ -1,6 +1,5 @@
 package com.example.cinet.feature.profile
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -10,7 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
@@ -47,22 +45,13 @@ fun ProfileScreen(
     val scope = rememberCoroutineScope()
 
     var isFriend by remember { mutableStateOf(false) }
-    var currentLocalNickname by remember { mutableStateOf<String?>(null) }
     var requestSent by remember { mutableStateOf(false) }
     var isLoadingAction by remember { mutableStateOf(false) }
-    var showNicknameDialog by remember { mutableStateOf(false) }
-
-    // Intercept system back button
-    BackHandler(enabled = true) {
-        onBack()
-    }
 
     LaunchedEffect(user.uid) {
         if (!isOwnProfile) {
             repository.getFriends().onSuccess { friends ->
-                val friend = friends.find { it.uid == user.uid }
-                isFriend = friend != null
-                currentLocalNickname = friend?.localNickname
+                isFriend = friends.any { it.uid == user.uid }
             }
             repository.getSentRequests().onSuccess { requests ->
                 requestSent = requests.any { it.receiverId == user.uid }
@@ -128,21 +117,12 @@ fun ProfileScreen(
 
             // Name
             Text(
-                text = currentLocalNickname ?: user.nickname,
+                text = user.nickname,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
-
-            // If local nickname is set, show real nickname below
-            if (currentLocalNickname != null) {
-                Text(
-                    text = "(${user.nickname})",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             // Pronouns
             if (user.pronouns.isNotBlank()) {
@@ -271,44 +251,33 @@ fun ProfileScreen(
                     }
                 } else {
                     if (isFriend) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = {
-                                    isLoadingAction = true
-                                    scope.launch {
-                                        repository.getOrCreateConversation(
-                                            participantIds = listOf(
-                                                currentUserProfile.uid, user.uid
-                                            ),
-                                            participantNicknames = mapOf(
-                                                currentUserProfile.uid to currentUserProfile.nickname,
-                                                user.uid to user.nickname
-                                            )
-                                        ).onSuccess { onOpenConversation(it) }
-                                        isLoadingAction = false
-                                    }
-                                },
-                                enabled = !isLoadingAction,
-                                modifier = Modifier.weight(1f).height(50.dp)
-                            ) {
-                                if (isLoadingAction) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Text("Message")
+                        Button(
+                            onClick = {
+                                isLoadingAction = true
+                                scope.launch {
+                                    repository.getOrCreateConversation(
+                                        participantIds = listOf(
+                                            currentUserProfile.uid, user.uid
+                                        ),
+                                        participantNicknames = mapOf(
+                                            currentUserProfile.uid to currentUserProfile.nickname,
+                                            user.uid to user.nickname
+                                        )
+                                    ).onSuccess { onOpenConversation(it) }
+                                    isLoadingAction = false
                                 }
-                            }
-                            
-                            OutlinedButton(
-                                onClick = { showNicknameDialog = true },
-                                modifier = Modifier.weight(1f).height(50.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Nickname")
+                            },
+                            enabled = !isLoadingAction,
+                            modifier = Modifier.fillMaxWidth().height(50.dp)
+                        ) {
+                            if (isLoadingAction) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Message")
                             }
                         }
                     } else {
@@ -341,42 +310,6 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
-    }
-
-    if (showNicknameDialog) {
-        var nicknameText by remember { mutableStateOf(currentLocalNickname ?: "") }
-        AlertDialog(
-            onDismissRequest = { showNicknameDialog = false },
-            title = { Text("Set Local Nickname") },
-            text = {
-                Column {
-                    Text("This nickname is only visible to you.", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = nicknameText,
-                        onValueChange = { nicknameText = it },
-                        placeholder = { Text("Enter nickname...") },
-                        singleLine = true
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    scope.launch {
-                        repository.updateLocalNickname(user.uid, nicknameText)
-                        currentLocalNickname = nicknameText.ifBlank { null }
-                        showNicknameDialog = false
-                    }
-                }) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNicknameDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 

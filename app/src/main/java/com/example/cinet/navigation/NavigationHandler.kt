@@ -163,26 +163,9 @@ private fun MainScaffold(
     }
 
     var currentScreen by remember { mutableStateOf(Screen.Home) }
-    var screenHistory by remember { mutableStateOf(listOf<Screen>()) }
-
-    fun navigateTo(screen: Screen) {
-        if (currentScreen != screen) {
-            screenHistory = (screenHistory + currentScreen).takeLast(15)
-            currentScreen = screen
-        }
-    }
-
-    fun popScreen() {
-        if (screenHistory.isNotEmpty()) {
-            currentScreen = screenHistory.last()
-            screenHistory = screenHistory.dropLast(1)
-        } else if (currentScreen != Screen.Home) {
-            currentScreen = Screen.Home
-        }
-    }
-
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var showProfileEdit by remember { mutableStateOf(false) }
+    var profileOpenedFromHome by remember { mutableStateOf(false) }
 
     var activeConversation by remember { mutableStateOf<Conversation?>(null) }
     var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -195,6 +178,10 @@ private fun MainScaffold(
     }
 
     var openedConversationTimestamps by remember {
+        // Persisted per-conversation open timestamps so unread dots survive app restarts.
+        // Each entry is stored as "opened_conv_{id}" -> Long in cinet_prefs.
+        // A dot disappears when the user opens that conversation, and stays gone across
+        // relaunches unless a genuinely new message arrives after the stored timestamp.
         mutableStateOf(
             sharedPrefs.all
                 .filter { it.key.startsWith("opened_conv_") }
@@ -215,10 +202,11 @@ private fun MainScaffold(
             val conversation = snap.toObject(Conversation::class.java)
 
             if (conversation != null) {
-                navigateTo(Screen.Social)
+                currentScreen = Screen.Social
                 val now = System.currentTimeMillis()
                 openedConversationTimestamps =
                     openedConversationTimestamps + (conversation.id to now)
+                // Persist so the dot stays gone after the app is restarted.
                 sharedPrefs.edit()
                     .putLong("opened_conv_${conversation.id}", now)
                     .apply()
@@ -243,7 +231,7 @@ private fun MainScaffold(
         if (location != null) {
             preSelectedMapLocation = location
             autoRouteToPreSelectedMapLocation = true
-            navigateTo(Screen.Map)
+            currentScreen = Screen.Map
             onMapLocationOpened()
         } else {
             android.util.Log.e(
@@ -276,10 +264,11 @@ private fun MainScaffold(
 
     var manualUpcomingEventsItems by remember { mutableStateOf(loadItems("event_items")) }
 
+    // Use a ticker to ensure the home banner updates as time passes
     var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(30000)
+            delay(30000) // Update every 30 seconds
             currentTimeMillis = System.currentTimeMillis()
         }
     }
@@ -314,19 +303,13 @@ private fun MainScaffold(
                 socialBackStackActive ||
                 showProfileEdit ||
                 isOverlayActive ||
-                selectedProfile != null ||
-                screenHistory.isNotEmpty()
+                selectedProfile != null
     ) {
         when {
             selectedNewsArticle != null -> {
-                val title = selectedNewsArticle?.title
-                if (title == "Study Rooms" || title == "Dining") {
+                if (selectedNewsArticle?.title == "Study Rooms") {
                     selectedNewsArticle = null
                     showCIView = false
-                    if (title == "Dining") {
-                        currentScreen = Screen.Home
-                        screenHistory = emptyList()
-                    }
                 } else {
                     selectedNewsArticle = null
                     showCIView = true
@@ -341,7 +324,7 @@ private fun MainScaffold(
             selectedProfile != null -> selectedProfile = null
             showSocialScreen -> showSocialScreen = false
             showProfileEdit -> showProfileEdit = false
-            else -> popScreen()
+            else -> currentScreen = Screen.Home
         }
     }
 
@@ -362,11 +345,12 @@ private fun MainScaffold(
                         NavigationBarItem(
                             selected = currentScreen == screen,
                             onClick = {
-                                navigateTo(screen)
+                                currentScreen = screen
                                 showCIView = false
                                 selectedNewsArticle = null
                                 showClubs = false
                                 selectedClub = null
+                                profileOpenedFromHome = false
 
                                 if (screen == Screen.Social) {
                                     activeConversation = null
@@ -423,12 +407,14 @@ private fun MainScaffold(
             innerPadding
         }
 
+        // Outer container holds both the always-rendered map layer and all other screens on top
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding)
         ) {
 
+            // ---- MAP LAYER (always in composition, hidden when not active) ----
             var sharedLocations by remember { mutableStateOf<List<CampusLocation>>(emptyList()) }
             Box(
                 modifier = Modifier
@@ -445,7 +431,7 @@ private fun MainScaffold(
                     )
             ) {
                 CampusMapScreen(
-                    onBack = { popScreen() },
+                    onBack = { currentScreen = Screen.Home },
                     preSelectedLocation = preSelectedMapLocation,
                     autoRouteToPreSelectedLocation = autoRouteToPreSelectedMapLocation,
                     onFinishedLoading = {
@@ -459,6 +445,7 @@ private fun MainScaffold(
                 )
             }
 
+            // ---- ALL OTHER SCREENS (rendered on top of the map layer) ----
             if (currentScreen != Screen.Map) {
                 if (isShowingNews) {
                     CIViewScreen(
@@ -469,11 +456,6 @@ private fun MainScaffold(
                             if (selectedNewsArticle?.title == "Study Rooms") {
                                 selectedNewsArticle = null
                                 showCIView = false
-                            } else if (selectedNewsArticle?.title == "Dining") {
-                                selectedNewsArticle = null
-                                showCIView = false
-                                currentScreen = Screen.Home
-                                screenHistory = emptyList()
                             } else if (selectedNewsArticle != null) {
                                 selectedNewsArticle = null
                                 showCIView = true
@@ -507,12 +489,12 @@ private fun MainScaffold(
                                 manualUpcomingEventsItems = it
                                 saveItems("event_items", it)
                             },
-                            onMapClick = { navigateTo(Screen.Map) },
-                            onSettingsClick = { navigateTo(Screen.Settings) },
-                            onCalendarClick = { navigateTo(Screen.Calendar) },
+                            onMapClick = { currentScreen = Screen.Map },
+                            onSettingsClick = { currentScreen = Screen.Settings },
+                            onCalendarClick = { currentScreen = Screen.Calendar },
                             onAddClassClick = {
                                 showAddClassOnCalendar = true
-                                navigateTo(Screen.Calendar)
+                                currentScreen = Screen.Calendar
                             },
                             onClubsClick = { showClubs = true },
                             onCIViewClick = { article ->
@@ -526,16 +508,17 @@ private fun MainScaffold(
                                 selectedNewsArticle = article
                             },
                             onSocialClick = {
-                                navigateTo(Screen.Social)
+                                currentScreen = Screen.Social
                                 activeConversation = null
                                 selectedProfile = null
                                 showNewConversation = false
                                 showSocialScreen = false
                             },
-                            onNotificationClick = { navigateTo(Screen.Settings) },
+                            onNotificationClick = { currentScreen = Screen.Settings },
                             onProfileClick = {
+                                profileOpenedFromHome = true
                                 selectedProfile = userProfile
-                                navigateTo(Screen.Settings)
+                                currentScreen = Screen.Settings
                             },
                             onNavigateToLocation = { locationName ->
                                 val location = campusRegistry.values.flatten()
@@ -543,7 +526,7 @@ private fun MainScaffold(
 
                                 preSelectedMapLocation = location
                                 autoRouteToPreSelectedMapLocation = false
-                                navigateTo(Screen.Map)
+                                currentScreen = Screen.Map
                             }
                         )
 
@@ -557,7 +540,7 @@ private fun MainScaffold(
 
                                     preSelectedMapLocation = location
                                     autoRouteToPreSelectedMapLocation = false
-                                    navigateTo(Screen.Map)
+                                    currentScreen = Screen.Map
                                 },
                                 onNavigateToCoordinates = { lat, lng, nickname, photoUrl  ->
                                     val sharedLocation = CampusLocation(
@@ -574,7 +557,7 @@ private fun MainScaffold(
                                     }
                                     preSelectedMapLocation = sharedLocation
                                     autoRouteToPreSelectedMapLocation = false
-                                    navigateTo(Screen.Map)
+                                    currentScreen = Screen.Map
                                 }
                             )
 
@@ -614,8 +597,7 @@ private fun MainScaffold(
                                             activeConversation = it
                                         }
                                     }
-                                },
-                                onBack = { showSocialScreen = false }
+                                }
                             )
 
                             else -> {
@@ -624,6 +606,7 @@ private fun MainScaffold(
                                         val now = System.currentTimeMillis()
                                         openedConversationTimestamps =
                                             openedConversationTimestamps + (it.id to now)
+                                        // Persist so the dot stays gone across app restarts.
                                         sharedPrefs.edit()
                                             .putLong("opened_conv_${it.id}", now)
                                             .apply()
@@ -632,6 +615,11 @@ private fun MainScaffold(
                                     onNewConversation = { showNewConversation = true },
                                     onOpenFriends = { showSocialScreen = true },
                                     openedConversationTimestamps = openedConversationTimestamps,
+                                    // On fresh install or emulator wipe SharedPrefs is empty,
+                                    // so every conversation would incorrectly show as unread.
+                                    // Seed all existing conversation IDs with "now" so only
+                                    // genuinely new messages (arriving after this moment)
+                                    // produce dots going forward.
                                     onSeedTimestamps = { ids ->
                                         val now = System.currentTimeMillis()
                                         val seeded = ids.associateWith { now }
@@ -647,11 +635,11 @@ private fun MainScaffold(
                             }
                         }
 
-                        Screen.Map -> {  }
+                        Screen.Map -> { /* handled by the always-rendered map layer above */ }
 
                         Screen.Calendar -> CalendarScreen(
                             onBack = {
-                                popScreen()
+                                currentScreen = Screen.Home
                                 showAddClassOnCalendar = false
                             },
                             initialShowClassDialog = showAddClassOnCalendar
@@ -674,16 +662,20 @@ private fun MainScaffold(
                                 currentUserProfile = userProfile,
                                 onOpenConversation = {
                                     activeConversation = it
-                                    navigateTo(Screen.Social)
+                                    currentScreen = Screen.Social
                                 },
                                 onBack = {
                                     selectedProfile = null
+                                    if (profileOpenedFromHome) {
+                                        profileOpenedFromHome = false
+                                        currentScreen = Screen.Home
+                                    }
                                 },
                                 onEditProfile = { showProfileEdit = true },
                             )
                         } else {
                             SettingScreen(
-                                onBack = { popScreen() },
+                                onBack = { currentScreen = Screen.Home },
                                 onSignOut = onSignOut,
                                 isDarkMode = userProfile.isDarkMode,
                                 notificationsEnabled = userProfile.notificationsEnabled,
@@ -693,6 +685,7 @@ private fun MainScaffold(
                                 },
                                 userProfile = userProfile,
                                 onViewProfile = {
+                                    profileOpenedFromHome = false
                                     selectedProfile = userProfile
                                 },
                             )

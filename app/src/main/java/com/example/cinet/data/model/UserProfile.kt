@@ -22,5 +22,4 @@ data class UserProfile(
     val selectedTheme: AppThemeColor = AppThemeColor.Green,
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val lastLoginAt: Date? = null,
-    val localNickname: String? = null, // only used on client-side for friends
 )
