@@ -42,10 +42,6 @@ class CalendarFirestoreRepository(
             val startTime = doc.getString("startTime") ?: return@mapNotNull null
             val endTime = doc.getString("endTime") ?: return@mapNotNull null
             val location = doc.getString("location") ?: ""
-            Log.d(
-                "FirestoreDebug",
-                "Loaded class -> id=${doc.id}, name=$name, meetingDays=$meetingDays, start=$startTime, end=$endTime"
-            )
 
             ClassItem(
                 id = doc.id,
@@ -54,7 +50,12 @@ class CalendarFirestoreRepository(
                 startTime = startTime,
                 endTime = endTime,
                 location = location,
-                remindersEnabled = doc.getBoolean("remindersEnabled") ?: true
+                remindersEnabled = doc.getBoolean("remindersEnabled") ?: true,
+                canvasId = doc.getString("canvasId"),
+                // Legacy docs without this field default to true so they remain
+                // visible after the upgrade. Canvas-synced docs explicitly set
+                // it on every sync; manual docs default to true and stay true.
+                isFavorite = doc.getBoolean("isFavorite") ?: true
             )
         }
     }
@@ -81,7 +82,8 @@ class CalendarFirestoreRepository(
                 classId = classId,
                 className = className,
                 assignmentName = assignmentName,
-                dueTime = dueTime
+                dueTime = dueTime,
+                canvasId = doc.getString("canvasId")
             )
         }
     }
@@ -258,7 +260,21 @@ class CalendarFirestoreRepository(
             val name = doc.getString("name") ?: return@mapNotNull null
             val time = doc.getString("time") ?: return@mapNotNull null
             val location = doc.getString("location") ?: ""
-            EventItem(id = doc.id, date = date, name = name, time = time, location = location, source = EventSource.USER)
+            val storedSource = doc.getString("source")
+            val source = when (storedSource) {
+                EventSource.CANVAS.name -> EventSource.CANVAS
+                EventSource.CAMPUS.name -> EventSource.CAMPUS
+                else -> EventSource.USER
+            }
+            EventItem(
+                id = doc.id,
+                date = date,
+                name = name,
+                time = time,
+                location = location,
+                source = source,
+                canvasId = doc.getString("canvasId")
+            )
         }
     }
 
@@ -291,12 +307,165 @@ class CalendarFirestoreRepository(
     suspend fun updateEvent(eventId: String, date: String, name: String, time: String, location: String) {
         val uid = getUid()
         db.collection("users").document(uid).collection("events").document(eventId)
-            .set(mapOf("date" to date, "name" to name, "time" to time, "location" to location))
+            .update(
+                "date", date,
+                "name", name,
+                "time", time,
+                "location", location
+            )
             .await()
     }
 
     suspend fun deleteEvent(eventId: String) {
         val uid = getUid()
         db.collection("users").document(uid).collection("events").document(eventId).delete().await()
+    }
+
+    // =======================================================================
+    // Canvas-sync helpers
+    // =======================================================================
+
+    /**
+     * Creates a new Canvas-synced class row stamped with [canvasId] and the
+     * given [isFavorite] flag. Meeting days, times, and location are left
+     * blank — users fill them in manually after import.
+     */
+    suspend fun addCanvasClass(
+        name: String,
+        canvasId: String,
+        isFavorite: Boolean
+    ): ClassItem {
+        val uid = getUid()
+        val data = mapOf(
+            "name" to name,
+            "meetingDays" to emptyList<String>(),
+            "startTime" to "",
+            "endTime" to "",
+            "location" to "",
+            "remindersEnabled" to true,
+            "canvasId" to canvasId,
+            "isFavorite" to isFavorite
+        )
+        val docRef = db.collection("users").document(uid).collection("classes").add(data).await()
+        Log.d("FirestoreDebug", "Added Canvas class: $name canvasId=$canvasId fav=$isFavorite docId=${docRef.id}")
+        return ClassItem(
+            id = docRef.id,
+            name = name,
+            meetingDays = emptyList(),
+            startTime = "",
+            endTime = "",
+            location = "",
+            remindersEnabled = true,
+            canvasId = canvasId,
+            isFavorite = isFavorite
+        )
+    }
+
+    /**
+     * Partial update of the class name AND the favorite flag, used on each
+     * sync for a class that's still favorited (so user-entered meeting days,
+     * times, and location are preserved). Two fields touched, nothing else.
+     */
+    suspend fun updateCanvasClassNameAndFavorite(
+        classId: String,
+        name: String,
+        isFavorite: Boolean
+    ) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("classes").document(classId)
+            .update(
+                mapOf(
+                    "name" to name,
+                    "isFavorite" to isFavorite
+                )
+            )
+            .await()
+    }
+
+    /**
+     * Partial update of just the favorite flag. Used to flip previously-synced
+     * Canvas classes to hidden when the user un-stars them in Canvas, without
+     * disturbing any other fields the user may have customized.
+     */
+    suspend fun updateCanvasClassFavorite(classId: String, isFavorite: Boolean) {
+        val uid = getUid()
+        db.collection("users").document(uid).collection("classes").document(classId)
+            .update("isFavorite", isFavorite)
+            .await()
+    }
+
+    /** Insert path for a Canvas-synced assignment. */
+    suspend fun addCanvasAssignment(
+        date: String,
+        classId: String,
+        className: String,
+        assignmentName: String,
+        dueTime: String,
+        canvasId: String
+    ) {
+        val uid = getUid()
+        val data = mapOf(
+            "date" to date,
+            "classId" to classId,
+            "className" to className,
+            "assignmentName" to assignmentName,
+            "dueTime" to dueTime,
+            "canvasId" to canvasId
+        )
+        db.collection("users").document(uid).collection("assignments").add(data).await()
+    }
+
+    /** Update path for a Canvas-synced assignment. Overwrites all fields. */
+    suspend fun updateCanvasAssignment(
+        assignmentId: String,
+        date: String,
+        classId: String,
+        className: String,
+        assignmentName: String,
+        dueTime: String,
+        canvasId: String
+    ) {
+        val uid = getUid()
+        val data = mapOf(
+            "date" to date,
+            "classId" to classId,
+            "className" to className,
+            "assignmentName" to assignmentName,
+            "dueTime" to dueTime,
+            "canvasId" to canvasId
+        )
+        db.collection("users").document(uid).collection("assignments").document(assignmentId)
+            .set(data)
+            .await()
+    }
+
+    /**
+     * Idempotent upsert for a Canvas calendar event. Queries for existing
+     * docs matching [canvasId], updates if found, otherwise inserts.
+     */
+    suspend fun upsertCanvasEvent(
+        canvasId: String,
+        date: String,
+        name: String,
+        time: String,
+        location: String
+    ) {
+        val uid = getUid()
+        val collection = db.collection("users").document(uid).collection("events")
+
+        val existing = collection.whereEqualTo("canvasId", canvasId).limit(1).get().await()
+        val data = mapOf(
+            "date" to date,
+            "name" to name,
+            "time" to time,
+            "location" to location,
+            "source" to EventSource.CANVAS.name,
+            "canvasId" to canvasId
+        )
+        if (existing.isEmpty) {
+            collection.add(data).await()
+        } else {
+            collection.document(existing.documents.first().id).set(data).await()
+        }
     }
 }

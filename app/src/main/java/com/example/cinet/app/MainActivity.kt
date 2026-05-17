@@ -22,6 +22,8 @@ import com.example.cinet.ui.theme.CINetTheme
 import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
+import com.example.cinet.data.remote.canvas.CanvasTokenStore
+import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
 
 class MainActivity : ComponentActivity() {
 
@@ -52,6 +54,8 @@ class MainActivity : ComponentActivity() {
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
 
+        CanvasDisplaySettings.init(this)
+
         setContent {
             val authState by authViewModel.authState.collectAsState()
 
@@ -78,7 +82,9 @@ class MainActivity : ComponentActivity() {
             ) {
                 NavigationHandler(
                     authState = authState,
-                    onSignOut = { authViewModel.signOut() },
+                    onSignOut = {
+                        CanvasTokenStore(this@MainActivity).clear()
+                        authViewModel.signOut() },
                     onRetry = { authViewModel.retryProfileLoad() },
                     onSaveProfile = { nickname, major, minor, pronouns ->
                         authViewModel.saveProfile(nickname, major, minor, pronouns)

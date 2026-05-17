@@ -49,7 +49,7 @@ fun ProfileEditScreen(
     var minor by remember(profile) { mutableStateOf(profile?.minor ?: "") }
     val context = LocalContext.current
     val programList = loadProgramsFromRaw(context).sortedBy { it.name }
-    val majorList = programList.filter { it.type == "Minor" }
+    val majorList = programList.filter { it.type == "Major" }
     val minorList = programList.filter { it.type == "Minor" }
 
     var pronouns by remember(profile) { mutableStateOf(profile?.pronouns ?: "") }
