@@ -40,6 +40,10 @@ internal fun NavigationScaffoldContent(
             AppTopBar(
                 state = uiState.topBarState,
                 onBack = onTopBarBack,
+                isHomeScreen = uiState.currentScreen == Screen.Home &&
+                        !uiState.isShowingNews &&
+                        !uiState.isShowingClubs,
+                nickname = uiState.userProfile.nickname,
                 onFriendsClick = onTopBarFriendsClick,
                 onNewMessageClick = onTopBarNewMessageClick
             )

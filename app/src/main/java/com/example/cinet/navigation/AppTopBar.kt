@@ -29,11 +29,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 
 // Draws the persistent page title bar used across the app.
 @Composable
 internal fun AppTopBar(
     state: NavigationTopBarState,
+    isHomeScreen: Boolean = false,
+    nickname: String = "",
     onBack: () -> Unit,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
@@ -41,7 +44,7 @@ internal fun AppTopBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
     ) {
         Row(
@@ -56,22 +59,29 @@ internal fun AppTopBar(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
             }
 
-            Text(
-                text = state.title,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                lineHeight = 50.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
+            if (isHomeScreen) {
+                WelcomeHeader(
+                    nickname = nickname,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                Text(
+                    text = state.title,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    lineHeight = 50.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             if (state.showSocialActions) {
                 SocialTopBarActions(
@@ -82,8 +92,37 @@ internal fun AppTopBar(
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        //HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     }
+}
+
+// Displays the home greeting inside the persistent top bar.
+@Composable
+private fun WelcomeHeader(
+    nickname: String,
+    modifier: Modifier = Modifier
+) {
+    val displayName = nickname.ifBlank { "there" }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "Welcome back, $displayName 👋",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = greetingFontSizeFor(displayName),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// Chooses a smaller greeting size when the name is longer.
+private fun greetingFontSizeFor(displayName: String) = when {
+    displayName.length > 22 -> 20.sp
+    displayName.length > 16 -> 22.sp
+    displayName.length > 10 -> 24.sp
+    else -> 26.sp
 }
 
 // Shows the friends and new-message actions used by the Messages page.
@@ -104,7 +143,7 @@ private fun SocialTopBarActions(
             Icon(
                 imageVector = Icons.Default.People,
                 contentDescription = "Friends",
-                tint = MaterialTheme.colorScheme.primary,
+                tint = Color.White,
                 modifier = Modifier.size(32.dp)
             )
         }
@@ -117,7 +156,7 @@ private fun SocialTopBarActions(
             Icon(
                 imageVector = Icons.Default.Edit,
                 contentDescription = "New conversation",
-                tint = MaterialTheme.colorScheme.primary,
+                tint = Color.White,
                 modifier = Modifier.size(32.dp)
             )
         }

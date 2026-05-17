@@ -153,6 +153,8 @@ internal fun MainScaffold(
             selectedClub != null -> selectedClub?.title ?: "Campus Clubs"
             showClubs -> "Campus Clubs"
 
+            currentScreen == Screen.Home -> "Home"
+
             currentScreen == Screen.Social -> when {
                 selectedProfile != null -> if (selectedProfile?.uid == userProfile.uid) "Profile" else selectedProfile?.nickname ?: "Profile"
                 showSocialScreen -> "Friends"
@@ -326,7 +328,13 @@ internal fun MainScaffold(
                 selectedProfile == null &&
                 !showNewConversation &&
                 !showSocialScreen,
-            pendingRequestCount = pendingRequestCount
+            pendingRequestCount = pendingRequestCount,
+            isHomeScreen = currentScreen == Screen.Home &&
+                    selectedNewsArticle == null &&
+                    !showCIView &&
+                    selectedClub == null &&
+                    !showClubs,
+            nickname = userProfile.nickname
         ),
         currentScreen = currentScreen,
         userProfile = userProfile,

@@ -132,10 +132,6 @@ private fun HomeScreenContent(
             .padding(top = 18.dp, bottom = 24.dp)
     ) {
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        WelcomeHeader(nickname = nickname)
-
         Spacer(modifier = Modifier.height(18.dp))
 
         HomeWeatherBanner(
@@ -173,32 +169,6 @@ private fun HomeScreenContent(
             onNotificationClick = onNotificationClick
         )
     }
-}
-
-/** Displays the greeting and keeps it locked to one line by scaling long names down. */
-@Composable
-private fun WelcomeHeader(nickname: String) {
-    val displayName = nickname.ifBlank { "there" }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Welcome back, $displayName 👋",
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Bold,
-            fontSize = greetingFontSizeFor(displayName),
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-/** Chooses a smaller greeting size when the name is longer so the greeting stays on one line. */
-private fun greetingFontSizeFor(displayName: String) = when {
-    displayName.length > 22 -> 20.sp
-    displayName.length > 16 -> 22.sp
-    displayName.length > 10 -> 24.sp
-    else -> 26.sp
 }
 
 /** Displays the weather summary without the "Campus Weather" label. */
