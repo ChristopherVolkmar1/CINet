@@ -71,6 +71,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.filled.Info
 
 /**
  * A file the user has selected but not yet sent.
@@ -88,6 +91,7 @@ fun ConversationScreen(
     onBack: () -> Unit,
     onNavigateToLocation: ((String) -> Unit)? = null,
     onNavigateToCoordinates: ((Double, Double, String, String) -> Unit)? = null,
+    onOpenProfile: ((UserProfile) -> Unit)? = null,
 ) {
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
@@ -126,6 +130,7 @@ fun ConversationScreen(
     var showEventInviteDialog by remember { mutableStateOf(false) }
     var showRemoveFriendDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+    var showGroupInfo by remember { mutableStateOf(false) }
     var renameInput by remember { mutableStateOf("") }
     // Local override so rename is reflected immediately without re-navigation
     var displayGroupName by remember { mutableStateOf(conversation.groupName) }
@@ -133,6 +138,9 @@ fun ConversationScreen(
     var myStudySessions by remember { mutableStateOf<List<StudySession>>(emptyList()) }
     var myEvents by remember { mutableStateOf<List<EventItem>>(emptyList()) }
     var otherUserPhotoUrl by remember { mutableStateOf("") }
+    var otherUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    // For group chats: uid → UserProfile so message avatars can open the right profile
+    var memberProfiles by remember { mutableStateOf<Map<String, UserProfile>>(emptyMap()) }
     var currentUserPhotoUrl by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     var showSearchBar by remember { mutableStateOf(false) }
@@ -203,10 +211,14 @@ fun ConversationScreen(
 
     // Load both participants' photos on open
     LaunchedEffect(conversation.id) {
-        if (otherUid.isNotBlank()) {
+        if (conversation.isGroup) {
+            val profiles = repository.getConversationMemberProfiles(conversation.participantIds)
+            memberProfiles = profiles.associateBy { it.uid }
+        } else if (otherUid.isNotBlank()) {
             val otherSnapshot = FirebaseFirestore.getInstance()
                 .collection("users").document(otherUid).get().await()
             otherUserPhotoUrl = otherSnapshot.getString("photoUrl") ?: ""
+            otherUserProfile = otherSnapshot.toObject(UserProfile::class.java)
         }
         val currentSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(currentUid).get().await()
@@ -296,6 +308,25 @@ fun ConversationScreen(
     }
 
     // Rename group dialog
+    // Group Info bottom sheet
+    if (showGroupInfo && conversation.isGroup) {
+        GroupInfoSheet(
+            conversation = conversation,
+            currentUid = currentUid,
+            onDismiss = { showGroupInfo = false },
+            onRenameGroup = {
+                showGroupInfo = false
+                renameInput = displayGroupName
+                showRenameDialog = true
+            },
+            onLeaveGroup = {
+                showGroupInfo = false
+                onBack()
+            },
+            onOpenProfile = onOpenProfile,
+        )
+    }
+
     if (showRenameDialog) {
         AlertDialog(
             onDismissRequest = { showRenameDialog = false },
@@ -373,22 +404,8 @@ fun ConversationScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Avatar — uses secondaryContainer for consistent green branding
-                    val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() && !conversation.isGroup }
-                    if (headerPhoto != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(headerPhoto)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Profile photo",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                        )
-                    } else {
+                    if (conversation.isGroup) {
+                        // Group: avatar placeholder
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
@@ -402,24 +419,14 @@ fun ConversationScreen(
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    // Group name is tappable to rename; DM name is static
-                    if (conversation.isGroup) {
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = conversationTitle,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    renameInput = displayGroupName
-                                    showRenameDialog = true
-                                }
+                            modifier = Modifier.weight(1f),
                         )
-                        // Search button for group chats
+                        // Search messages
                         IconButton(onClick = { showSearchBar = !showSearchBar }) {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -427,47 +434,90 @@ fun ConversationScreen(
                                 tint = MaterialTheme.colorScheme.onPrimary,
                             )
                         }
+                        // Group info sheet
+                        IconButton(onClick = { showGroupInfo = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Group info",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
                     } else {
-                        Text(
-                            text = conversationTitle,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    // Remove Friend button — only for direct (non-group) conversations
-                    if (!conversation.isGroup && otherUid.isNotBlank()) {
-                        var expanded by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { expanded = true }) {
-                                Icon(
-                                    Icons.Default.MoreVert,
-                                    contentDescription = "Remove Friend",
-                                    tint = MaterialTheme.colorScheme.onPrimary
+                        // DM: avatar + name — tappable to open the other user's ProfileScreen
+                        val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() }
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(
+                                    if (otherUserProfile != null && onOpenProfile != null)
+                                        Modifier.clickable { onOpenProfile(otherUserProfile!!) }
+                                    else Modifier
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (headerPhoto != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(headerPhoto)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Profile photo",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
                                 )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = conversationTitle.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
                             }
-
-                            DropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false },
-                                offset = DpOffset(x = 0.dp, y = 4.dp)
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Search Message") },
-                                    leadingIcon = { Icon(Icons.Default.Search, "Search Message") },
-                                    onClick = {
-                                        expanded = false
-                                        showSearchBar = true
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Remove Friend") },
-                                    leadingIcon = { Icon(Icons.Default.PersonRemove, "Remove Friend") },
-                                    onClick = {
-                                        expanded = false
-                                        showRemoveFriendDialog = true
-                                    }
-                                )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = conversationTitle,
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        // DM MoreVert: search + remove friend
+                        if (otherUid.isNotBlank()) {
+                            var expanded by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { expanded = true }) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = "More options",
+                                        tint = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = expanded,
+                                    onDismissRequest = { expanded = false },
+                                    offset = DpOffset(x = 0.dp, y = 4.dp)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Search Messages") },
+                                        leadingIcon = { Icon(Icons.Default.Search, null) },
+                                        onClick = { expanded = false; showSearchBar = true }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Remove Friend") },
+                                        leadingIcon = { Icon(Icons.Default.PersonRemove, null) },
+                                        onClick = { expanded = false; showRemoveFriendDialog = true }
+                                    )
+                                }
                             }
                         }
                     }
@@ -568,6 +618,21 @@ fun ConversationScreen(
                             onNavigateToLocation = onNavigateToLocation,
                             onNavigateToCoordinates = onNavigateToCoordinates,
                             onPreviewImage = { previewMessage = it },
+                            onOpenSenderProfile = if (message.senderId != currentUid && onOpenProfile != null) {
+                                {
+                                    val profile = if (conversation.isGroup)
+                                        memberProfiles[message.senderId]
+                                    else
+                                        otherUserProfile
+                                    profile?.let { onOpenProfile(it) }
+                                }
+                            } else null,
+                            onDeleteMessage = if (
+                                conversation.roles[currentUid] == "admin" ||
+                                message.senderId == currentUid
+                            ) {
+                                { scope.launch { repository.deleteMessage(conversation.id, message.id) } }
+                            } else null,
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                                 (message.type == "study_invite" || message.type == "event_invite")) {
                                 {
@@ -861,6 +926,7 @@ fun ConversationScreen(
 }
 
 // Frontend team: restyle this bubble however you want
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
     message: Message,
@@ -873,14 +939,49 @@ fun MessageBubble(
     onPreviewImage: ((Message) -> Unit)? = null,
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
+    onDeleteMessage: (() -> Unit)? = null,
+    onOpenSenderProfile: (() -> Unit)? = null,
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog && onDeleteMessage != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Message?") },
+            text = { Text("This will permanently remove the message for everyone.") },
+            confirmButton = {
+                Button(
+                    onClick = { showDeleteDialog = false; onDeleteMessage() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onDeleteMessage != null)
+                    Modifier.combinedClickable(
+                        onClick = {},
+                        onLongClick = { showDeleteDialog = true }
+                    )
+                else Modifier
+            ),
         horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
         if (!isCurrentUser) {
             val photoUrl = message.senderPhotoUrl.takeIf { it.isNotBlank() }
+            val avatarClickModifier = if (onOpenSenderProfile != null)
+                Modifier.clickable { onOpenSenderProfile() }
+            else Modifier
             if (photoUrl != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -889,14 +990,14 @@ fun MessageBubble(
                         .build(),
                     contentDescription = "Profile photo",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
+                    modifier = avatarClickModifier
                         .size(36.dp)
                         .clip(CircleShape)
                         .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
                 )
             } else {
                 Box(
-                    modifier = Modifier
+                    modifier = avatarClickModifier
                         .size(36.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.secondaryContainer)

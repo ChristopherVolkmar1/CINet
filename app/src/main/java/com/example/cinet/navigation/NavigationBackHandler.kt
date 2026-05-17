@@ -37,31 +37,25 @@ internal fun NavigationBackHandler(
     onHideProfileEdit: () -> Unit,
     onGoBack: () -> Unit,
 ) {
-    val isSubPageActive = activeConversation != null ||
-            selectedProfile != null ||
-            showNewConversation ||
-            showSocialScreen ||
-            showProfileEdit ||
-            showCanvasScreen ||
-            showAddClassOnCalendar ||
-            showCIView ||
-            selectedNewsArticle != null ||
-            showClubs ||
-            selectedClub != null
+    val socialBackStackActive = currentScreen == Screen.Social &&
+            (activeConversation != null || selectedProfile != null ||
+                    showNewConversation || showSocialScreen)
 
-    val isAtRoot = backStackSize <= 1 && !isSubPageActive
-
-    BackHandler(enabled = !isAtRoot) {
+    BackHandler(
+        enabled = backStackSize > 1 ||
+                socialBackStackActive ||
+                showProfileEdit ||
+                showCanvasScreen ||
+                showAddClassOnCalendar ||
+                showCIView ||
+                selectedNewsArticle != null ||
+                showClubs ||
+                selectedClub != null ||
+                selectedProfile != null
+    ) {
         when {
-            // Priority 1: Dialogs and deepest terminal screens
             showCanvasScreen -> onHideCanvas()
-            showProfileEdit -> onHideProfileEdit()
             showAddClassOnCalendar -> onHideAddClass()
-            
-            // Priority 2: Main content pages (Chat, Article, Club details)
-            // We clear the active conversation first to support "Profile -> Chat -> Back to Profile"
-            activeConversation != null -> onClearActiveConversation()
-            
             selectedNewsArticle != null -> {
                 if (selectedNewsArticle.title == "Study Rooms") {
                     onClearSelectedNewsArticle()
@@ -71,18 +65,17 @@ internal fun NavigationBackHandler(
                     onShowCIView()
                 }
             }
+            showCIView -> onHideCIView()
             selectedClub != null -> onClearSelectedClub()
-
-            // Priority 3: Detail views
+            showClubs -> onHideClubs()
+            // selectedProfile is checked BEFORE activeConversation so that
+            // pressing system-back while viewing a profile opened from inside
+            // a conversation returns to the conversation, not the list.
             selectedProfile != null -> onClearSelectedProfile()
-
-            // Priority 4: Functional sub-lists (New Chat, Friends List, News List, Clubs List)
+            activeConversation != null -> onClearActiveConversation()
             showNewConversation -> onHideNewConversation()
             showSocialScreen -> onHideSocialScreen()
-            showCIView -> onHideCIView()
-            showClubs -> onHideClubs()
-
-            // Priority 5: Global backstack (Tab history)
+            showProfileEdit -> onHideProfileEdit()
             else -> onGoBack()
         }
     }
