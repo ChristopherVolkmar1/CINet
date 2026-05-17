@@ -37,6 +37,7 @@ import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.Locale
+import androidx.compose.ui.graphics.lerp
 
 /** Shows the Day, Week, and Month selector as a pill control. */
 @Composable
@@ -125,7 +126,7 @@ private fun CalendarModeButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent
+    val containerColor = if (isSelected) Color.White else Color.Transparent
     val textColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary
 
     Box(
@@ -279,7 +280,7 @@ private fun DayCalendarBody(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface),
+                    .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -417,7 +418,7 @@ private fun MonthCalendarBody(
     )
 }
 
-/** Wraps calendar view pieces in a filled purple rounded card. */
+/** Wraps calendar view pieces in a filled rounded card. */
 @Composable
 private fun PurpleSectionCard(
     modifier: Modifier = Modifier,
@@ -427,7 +428,13 @@ private fun PurpleSectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        colors = CardDefaults.cardColors(
+            containerColor = lerp(
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.primary,
+                0.80f
+            )
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -542,7 +549,7 @@ private fun WeekStripDate(
             modifier = Modifier
                 .size(if (isSelected) 38.dp else 34.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent),
+                .background(if (isSelected) Color.White else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -619,7 +626,7 @@ private fun MonthDateCell(
             modifier = Modifier
                 .size(if (isSelected) 26.dp else 22.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent),
+                .background(if (isSelected) Color.White else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(

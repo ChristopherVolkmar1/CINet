@@ -396,7 +396,7 @@ private fun LatestNewsHeader(
             text = "CI View - Latest News",
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
-            fontSize = 22.sp,
+            fontSize = 18.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)

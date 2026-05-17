@@ -31,6 +31,7 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.graphics.lerp
 
 /** Identifies which quick-access popup is currently open. */
 enum class CalendarQuickAccessType {
@@ -155,18 +156,22 @@ private fun PopupHeader(
 /** Shows the icon bubble for the selected popup type. */
 @Composable
 private fun PopupIcon(type: CalendarQuickAccessType) {
-    val green = MaterialTheme.colorScheme.onSecondary
+    //val green = MaterialTheme.colorScheme.onSecondary
 
     Surface(
         modifier = Modifier.size(44.dp),
         shape = CircleShape,
-        color = green.copy(alpha = 0.12f)
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        )
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = popupIcon(type),
                 contentDescription = null,
-                tint = green,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(24.dp)
             )
         }

@@ -209,10 +209,10 @@ fun CalendarScreen(
             .padding(horizontal = 24.dp)
             .padding(top = 18.dp, bottom = 110.dp)
     ) {
-        if(showHeader) {
-            CalendarHeader()
-            Spacer(modifier = Modifier.height(10.dp))
-        }
+        if(showHeader){
+        CalendarHeader()
+        Spacer(modifier = Modifier.height(10.dp))
+            }
 
         CalendarModeSection(
             selectedMode = calendarMode,

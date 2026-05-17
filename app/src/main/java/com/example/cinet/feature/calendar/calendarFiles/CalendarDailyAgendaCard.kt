@@ -27,6 +27,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.example.cinet.feature.calendar.event.EventSource
+import androidx.compose.ui.graphics.lerp
 
 /** Shows the selected day's classes, study sessions, custom events, and toggled campus events. */
 @Composable
@@ -138,7 +139,11 @@ private fun EmptyAgendaMessage(selectedDate: LocalDate) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Column(
@@ -174,7 +179,11 @@ private fun AgendaEventCard(item: AgendaItem) {
             .height(62.dp)
             .clickable { item.onClick() },
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Row(
