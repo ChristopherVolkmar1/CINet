@@ -756,18 +756,92 @@ class SocialRepository(
     ): Conversation {
         val docRef = db.collection("conversations").document()
 
+        // For group chats the creator (currentUid) is automatically admin.
+        val roles: Map<String, String> = if (isGroup) mapOf(currentUid to "admin") else emptyMap()
+
         val conversation = Conversation(
             id = docRef.id,
             participantIds = participantIds,
             participantNicknames = participantNicknames,
             isGroup = isGroup,
             groupName = groupName,
+            roles = roles,
         )
 
         Log.d("SocialRepository", "Creating new conversation: ${docRef.id}")
         docRef.set(conversation).await()
 
         return conversation
+    }
+
+    // ── Group management ────────────────────────────────────────────────────
+
+    /** Loads full UserProfile objects for every UID in [uids]. Used by GroupInfoSheet. */
+    suspend fun getConversationMemberProfiles(uids: List<String>): List<UserProfile> {
+        return uids.mapNotNull { uid ->
+            try {
+                db.collection("users").document(uid).get().await()
+                    .toObject(UserProfile::class.java)
+            } catch (_: Exception) { null }
+        }
+    }
+
+    /** Adds [member] to an existing group conversation. */
+    suspend fun addGroupMember(conversationId: String, member: UserProfile): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update(
+                    mapOf(
+                        "participantIds" to FieldValue.arrayUnion(member.uid),
+                        "participantNicknames.${member.uid}" to member.nickname,
+                    )
+                )
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "addGroupMember failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Removes [uid] from the group. Also clears their roles entry.
+     * Passing currentUid serves as "leave group."
+     */
+    suspend fun removeGroupMember(conversationId: String, uid: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update(
+                    mapOf(
+                        "participantIds" to FieldValue.arrayRemove(uid),
+                        "roles.$uid" to FieldValue.delete(),
+                    )
+                )
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "removeGroupMember failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Hard-deletes a single message. Admins can delete any message;
+     * callers are responsible for the permission check before calling.
+     */
+    suspend fun deleteMessage(conversationId: String, messageId: String): Result<Unit> {
+        return try {
+            db.collection("conversations")
+                .document(conversationId)
+                .collection("messages")
+                .document(messageId)
+                .delete()
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "deleteMessage failed: ${e.message}")
+            Result.failure(e)
+        }
     }
 
     /** Builds a message object using the current sender's profile data. */

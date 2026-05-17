@@ -180,9 +180,14 @@ internal fun MainScaffold(
 
     val handleClearProfile = {
         selectedProfile = null
-        if (profileOpenedFromHome) {
+        // Only pop the back stack when there is no active conversation.
+        // If a profile was opened from inside a conversation, clearing it
+        // must return to the conversation — not navigate away from the screen.
+        if (profileOpenedFromHome && activeConversation == null) {
             profileOpenedFromHome = false
             popBackStack()
+        } else {
+            profileOpenedFromHome = false
         }
     }
 
