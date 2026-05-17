@@ -33,6 +33,7 @@ import com.example.cinet.feature.home.news.NewsRepository
 import com.example.cinet.feature.map.BusScheduleSheet
 import com.example.cinet.ui.theme.CINetTheme
 import java.util.Calendar
+import androidx.compose.ui.graphics.lerp
 
 @Suppress("UNUSED_PARAMETER")
 @Composable
@@ -183,7 +184,11 @@ private fun HomeWeatherBanner(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(34.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Row(
@@ -231,7 +236,11 @@ private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(34.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Row(
@@ -411,14 +420,18 @@ private fun LoadingNewsCard() {
             .fillMaxWidth()
             .height(170.dp),
         shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 2.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = "Loading latest campus news...",
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f),
                 fontWeight = FontWeight.Medium
             )
         }
@@ -437,7 +450,11 @@ private fun HomeNewsCard(
             .height(165.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Column(
@@ -570,7 +587,11 @@ private fun QuickActionCircleButton(
         Surface(
             modifier = Modifier.size(75.dp),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
+            color = lerp(
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.primary,
+                0.80f
+            ),
             shadowElevation = 5.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
