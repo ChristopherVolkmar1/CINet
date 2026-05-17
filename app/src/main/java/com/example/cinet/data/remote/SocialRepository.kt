@@ -844,6 +844,22 @@ class SocialRepository(
         }
     }
 
+    /**
+     * Promotes or demotes a member. Pass "admin" to promote, "member" to demote.
+     * Only the current admin should be calling this — enforce in the UI.
+     */
+    suspend fun updateMemberRole(conversationId: String, uid: String, role: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update("roles.$uid", role)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "updateMemberRole failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
     /** Builds a message object using the current sender's profile data. */
     private fun buildMessage(
         sender: UserProfile,

@@ -49,7 +49,10 @@ fun GroupInfoSheet(
     val repository = remember { SocialRepository() }
     val scope = rememberCoroutineScope()
 
-    val isAdmin = conversation.roles[currentUid] == "admin"
+    // Local copy of roles so promote/demote reflects immediately without
+    // waiting for a Firestore round-trip to update the parent Conversation.
+    var localRoles by remember { mutableStateOf(conversation.roles) }
+    val isAdmin = localRoles[currentUid] == "admin"
 
     // Load full UserProfile objects for each participant
     var members by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
@@ -173,7 +176,7 @@ fun GroupInfoSheet(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(members, key = { it.uid }) { member ->
-                        val memberRole = conversation.roles[member.uid] ?: "member"
+                        val memberRole = localRoles[member.uid] ?: "member"
                         val isSelf = member.uid == currentUid
 
                         Row(
@@ -244,26 +247,44 @@ fun GroupInfoSheet(
                                 }
                             }
 
-                            // Admin can remove non-admin members (not themselves)
-                            if (isAdmin && !isSelf && memberRole != "admin") {
-                                IconButton(
-                                    onClick = {
-                                        removingUid = member.uid
-                                        scope.launch {
-                                            repository.removeGroupMember(conversation.id, member.uid)
-                                            members = members.filter { it.uid != member.uid }
-                                            removingUid = null
-                                        }
+                            // Admin actions on other members
+                            if (isAdmin && !isSelf) {
+                                // Promote / demote toggle
+                                TextButton(onClick = {
+                                    val newRole = if (memberRole == "admin") "member" else "admin"
+                                    // Update local state immediately so UI reflects the change
+                                    localRoles = localRoles.toMutableMap().also { it[member.uid] = newRole }
+                                    scope.launch {
+                                        repository.updateMemberRole(conversation.id, member.uid, newRole)
                                     }
-                                ) {
-                                    if (removingUid == member.uid) {
-                                        CircularProgressIndicator(modifier = Modifier.size(18.dp))
-                                    } else {
-                                        Icon(
-                                            Icons.Default.PersonRemove,
-                                            contentDescription = "Remove ${member.nickname}",
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
+                                }) {
+                                    Text(
+                                        text = if (memberRole == "admin") "Demote" else "Make Admin",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                // Remove — only for non-admins
+                                if (memberRole != "admin") {
+                                    IconButton(
+                                        onClick = {
+                                            removingUid = member.uid
+                                            scope.launch {
+                                                repository.removeGroupMember(conversation.id, member.uid)
+                                                members = members.filter { it.uid != member.uid }
+                                                removingUid = null
+                                            }
+                                        }
+                                    ) {
+                                        if (removingUid == member.uid) {
+                                            CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                                        } else {
+                                            Icon(
+                                                Icons.Default.PersonRemove,
+                                                contentDescription = "Remove ${member.nickname}",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
                                     }
                                 }
                             }
