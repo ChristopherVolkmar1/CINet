@@ -30,19 +30,6 @@ class SocialRepository(
         get() = auth.currentUser?.uid ?: error("No signed-in user.")
 
     /** Searches for users whose nickname matches the typed query (case-insensitive). */
-    /**
-     * Searches for users whose nickname starts with [query], case-insensitively.
-     *
-     * Two parallel server queries are merged to handle both new and legacy documents:
-     *  1. nicknameLower range — hits users whose nicknameLower field has been populated
-     *     (written on every profile save / backfilled at login post-deploy).
-     *  2. Capitalised nickname range — hits legacy users whose nickname is Title Case
-     *     (the most common format) and whose nicknameLower hasn\'t been written yet.
-     *     A client-side toLowerCase check ensures only genuine prefix matches surface.
-     *
-     * Once all users have logged in at least once after the deploy, query 2 becomes
-     * redundant and can be removed.
-     */
     suspend fun searchUsersByNickname(query: String): Result<List<UserProfile>> {
         return try {
             val lowerQuery = query.lowercase()
@@ -119,10 +106,7 @@ class SocialRepository(
         }
     }
 
-    /** Gets outgoing pending friend requests sent by the current user.
-     *  For legacy docs that pre-date the receiverNickname field, the nickname
-     *  is fetched on the fly so the UI never shows a raw UID.
-     */
+    /** Gets outgoing pending friend requests sent by the current user. */
     suspend fun getSentRequests(): Result<List<FriendRequest>> {
         return try {
             val requests = loadPendingRequestsForSender(currentUid)
@@ -174,30 +158,42 @@ class SocialRepository(
     /** Gets the current user's friends as full user profiles. */
     suspend fun getFriends(): Result<List<UserProfile>> {
         return try {
-            val friendIds = loadFriendIds(currentUid)
-            val profiles = loadUserProfiles(friendIds)
+            val friendData = loadFriendData(currentUid)
+            val profiles = friendData.mapNotNull { (uid, localNickname) ->
+                db.collection("users")
+                    .document(uid)
+                    .get()
+                    .await()
+                    .toObject(UserProfile::class.java)
+                    ?.copy(localNickname = localNickname)
+            }
             Result.success(profiles)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    /**
-     * Removes a friend atomically via a WriteBatch:
-     *  1. Deletes both users' friend subcollection docs.
-     *  2. Finds the shared DM conversation (client-side isGroup check to handle
-     *     docs where the field was never written) and sets active = false so it
-     *     disappears from ConversationsListScreen without losing message history.
-     *  3. Deletes both possible friendRequest docs.
-     *
-     * Sending a new message after re-adding calls updateConversationLastMessage
-     * which sets active = true, restoring the conversation automatically.
-     */
+    /** Updates the local nickname for a friend. */
+    suspend fun updateLocalNickname(friendUid: String, localNickname: String): Result<Unit> {
+        return try {
+            db.collection("users")
+                .document(currentUid)
+                .collection("friends")
+                .document(friendUid)
+                .set(mapOf("localNickname" to localNickname), SetOptions.merge())
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "updateLocalNickname failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** Removes a friend atomically via a WriteBatch. */
     suspend fun removeFriend(friendUid: String): Result<Unit> {
         return try {
             val batch = db.batch()
 
-            // 1. Delete both friend subcollection docs
             batch.delete(
                 db.collection("users").document(currentUid)
                     .collection("friends").document(friendUid)
@@ -207,10 +203,6 @@ class SocialRepository(
                     .collection("friends").document(currentUid)
             )
 
-            // 2. Find the shared DM conversation and deactivate it.
-            //    Query by participantIds contains currentUid, then filter client-side
-            //    because whereEqualTo("isGroup", false) misses docs where the field
-            //    was never set.
             val conversationsSnapshot = db.collection("conversations")
                 .whereArrayContains("participantIds", currentUid)
                 .get()
@@ -230,9 +222,6 @@ class SocialRepository(
             batch.commit().await()
             Log.d("SocialRepository", "removeFriend: friend docs deleted, conversation deactivated")
 
-            // 3. Delete both possible friendRequest docs outside the batch.
-            //    A batch delete on a non-existent doc causes PERMISSION_DENIED
-            //    and fails the whole batch, so each is done individually.
             for (docId in listOf("${currentUid}_${friendUid}", "${friendUid}_${currentUid}")) {
                 try {
                     db.collection("friendRequests").document(docId).delete().await()
@@ -277,7 +266,6 @@ class SocialRepository(
             )
 
             if (!isGroup) {
-                // DM path: find any existing active DM with exactly these participants.
                 val existingConversation = findExistingDirectConversation(participantIds)
                 if (existingConversation != null) {
                     Log.d(
@@ -287,11 +275,6 @@ class SocialRepository(
                     return Result.success(existingConversation)
                 }
             } else {
-                // Group path: deduplicate by exact participant set + group name.
-                // Without this check, network timeouts after a successful Firestore
-                // write let the creator tap "Create" again, producing a second group
-                // document. Creator ends up in G2 while other members reply in G1 —
-                // making replies appear "individual" from the creator's perspective.
                 val existingGroup = findExistingGroupConversation(participantIds, groupName)
                 if (existingGroup != null) {
                     Log.d(
@@ -358,13 +341,7 @@ class SocialRepository(
         }
     }
 
-    /**
-     * Picks a file URI, uploads it to Firebase Storage at
-     *   conversations/{conversationId}/attachments/{messageId}
-     * then sends a Message with type="attachment" and metadata keys:
-     *   url, fileName, mimeType, caption.
-     * The last-message preview is the caption when provided, otherwise "📎 <fileName>".
-     */
+    /** Sends an attachment. */
     suspend fun sendAttachment(
         conversationId: String,
         uri: Uri,
@@ -373,7 +350,6 @@ class SocialRepository(
     ): Result<Unit> {
         return try {
             val currentUser = getCurrentUserProfile()
-            // Reserve the Firestore doc ID first so we can use it as the Storage file name.
             val messageId = db.collection("conversations")
                 .document(conversationId)
                 .collection("messages")
@@ -385,8 +361,6 @@ class SocialRepository(
 
             val downloadUrl = uploadToStorage(conversationId, messageId, uri)
 
-            // Use the caption as the message content if provided so conversation list
-            // previews and search both show the caption text rather than just the filename.
             val trimmedCaption = caption.trim()
             val content = trimmedCaption.ifBlank { "📎 $fileName" }
 
@@ -461,13 +435,7 @@ class SocialRepository(
         }
     }
 
-    /** Updates the response value for a study invite message. */
-    /**
-     * Records the current user's response to an invite.
-     * Uses per-user arrays (acceptedBy / declinedBy) instead of a single
-     * "response" field so each participant in a group chat can respond
-     * independently without blocking others.
-     */
+    /** Records the current user's response to an invite. */
     suspend fun respondToInvite(
         conversationId: String,
         messageId: String,
@@ -543,20 +511,15 @@ class SocialRepository(
                 return false
             }
         } catch (e: Exception) {
-            // If the index query fails (e.g. missing composite index), log clearly and
-            // allow the send rather than silently blocking it. The saveFriendRequest
-            // document ID is deterministic so a duplicate write is harmless.
             Log.e("SocialRepository", "canSendFriendRequest check failed — allowing send. Error: ${e.message}")
         }
         return true
     }
 
-    /** Builds a stable friend request document id from sender and receiver ids. */
     private fun friendRequestDocumentId(senderId: String, receiverId: String): String {
         return "${senderId}_${receiverId}"
     }
 
-    /** Builds a friend request object from the provided values. */
     private fun buildFriendRequest(
         senderId: String,
         senderNickname: String,
@@ -575,18 +538,12 @@ class SocialRepository(
         )
     }
 
-    /**
-     * Saves a friend request to Firestore.
-     * Deletes any stale doc first (e.g. a previously declined request) so the
-     * write is always a `create` -- which the sender is permitted to do.
-     */
     private suspend fun saveFriendRequest(request: FriendRequest) {
         val docRef = db.collection("friendRequests").document(request.id)
         try { docRef.delete().await() } catch (_: Exception) { }
         docRef.set(request).await()
     }
 
-    /** Loads the current user's full profile from Firestore. */
     private suspend fun getCurrentUserProfile(): UserProfile {
         return db.collection("users")
             .document(currentUid)
@@ -596,7 +553,6 @@ class SocialRepository(
             ?: error("Current user not found.")
     }
 
-    /** Checks whether the current user is already friends with the other user. */
     private suspend fun areAlreadyFriends(otherUid: String): Boolean {
         val friendDoc = db.collection("users")
             .document(currentUid)
@@ -608,7 +564,6 @@ class SocialRepository(
         return friendDoc.exists()
     }
 
-    /** Checks whether a pending request exists between two users. */
     private suspend fun hasPendingRequest(senderId: String, receiverId: String): Boolean {
         val snapshot = db.collection("friendRequests")
             .whereEqualTo("senderId", senderId)
@@ -621,7 +576,6 @@ class SocialRepository(
         return !snapshot.isEmpty
     }
 
-    /** Loads pending requests where the current user is the receiver. */
     private suspend fun loadPendingRequestsForReceiver(receiverId: String): List<FriendRequest> {
         val snapshot = db.collection("friendRequests")
             .whereEqualTo("receiverId", receiverId)
@@ -632,7 +586,6 @@ class SocialRepository(
         return snapshot.toObjects(FriendRequest::class.java)
     }
 
-    /** Loads pending requests where the current user is the sender. */
     private suspend fun loadPendingRequestsForSender(senderId: String): List<FriendRequest> {
         val snapshot = db.collection("friendRequests")
             .whereEqualTo("senderId", senderId)
@@ -643,7 +596,6 @@ class SocialRepository(
         return snapshot.toObjects(FriendRequest::class.java)
     }
 
-    /** Marks matching pending requests between two users with the given status. */
     private suspend fun markPendingRequestsBetween(
         senderId: String,
         receiverId: String,
@@ -661,7 +613,6 @@ class SocialRepository(
         }
     }
 
-    /** Marks both directions of pending requests as accepted. */
     private suspend fun markRequestsAcceptedBetweenUsers(
         firstUid: String,
         secondUid: String,
@@ -670,45 +621,34 @@ class SocialRepository(
         markPendingRequestsBetween(secondUid, firstUid, "accepted")
     }
 
-    /** Adds two users to each other's friends subcollection. */
     private suspend fun addUsersAsFriends(firstUid: String, secondUid: String) {
         addSingleFriend(firstUid, secondUid)
         addSingleFriend(secondUid, firstUid)
     }
 
-    /** Adds one friend document under a user's friends subcollection. */
     private suspend fun addSingleFriend(ownerUid: String, friendUid: String) {
         db.collection("users")
             .document(ownerUid)
             .collection("friends")
             .document(friendUid)
-            .set(mapOf("uid" to friendUid))
+            .set(mapOf("uid" to friendUid), SetOptions.merge())
             .await()
     }
 
-    /** Loads the friend ids for the given user. */
-    private suspend fun loadFriendIds(userUid: String): List<String> {
+    private suspend fun loadFriendData(userUid: String): List<Pair<String, String?>> {
         val snapshot = db.collection("users")
             .document(userUid)
             .collection("friends")
             .get()
             .await()
 
-        return snapshot.documents.mapNotNull { it.getString("uid") }
-    }
-
-    /** Loads user profiles for a list of user ids. */
-    private suspend fun loadUserProfiles(uids: List<String>): List<UserProfile> {
-        return uids.mapNotNull { uid ->
-            db.collection("users")
-                .document(uid)
-                .get()
-                .await()
-                .toObject(UserProfile::class.java)
+        return snapshot.documents.mapNotNull { doc ->
+            val uid = doc.getString("uid") ?: return@mapNotNull null
+            val local = doc.getString("localNickname")
+            uid to local
         }
     }
 
-    /** Looks for an existing one-on-one conversation with the exact participants. */
     private suspend fun findExistingDirectConversation(
         participantIds: List<String>,
     ): Conversation? {
@@ -724,12 +664,6 @@ class SocialRepository(
             }
     }
 
-    /**
-     * Looks for an existing group conversation with exactly these participants and
-     * the same group name. Used to deduplicate group creation — if a Firestore write
-     * succeeds but the response times out, retrying would otherwise create a second
-     * identical group, splitting replies across two conversations.
-     */
     private suspend fun findExistingGroupConversation(
         participantIds: List<String>,
         groupName: String,
@@ -747,7 +681,6 @@ class SocialRepository(
             }
     }
 
-    /** Creates and saves a new conversation document. */
     private suspend fun createConversation(
         participantIds: List<String>,
         participantNicknames: Map<String, String>,
@@ -764,13 +697,10 @@ class SocialRepository(
             groupName = groupName,
         )
 
-        Log.d("SocialRepository", "Creating new conversation: ${docRef.id}")
         docRef.set(conversation).await()
-
         return conversation
     }
 
-    /** Builds a message object using the current sender's profile data. */
     private fun buildMessage(
         sender: UserProfile,
         content: String,
@@ -793,7 +723,6 @@ class SocialRepository(
         )
     }
 
-    /** Saves a message inside a conversation's messages subcollection. */
     private suspend fun saveMessage(conversationId: String, message: Message) {
         db.collection("conversations")
             .document(conversationId)
@@ -803,10 +732,6 @@ class SocialRepository(
             .await()
     }
 
-    /**
-     * Updates the last message preview and lastUpdated timestamp for a conversation.
-     * lastUpdated is written as a server timestamp so sort order in the list is correct.
-     */
     private suspend fun updateConversationLastMessage(
         conversationId: String,
         content: String,
@@ -818,9 +743,6 @@ class SocialRepository(
                     "lastMessage" to content,
                     "lastUpdated" to FieldValue.serverTimestamp(),
                     "lastSenderId" to currentUid,
-                    // Re-activates the conversation if it was hidden after an unfriend.
-                    // This means sending a message after re-adding a friend restores
-                    // the conversation in the list automatically.
                     "active" to true
                 ),
                 SetOptions.merge()
@@ -828,7 +750,6 @@ class SocialRepository(
             .await()
     }
 
-    /** Converts Firestore data into a ScheduleItem when all required fields exist. */
     private fun mapDocumentToScheduleItem(
         id: String,
         data: Map<String, Any>,
@@ -839,17 +760,9 @@ class SocialRepository(
         val assignmentName = data["assignmentName"] as? String ?: return null
         val dueTime = data["dueTime"] as? String ?: return null
 
-        return ScheduleItem(
-            id = id,
-            date = date,
-            classId = classId,
-            className = className,
-            assignmentName = assignmentName,
-            dueTime = dueTime,
-        )
+        return ScheduleItem(id, date, classId, className, assignmentName, dueTime)
     }
 
-    /** Converts Firestore data into a StudySession when all required fields exist. */
     private fun mapDocumentToStudySession(
         id: String,
         data: Map<String, Any>,
@@ -860,17 +773,9 @@ class SocialRepository(
         val startTime = data["startTime"] as? String ?: return null
         val location = data["location"] as? String ?: ""
 
-        return StudySession(
-            id = id,
-            date = date,
-            className = className,
-            topic = topic,
-            startTime = startTime,
-            location = location,
-        )
+        return StudySession(id, date, className, topic, startTime, location)
     }
 
-    /** Converts Firestore data into an EventItem when all required fields exist. */
     private fun mapDocumentToEventItem(
         id: String,
         data: Map<String, Any>,
@@ -880,16 +785,9 @@ class SocialRepository(
         val time = data["time"] as? String ?: return null
         val location = data["location"] as? String ?: ""
 
-        return EventItem(
-            id = id,
-            date = date,
-            name = name,
-            time = time,
-            location = location,
-        )
+        return EventItem(id, date, name, time, location)
     }
 
-    /** Uploads [uri] to Storage and returns the HTTPS download URL. */
     private suspend fun uploadToStorage(
         conversationId: String,
         messageId: String,
@@ -901,11 +799,6 @@ class SocialRepository(
         return ref.downloadUrl.await().toString()
     }
 
-    /**
-     * Resolves a human-readable file name from a content URI using
-     * [OpenableColumns.DISPLAY_NAME]. Falls back to "attachment" if the
-     * column is unavailable (e.g. a file:// URI without a name segment).
-     */
     private fun resolveFileName(context: Context, uri: Uri): String {
         var name = "attachment"
         runCatching {

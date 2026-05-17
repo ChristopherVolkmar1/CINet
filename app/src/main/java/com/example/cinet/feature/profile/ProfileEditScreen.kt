@@ -1,5 +1,6 @@
 package com.example.cinet.feature.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -62,6 +63,12 @@ fun ProfileEditScreen(
     var minorExpanded by remember { mutableStateOf(false) }
     val validMajor = majorList.any { it.name == major }
     val validMinor = minorList.any { it.name == minor} || minor.isBlank()
+
+    // Intercept system back button
+    BackHandler(enabled = true) {
+        onBack()
+    }
+
     // Navigate back automatically once save succeeds
     LaunchedEffect(state) {
         if (state is ProfileEditState.Success) {

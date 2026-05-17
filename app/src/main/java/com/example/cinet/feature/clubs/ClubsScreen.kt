@@ -1,8 +1,8 @@
 package com.example.cinet.feature.clubs
 
-import android.text.TextUtils.replace
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.cinet.feature.map.SearchBar
 
-// clubs stuff - Zack
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClubsScreen(
@@ -34,15 +33,26 @@ fun ClubsScreen(
     val clubsRepository = remember { ClubsRepository() }
     var clubs by remember { mutableStateOf<List<ClubItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    var lastLoadedUrl by remember { mutableStateOf<String?>(null) }
 
-    val textFieldState = rememberTextFieldState() // Search text field
+    val textFieldState = rememberTextFieldState()
+
     LaunchedEffect(Unit) {
         clubs = clubsRepository.fetchClubs()
         isLoading = false
     }
 
+    // System back button handling
+    BackHandler(enabled = true) {
+        if (selectedClubUrl != null && webView?.canGoBack() == true) {
+            webView?.goBack()
+        } else {
+            onBack()
+        }
+    }
+
     if (selectedClubUrl != null) {
-        // club details - Zack
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -54,7 +64,13 @@ fun ClubsScreen(
                         ) 
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = {
+                            if (webView?.canGoBack() == true) {
+                                webView?.goBack()
+                            } else {
+                                onBack()
+                            }
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
@@ -66,13 +82,16 @@ fun ClubsScreen(
                     WebView(context).apply {
                         webViewClient = WebViewClient()
                         settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true // Required for some modern sites
+                        settings.domStorageEnabled = true
                         loadUrl(selectedClubUrl)
+                        webView = this
+                        lastLoadedUrl = selectedClubUrl
                     }
                 },
-                update = { webView ->
-                    if (webView.url != selectedClubUrl) {
-                        webView.loadUrl(selectedClubUrl)
+                update = { view ->
+                    if (selectedClubUrl != null && selectedClubUrl != lastLoadedUrl) {
+                        view.loadUrl(selectedClubUrl)
+                        lastLoadedUrl = selectedClubUrl
                     }
                 },
                 modifier = Modifier
@@ -81,7 +100,6 @@ fun ClubsScreen(
             )
         }
     } else {
-        // main clubs list - Zack
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -146,7 +164,9 @@ fun ClubsScreen(
                             textFieldState = textFieldState,
                             searchResults = emptyList(),
                             onSearch = { query ->
-                                textFieldState.edit { replace(0, length, query) }
+                                textFieldState.edit { 
+                                    replace(0, length, query)
+                                }
                             }
                         )
                     }
@@ -168,7 +188,6 @@ fun ClubsScreen(
     }
 }
 
-// club item card - Zack
 @Composable
 fun ClubListItem(club: ClubItem, onClick: () -> Unit) {
     Card(

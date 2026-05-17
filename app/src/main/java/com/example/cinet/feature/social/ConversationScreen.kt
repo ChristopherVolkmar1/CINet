@@ -96,12 +96,8 @@ fun ConversationScreen(
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val listState = rememberLazyListState()
     var isUploadingAttachment by remember { mutableStateOf(false) }
-    // Holds a picked file that hasn't been sent yet — shown as a preview
-    // above the message box. Cleared on send or on the user pressing X.
     var pendingAttachment by remember { mutableStateOf<PendingAttachment?>(null) }
 
-    // File picker — resolves metadata client-side, stores as pending so the
-    // user sees a preview before the file is actually uploaded or sent.
     val attachmentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -121,13 +117,11 @@ fun ConversationScreen(
     var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
     var conversationCount by remember { mutableIntStateOf(0) }
     val entryTime = remember { System.currentTimeMillis() }
-    var messageInput by remember { mutableStateOf("") }
     var showStudyInviteDialog by remember { mutableStateOf(false) }
     var showEventInviteDialog by remember { mutableStateOf(false) }
     var showRemoveFriendDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameInput by remember { mutableStateOf("") }
-    // Local override so rename is reflected immediately without re-navigation
     var displayGroupName by remember { mutableStateOf(conversation.groupName) }
     var myScheduleItems by remember { mutableStateOf<List<ScheduleItem>>(emptyList()) }
     var myStudySessions by remember { mutableStateOf<List<StudySession>>(emptyList()) }
@@ -137,12 +131,30 @@ fun ConversationScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showSearchBar by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    // null = preview closed; non-null = show full-screen image preview for this message
     var previewMessage by remember { mutableStateOf<Message?>(null) }
     var currentUserNickname by remember { mutableStateOf("") }
-    // Filtered messages — client-side only, no extra Firestore reads.
-    // Matches text content for regular messages; falls back to invite
-    // title/class fields and location name for structured bubble types.
+    
+    var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        repository.getFriends().onSuccess { friends = it }
+    }
+    val localNicknamesMap = remember(friends) {
+        friends.associate { it.uid to it.localNickname }.filterValues { it != null }
+    }
+
+    // Comprehensive system back button handling
+    BackHandler(enabled = true) {
+        when {
+            previewMessage != null -> previewMessage = null
+            showSearchBar -> {
+                showSearchBar = false
+                searchQuery = ""
+            }
+            pendingAttachment != null -> pendingAttachment = null
+            else -> onBack()
+        }
+    }
+
     val displayedMessages by remember {
         derivedStateOf {
             val q = searchQuery.trim()
@@ -172,7 +184,6 @@ fun ConversationScreen(
         }
     }
 
-    // When the query changes and results exist, jump to the first match.
     LaunchedEffect(searchQuery) {
         if (searchQuery.isNotBlank() && displayedMessages.isNotEmpty()) {
             val firstIndex = messages.indexOfFirst { it.id == displayedMessages.first().id }
@@ -180,8 +191,6 @@ fun ConversationScreen(
         }
     }
 
-    // Returns true if the same invite was sent in this conversation within
-    // the last 5 minutes, preventing accidental double-sends.
     fun isDuplicateInvite(type: String, name: String, date: String): Boolean {
         val fiveMinutesAgo = System.currentTimeMillis() - 5 * 60 * 1000L
         return messages.any { msg ->
@@ -197,11 +206,10 @@ fun ConversationScreen(
     val conversationTitle = if (conversation.isGroup) {
         displayGroupName.ifBlank { "Group Chat" }
     } else {
-        conversation.participantNicknames.entries
+        localNicknamesMap[otherUid] ?: conversation.participantNicknames.entries
             .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
     }
 
-    // Load both participants' photos on open
     LaunchedEffect(conversation.id) {
         if (otherUid.isNotBlank()) {
             val otherSnapshot = FirebaseFirestore.getInstance()
@@ -211,8 +219,7 @@ fun ConversationScreen(
         val currentSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(currentUid).get().await()
         currentUserPhotoUrl = currentSnapshot.getString("photoUrl") ?: ""
-
-        currentUserNickname = currentSnapshot.getString("nickname") ?: ""  // add
+        currentUserNickname = currentSnapshot.getString("nickname") ?: ""
     }
 
     DisposableEffect(conversation.id) {
@@ -229,7 +236,6 @@ fun ConversationScreen(
         onDispose { listener.remove() }
     }
 
-    // Real-time listener: keeps conversation count badge in sync
     DisposableEffect(currentUid) {
         val listener = FirebaseFirestore.getInstance()
             .collection("conversations")
@@ -250,7 +256,6 @@ fun ConversationScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    // User location
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     try {
@@ -260,15 +265,7 @@ fun ConversationScreen(
     } catch (_: SecurityException) {
         Log.e("Location", "No Permission")
     }
-    var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
 
-    LaunchedEffect(Unit) {
-        repository.getFriends().onSuccess {
-            friends = it
-        }
-    }
-
-    // Remove Friend confirmation dialog
     if (showRemoveFriendDialog) {
         AlertDialog(
             onDismissRequest = { showRemoveFriendDialog = false },
@@ -295,7 +292,6 @@ fun ConversationScreen(
         )
     }
 
-    // Rename group dialog
     if (showRenameDialog) {
         AlertDialog(
             onDismissRequest = { showRenameDialog = false },
@@ -339,14 +335,12 @@ fun ConversationScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
 
-                // Header
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // iOS-style back: bare chevron + conversation count pill
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.clickable(onClick = onBack),
@@ -373,7 +367,6 @@ fun ConversationScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Avatar — uses secondaryContainer for consistent green branding
                     val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() && !conversation.isGroup }
                     if (headerPhoto != null) {
                         AsyncImage(
@@ -406,7 +399,6 @@ fun ConversationScreen(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    // Group name is tappable to rename; DM name is static
                     if (conversation.isGroup) {
                         Text(
                             text = conversationTitle,
@@ -419,12 +411,11 @@ fun ConversationScreen(
                                     showRenameDialog = true
                                 }
                         )
-                        // Search button for group chats
                         IconButton(onClick = { showSearchBar = !showSearchBar }) {
                             Icon(
                                 imageVector = Icons.Default.Search,
                                 contentDescription = "Search messages",
-                                tint = MaterialTheme.colorScheme.onPrimary,
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     } else {
@@ -435,15 +426,14 @@ fun ConversationScreen(
                         )
                     }
 
-                    // Remove Friend button — only for direct (non-group) conversations
                     if (!conversation.isGroup && otherUid.isNotBlank()) {
                         var expanded by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { expanded = true }) {
                                 Icon(
                                     Icons.Default.MoreVert,
-                                    contentDescription = "Remove Friend",
-                                    tint = MaterialTheme.colorScheme.onPrimary
+                                    contentDescription = "Menu",
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
 
@@ -475,7 +465,6 @@ fun ConversationScreen(
 
                 HorizontalDivider()
 
-                // ── Search bar — animates in/out below the header divider ──────
                 AnimatedVisibility(
                     visible = showSearchBar,
                     enter = expandVertically(),
@@ -520,7 +509,6 @@ fun ConversationScreen(
                                 ),
                             )
                             Spacer(Modifier.width(8.dp))
-                            // Dismiss search entirely
                             IconButton(onClick = {
                                 showSearchBar = false
                                 searchQuery = ""
@@ -532,7 +520,6 @@ fun ConversationScreen(
                                 )
                             }
                         }
-                        // Match count pill — only shown when query is active
                         if (searchQuery.isNotBlank()) {
                             Text(
                                 text = if (matchCount == 0) "No results"
@@ -554,13 +541,20 @@ fun ConversationScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(displayedMessages) { message ->
-                        // Per-user check: has THIS user already accepted or declined?
-                        // acceptedBy/declinedBy are comma-separated UIDs stored in metadata.
                         val acceptedBy = (message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                         val declinedBy = (message.metadata["declinedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                         val alreadyResponded = currentUid in acceptedBy || currentUid in declinedBy
+                        
+                        // Use local nickname for message bubbles if the sender is a friend
+                        val displaySenderNickname = if (message.senderId == currentUid) {
+                            message.senderNickname
+                        } else {
+                            localNicknamesMap[message.senderId] ?: message.senderNickname
+                        }
+
                         MessageBubble(
                             message = message,
+                            senderNicknameOverride = displaySenderNickname,
                             isCurrentUser = message.senderId == currentUid,
                             currentUid = currentUid,
                             currentUserPhotoUrl = currentUserPhotoUrl,
@@ -578,14 +572,8 @@ fun ConversationScreen(
                                             val date = message.metadata["date"] as? String ?: ""
                                             val time = message.metadata["time"] as? String ?: ""
                                             val location = message.metadata["location"] as? String ?: ""
-                                            android.util.Log.d("CalendarSave", "Saving study session: $className $topic $date $time")
                                             if (date.isNotBlank()) {
-                                                android.util.Log.d("CalendarSave", "metadata: ${message.metadata}")
-                                                android.util.Log.d("CalendarSave", "date: ${message.metadata["date"]}")
                                                 calendarRepository.addStudySession(date, className, topic, time, location)
-                                                android.util.Log.d("CalendarSave", "Study session saved successfully")
-                                            } else {
-                                                android.util.Log.e("CalendarSave", "Date is blank — metadata: ${message.metadata}")
                                             }
                                         } else {
                                             val name = message.metadata["name"] as? String ?: ""
@@ -615,8 +603,6 @@ fun ConversationScreen(
 
                 val textFieldState = rememberTextFieldState()
 
-                // ── Step 1: pending attachment preview ───────────────────────────
-                // Shown after the user picks a file but before they tap Send.
                 AnimatedVisibility(
                     visible = pendingAttachment != null,
                     enter = expandVertically(),
@@ -630,7 +616,6 @@ fun ConversationScreen(
                     }
                 }
 
-                // Upload progress bar — shown only during the actual upload
                 if (isUploadingAttachment) {
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
@@ -638,9 +623,6 @@ fun ConversationScreen(
                     )
                 }
 
-                // ── Step 2: send ─────────────────────────────────────────────────
-                // If a pending attachment exists, Send uploads + sends it.
-                // Otherwise Send behaves as normal text send.
                 MessageBox(
                     state = textFieldState,
                     onSendMessage = {
@@ -672,8 +654,6 @@ fun ConversationScreen(
                     studySelected = { showStudyInviteDialog = true },
                     eventSelected = { showEventInviteDialog = true },
                     onAttachmentClick = {
-                        // Don't allow picking a new file while one is already
-                        // staged or being uploaded
                         if (pendingAttachment == null && !isUploadingAttachment) {
                             attachmentLauncher.launch("*/*")
                         }
@@ -732,12 +712,8 @@ fun ConversationScreen(
                 )
             }
         }
-    } // outer Box
+    }
 
-    // Dismiss preview on back gesture
-    BackHandler(enabled = previewMessage != null) { previewMessage = null }
-
-    // Full-screen image preview overlay
     AnimatedVisibility(
         visible = previewMessage != null,
         enter = fadeIn(),
@@ -776,7 +752,6 @@ fun ConversationScreen(
                             "location" to ""
                         )
                     )
-                    // Add to sender's calendar as a study session (distinct from the assignment entry)
                     if (item.date.isNotBlank()) {
                         calendarRepository.addStudySession(item.date, item.className, item.assignmentName, item.dueTime, "")
                     }
@@ -803,7 +778,6 @@ fun ConversationScreen(
                             "location" to session.location
                         )
                     )
-                    // Session is already in sender's studySessions — no add needed
                     showStudyInviteDialog = false
                 }
             },
@@ -821,7 +795,6 @@ fun ConversationScreen(
                         type = "study_invite",
                         metadata = mapOf("className" to cls, "topic" to topic, "date" to date, "time" to time, "location" to location)
                     )
-                    // New session — save to sender's calendar immediately
                     if (date.isNotBlank()) {
                         calendarRepository.addStudySession(date, cls, topic, time, location)
                     }
@@ -849,7 +822,6 @@ fun ConversationScreen(
                         type = "event_invite",
                         metadata = mapOf("name" to name, "date" to date, "time" to time, "location" to location)
                     )
-                    // Save to sender's calendar so they don't have to accept their own invite
                     if (date.isNotBlank()) {
                         calendarRepository.addEvent(date, name, time, location)
                     }
@@ -860,10 +832,10 @@ fun ConversationScreen(
     }
 }
 
-// Frontend team: restyle this bubble however you want
 @Composable
 fun MessageBubble(
     message: Message,
+    senderNicknameOverride: String? = null,
     isCurrentUser: Boolean,
     currentUid: String = "",
     currentUserPhotoUrl: String = "",
@@ -874,6 +846,8 @@ fun MessageBubble(
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
 ) {
+    val displayNickname = senderNicknameOverride ?: message.senderNickname
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isCurrentUser) Arrangement.End else Arrangement.Start,
@@ -904,7 +878,7 @@ fun MessageBubble(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = message.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                        text = displayNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
@@ -918,7 +892,7 @@ fun MessageBubble(
         ) {
             if (!isCurrentUser) {
                 Text(
-                    text = message.senderNickname,
+                    text = displayNickname,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp)
@@ -968,8 +942,6 @@ fun MessageBubble(
                     color = bubbleColor,
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                        // Build an AnnotatedString that bolds + backgrounds any
-                        // portion of the text matching the current search query.
                         val annotated = remember(message.content, highlightQuery, textColor) {
                             buildAnnotatedString {
                                 if (highlightQuery.isBlank()) {
@@ -1045,11 +1017,6 @@ fun MessageBubble(
     }
 }
 
-/**
- * Card-style bubble for study_invite and event_invite messages.
- * Shows type icon, title, subtitle (study only), date/time/location rows,
- * and either Accept/Decline buttons or the recorded response.
- */
 @Composable
 fun InviteBubble(
     message: Message,
@@ -1088,7 +1055,6 @@ fun InviteBubble(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
 
-            // ── Header: type icon + label + optional map pin ────────
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
@@ -1107,7 +1073,6 @@ fun InviteBubble(
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
                     modifier = Modifier.weight(1f),
                 )
-                // Map pin button — taps into Map tab directions for this location
                 if (location.isNotBlank() && onNavigateToLocation != null) {
                     Surface(
                         shape = CircleShape,
@@ -1135,7 +1100,6 @@ fun InviteBubble(
             )
             Spacer(Modifier.height(8.dp))
 
-            // ── Title + subtitle ─────────────────────────────────────
             if (title.isNotBlank()) {
                 Text(
                     text = title,
@@ -1154,7 +1118,6 @@ fun InviteBubble(
 
             Spacer(Modifier.height(8.dp))
 
-            // ── Detail rows: date / time / location ──────────────────
             @Composable
             fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
                 if (text.isBlank()) return
@@ -1181,7 +1144,6 @@ fun InviteBubble(
             DetailRow(Icons.Default.Schedule, time)
             DetailRow(Icons.Default.LocationOn, location)
 
-            // ── Response status or Accept / Decline buttons ──────────
             when {
                 response == "accepted" || currentUid in ((message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()) -> {
                     Spacer(Modifier.height(8.dp))
@@ -1292,15 +1254,6 @@ fun LocationShareBubble(
     }
 }
 
-/**
- * Renders an attachment message bubble.
- *
- * • Image MIME types  → inline [AsyncImage] (Coil), tap to open in system viewer
- * • All other types   → compact file card with [AttachFile] icon, file name, and an
- *                       "Open" button that fires [Intent.ACTION_VIEW]
- *
- * Shape, alignment, and sizing are consistent with the rest of the bubble family.
- */
 @Composable
 fun AttachmentBubble(
     message: Message,
@@ -1329,7 +1282,6 @@ fun AttachmentBubble(
     }
 
     if (mimeType.startsWith("image/")) {
-        // ── Image bubble — tap opens full-screen preview ──────────────────────────
         Surface(
             shape = cardShape,
             color = if (isCurrentUser)
@@ -1343,7 +1295,6 @@ fun AttachmentBubble(
                 },
         ) {
             Column {
-                // Round bottom corners only when there's no caption below the image
                 val imageShape = if (caption.isNotBlank()) RoundedCornerShape(
                     topStart    = if (isCurrentUser) 16.dp else 4.dp,
                     topEnd      = if (isCurrentUser) 4.dp  else 16.dp,
@@ -1376,7 +1327,6 @@ fun AttachmentBubble(
             }
         }
     } else {
-        // ── Generic file card ─────────────────────────────────────────────────────
         Card(
             shape = cardShape,
             colors = CardDefaults.cardColors(
@@ -1386,7 +1336,6 @@ fun AttachmentBubble(
             modifier = Modifier.widthIn(min = 200.dp, max = 280.dp),
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                // Header row — icon + "ATTACHMENT" label
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.AttachFile,
@@ -1402,7 +1351,6 @@ fun AttachmentBubble(
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
                     )
                 }
-                // File name sits directly under the label, above the divider
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = fileName,
@@ -1418,7 +1366,6 @@ fun AttachmentBubble(
                     thickness = 0.5.dp,
                 )
                 Spacer(Modifier.height(8.dp))
-                // Open button
                 Button(
                     onClick = { openUrl() },
                     modifier = Modifier.fillMaxWidth(),
@@ -1434,7 +1381,6 @@ fun AttachmentBubble(
                     Spacer(Modifier.width(6.dp))
                     Text("Open")
                 }
-                // Caption — shown below the Open button when the sender added one
                 if (caption.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
                     HorizontalDivider(
@@ -1453,18 +1399,6 @@ fun AttachmentBubble(
     }
 }
 
-/**
- * Full-screen image preview overlay, shown when the user taps an image attachment.
- *
- * Layout (mirrors Discord's viewer):
- *   • Near-black background — tap it to dismiss
- *   • Image fills available space with ContentScale.Fit (no cropping)
- *   • Floating top toolbar: [✕ close]  [filename]  [↓ download]
- *
- * Download uses DownloadManager so the file lands in the device's Downloads
- * folder and a system notification confirms completion — no extra permissions
- * needed on API 29+ (Android 10+).
- */
 @Composable
 fun ImagePreviewOverlay(
     message: Message,
@@ -1494,7 +1428,7 @@ fun ImagePreviewOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xF0000000)) // ~94 % opaque black
+            .background(Color(0xF0000000))
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
@@ -1502,7 +1436,6 @@ fun ImagePreviewOverlay(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        // Image — consume clicks so tapping the photo doesn't dismiss the overlay
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(url)
@@ -1512,24 +1445,22 @@ fun ImagePreviewOverlay(
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 64.dp) // clear space for toolbar at top
+                .padding(bottom = 64.dp)
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() },
-                    onClick = { /* consume — don't dismiss */ },
+                    onClick = { },
                 ),
         )
 
-        // ── Floating top toolbar ─────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .background(Color(0x88000000)) // translucent black scrim
+                .background(Color(0x88000000))
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Close
             IconButton(onClick = onDismiss) {
                 Icon(
                     imageVector = Icons.Default.Close,
@@ -1538,7 +1469,6 @@ fun ImagePreviewOverlay(
                 )
             }
 
-            // Filename — truncated in the middle of the toolbar
             Text(
                 text = fileName,
                 color = Color.White,
@@ -1551,7 +1481,6 @@ fun ImagePreviewOverlay(
                     .padding(horizontal = 4.dp),
             )
 
-            // Download
             IconButton(onClick = { downloadImage() }) {
                 Icon(
                     imageVector = Icons.Default.Download,
@@ -1563,14 +1492,6 @@ fun ImagePreviewOverlay(
     }
 }
 
-/**
- * Preview card shown above the message box after the user picks a file
- * but before they tap Send (the 2-step attachment send flow).
- *
- * • Images  → thumbnail (loaded from the local URI via Coil) + filename
- * • Files   → AttachFile icon + filename
- * • ✕ button cancels the pending attachment without sending anything
- */
 @Composable
 private fun PendingAttachmentPreview(
     attachment: PendingAttachment,
@@ -1589,7 +1510,6 @@ private fun PendingAttachmentPreview(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (attachment.mimeType.startsWith("image/")) {
-                // Thumbnail loaded directly from the local URI — no network needed
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(attachment.uri)
@@ -1602,7 +1522,6 @@ private fun PendingAttachmentPreview(
                         .clip(RoundedCornerShape(10.dp)),
                 )
             } else {
-                // Generic file icon in a small container
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -1638,7 +1557,6 @@ private fun PendingAttachmentPreview(
                 )
             }
 
-            // Cancel — clears the pending attachment without sending
             IconButton(onClick = onCancel) {
                 Icon(
                     imageVector = Icons.Default.Close,

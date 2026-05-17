@@ -1,5 +1,6 @@
 package com.example.cinet.feature.social
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,6 +56,14 @@ fun NewConversationScreen(
     LaunchedEffect(Unit) {
         repository.getFriends().onSuccess { friends = it }
         isLoading = false
+    }
+
+    // Handle system back button internally
+    BackHandler(enabled = true) {
+        when (step) {
+            NewConvStep.Selecting -> onBack()
+            NewConvStep.Naming -> step = NewConvStep.Selecting
+        }
     }
 
     val filteredFriends = remember(friends, searchQuery) {
