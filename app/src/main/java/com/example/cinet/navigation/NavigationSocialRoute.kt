@@ -8,6 +8,7 @@ import com.example.cinet.feature.social.ConversationsListScreen
 import com.example.cinet.feature.social.NewConversationScreen
 import com.example.cinet.feature.social.SocialScreen
 import com.example.cinet.feature.profile.ProfileScreen
+import com.example.cinet.feature.social.NewConversationTopBarState
 
 // Chooses which social subpage is currently visible.
 @Composable
@@ -31,6 +32,7 @@ internal fun NavigationSocialRoute(
     onNewConversation: () -> Unit,
     onOpenFriends: () -> Unit,
     onSeedTimestamps: (List<String>) -> Unit,
+    onNewConversationTopBarChange: (NewConversationTopBarState?) -> Unit,
 ) {
     when {
         activeConversation != null -> ConversationScreen(
@@ -52,7 +54,8 @@ internal fun NavigationSocialRoute(
         showNewConversation -> NewConversationScreen(
             currentUserProfile = userProfile,
             onBack = onNewConversationBack,
-            onOpenConversation = onOpenConversationFromNew
+            onOpenConversation = onOpenConversationFromNew,
+            onTopBarStateChange = onNewConversationTopBarChange
         )
 
         showSocialScreen -> SocialScreen(

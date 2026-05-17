@@ -30,6 +30,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 
 // Draws the persistent page title bar used across the app.
 @Composable
@@ -54,6 +57,7 @@ internal fun AppTopBar(
                 .padding(start = 20.dp, end = 22.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val newConversationTopBarState = state.newConversationTopBarState
             if (state.showBackButton) {
                 IconButton(onClick = onBack) {
                     Icon(
@@ -65,25 +69,44 @@ internal fun AppTopBar(
                 Spacer(modifier = Modifier.width(4.dp))
             }
 
-            if (isHomeScreen) {
-                WelcomeHeader(
-                    nickname = nickname,
-                    modifier = Modifier.weight(1f)
-                )
-            } else {
-                Text(
-                    text = state.title,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    lineHeight = 50.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+            when {
+                newConversationTopBarState != null -> {
+                    Text(
+                        text = newConversationTopBarState.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        lineHeight = 50.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                isHomeScreen -> {
+                    WelcomeHeader(
+                        nickname = nickname,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                else -> {
+                    Text(
+                        text = state.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        lineHeight = 50.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
-            if (state.showSocialActions) {
+            if (newConversationTopBarState != null) {
+                NewConversationTopBarAction(state = newConversationTopBarState)
+            } else if (state.showSocialActions) {
                 SocialTopBarActions(
                     pendingRequestCount = state.pendingRequestCount,
                     onFriendsClick = onFriendsClick,
@@ -91,8 +114,34 @@ internal fun AppTopBar(
                 )
             }
         }
+    }
+}
 
-        //HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+// Shows the right-side action used by the New Message page.
+@Composable
+private fun NewConversationTopBarAction(
+    state: com.example.cinet.feature.social.NewConversationTopBarState,
+) {
+    TextButton(
+        onClick = state.onActionClick,
+        enabled = state.actionEnabled,
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = Color.White,
+            disabledContentColor = Color.White.copy(alpha = 0.45f)
+        )
+    ) {
+        if (state.isActionLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = Color.White,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Text(
+                text = state.actionLabel,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

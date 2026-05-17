@@ -132,7 +132,7 @@ private fun HomeScreenContent(
             .padding(top = 18.dp, bottom = 24.dp)
     ) {
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         HomeWeatherBanner(
             temp = weatherInfo.temp,
@@ -153,11 +153,11 @@ private fun HomeScreenContent(
             NextUpcomingEventBanner(nextUpcomingEvent = nextUpcomingEvent)
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        //Spacer(modifier = Modifier.height(24.dp))
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+        //HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         QuickActionGrid(
             onMapClick = onMapClick,
@@ -235,7 +235,7 @@ private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
         shadowElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -246,7 +246,7 @@ private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
                     .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.42f))
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
+            //Spacer(modifier = Modifier.width(5.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
