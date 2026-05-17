@@ -58,6 +58,7 @@ import com.example.cinet.feature.profile.ProfileEditScreen
 import com.example.cinet.feature.profile.ProfileScreen
 import com.example.cinet.feature.settings.AppSettings
 import com.example.cinet.feature.settings.SettingScreen
+import com.example.cinet.feature.settings.canvas.CanvasConnectionScreen
 import com.example.cinet.feature.social.ConversationScreen
 import com.example.cinet.feature.social.ConversationsListScreen
 import com.example.cinet.feature.social.NewConversationScreen
@@ -164,6 +165,7 @@ private fun MainScaffold(
 
     var currentScreen by remember { mutableStateOf(Screen.Home) }
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
+    var showCanvasScreen by remember { mutableStateOf(false) }
     var showProfileEdit by remember { mutableStateOf(false) }
     var profileOpenedFromHome by remember { mutableStateOf(false) }
 
@@ -302,10 +304,12 @@ private fun MainScaffold(
         enabled = currentScreen != Screen.Home ||
                 socialBackStackActive ||
                 showProfileEdit ||
+                showCanvasScreen ||
                 isOverlayActive ||
                 selectedProfile != null
     ) {
         when {
+            showCanvasScreen -> showCanvasScreen = false
             selectedNewsArticle != null -> {
                 if (selectedNewsArticle?.title == "Study Rooms") {
                     selectedNewsArticle = null
@@ -645,7 +649,12 @@ private fun MainScaffold(
                             initialShowClassDialog = showAddClassOnCalendar
                         )
 
-                        Screen.Settings -> if (showProfileEdit) {
+                        Screen.Settings -> if (showCanvasScreen) {
+                            CanvasConnectionScreen(
+                                onBack = { showCanvasScreen = false },
+                                onSyncComplete = { calendarViewModel.refreshAllSavedCalendarItems() }
+                            )
+                        } else if (showProfileEdit) {
                             ProfileEditScreen(
                                 onBack = { showProfileEdit = false },
                                 onSaved = { authViewModel.silentReloadProfile() },
@@ -688,6 +697,7 @@ private fun MainScaffold(
                                     profileOpenedFromHome = false
                                     selectedProfile = userProfile
                                 },
+                                onOpenCanvas = { showCanvasScreen = true },
                             )
                         }
                     }

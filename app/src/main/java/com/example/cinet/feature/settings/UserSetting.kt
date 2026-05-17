@@ -49,6 +49,7 @@ fun SettingScreen(
     onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
     userProfile: UserProfile? = null,
     onViewProfile: () -> Unit = {},
+    onOpenCanvas: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -209,6 +210,17 @@ fun SettingScreen(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        // Canvas LMS sync entry
+        OutlinedButton(
+            onClick = onOpenCanvas,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+        ) {
+            Text("Canvas Sync")
+        }
 
         // sign out button
         OutlinedButton(
