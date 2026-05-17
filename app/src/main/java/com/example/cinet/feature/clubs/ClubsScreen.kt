@@ -1,8 +1,8 @@
 package com.example.cinet.feature.clubs
 
-import android.text.TextUtils.replace
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +34,7 @@ fun ClubsScreen(
     val clubsRepository = remember { ClubsRepository() }
     var clubs by remember { mutableStateOf<List<ClubItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
 
     val textFieldState = rememberTextFieldState() // Search text field
     LaunchedEffect(Unit) {
@@ -42,6 +43,13 @@ fun ClubsScreen(
     }
 
     if (selectedClubUrl != null) {
+        BackHandler {
+            if (webView?.canGoBack() == true) {
+                webView?.goBack()
+            } else {
+                onBack()
+            }
+        }
         // club details - Zack
         Scaffold(
             topBar = {
@@ -68,11 +76,12 @@ fun ClubsScreen(
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true // Required for some modern sites
                         loadUrl(selectedClubUrl)
+                        webView = this
                     }
                 },
-                update = { webView ->
-                    if (webView.url != selectedClubUrl) {
-                        webView.loadUrl(selectedClubUrl)
+                update = { view ->
+                    if (view.url != selectedClubUrl) {
+                        view.loadUrl(selectedClubUrl)
                     }
                 },
                 modifier = Modifier

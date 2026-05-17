@@ -31,7 +31,8 @@ internal fun NavigationScreenRoute(
             },
             onNotificationClick = { callbacks.onGoToScreen(Screen.Settings) },
             onProfileClick = callbacks.onOpenHomeProfile,
-            onNavigateToLocation = callbacks.onNavigateToLocation
+            onNavigateToLocation = callbacks.onNavigateToLocation,
+            onOpenChatFromHome = callbacks.onOpenChatFromHome
         )
 
         Screen.Social -> NavigationSocialRoute(

@@ -33,6 +33,7 @@ internal fun NavigationSocialRoute(
     onSeedTimestamps: (List<String>) -> Unit,
 ) {
     when {
+        // Priority 1: Active Chat (Chat is the "deepest" view in the social stack)
         activeConversation != null -> ConversationScreen(
             conversation = activeConversation,
             onBack = onConversationBack,
@@ -40,6 +41,7 @@ internal fun NavigationSocialRoute(
             onNavigateToCoordinates = onNavigateToCoordinates
         )
 
+        // Priority 2: Profile view (can be opened from Friends list or indirectly from Home/Settings)
         selectedProfile != null -> ProfileScreen(
             user = if (selectedProfile.uid == userProfile.uid) userProfile else selectedProfile,
             currentUserProfile = userProfile,
@@ -48,17 +50,20 @@ internal fun NavigationSocialRoute(
             onEditProfile = onEditProfile,
         )
 
+        // Priority 3: Setup for a new conversation
         showNewConversation -> NewConversationScreen(
             currentUserProfile = userProfile,
             onBack = onNewConversationBack,
             onOpenConversation = onOpenConversationFromNew
         )
 
+        // Priority 4: Social (Friends List)
         showSocialScreen -> SocialScreen(
             onOpenProfile = onOpenProfile,
             onOpenConversation = onOpenConversationWithFriend
         )
 
+        // Root: Messages List
         else -> ConversationsListScreen(
             onOpenConversation = onOpenConversationFromList,
             onNewConversation = onNewConversation,

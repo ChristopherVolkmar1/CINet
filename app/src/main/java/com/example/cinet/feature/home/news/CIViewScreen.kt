@@ -2,6 +2,7 @@ package com.example.cinet.feature.home.news
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +29,7 @@ fun CIViewScreen(
     val newsRepository = remember { NewsRepository() }
     var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
 
     LaunchedEffect(Unit) {
         articles = newsRepository.fetchLatestNews()
@@ -35,6 +37,13 @@ fun CIViewScreen(
     }
 
     if (selectedArticleUrl != null) {
+        BackHandler {
+            if (webView?.canGoBack() == true) {
+                webView?.goBack()
+            } else {
+                onBack()
+            }
+        }
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -58,12 +67,14 @@ fun CIViewScreen(
                     WebView(context).apply {
                         webViewClient = WebViewClient()
                         settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
                         loadUrl(selectedArticleUrl)
+                        webView = this
                     }
                 },
-                update = { webView ->
-                    if (webView.url != selectedArticleUrl) {
-                        webView.loadUrl(selectedArticleUrl)
+                update = { view ->
+                    if (view.url != selectedArticleUrl) {
+                        view.loadUrl(selectedArticleUrl)
                     }
                 },
                 modifier = Modifier
