@@ -58,6 +58,7 @@ fun CIViewScreen(
                     WebView(context).apply {
                         webViewClient = WebViewClient()
                         settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
                         loadUrl(selectedArticleUrl)
                     }
                 },
