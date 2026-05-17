@@ -184,7 +184,7 @@ private fun WelcomeHeader(nickname: String) {
         Text(
             text = "Welcome back, $displayName 👋",
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = greetingFontSizeFor(displayName),
             maxLines = 1,
             softWrap = false,
@@ -233,7 +233,7 @@ private fun HomeWeatherBanner(
                 Text(
                     text = "$temp • $displayCondition",
                     color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     fontSize = 21.sp,
                     lineHeight = 25.sp,
                     maxLines = 1,
@@ -283,7 +283,7 @@ private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
                     text = nextUpcomingEvent.title,
                     fontSize = 15.sp,
                     lineHeight = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -416,7 +416,7 @@ private fun LatestNewsHeader(
         Text(
             text = "CI View - Latest News",
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 22.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -426,7 +426,7 @@ private fun LatestNewsHeader(
         Text(
             text = "See all",
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             modifier = Modifier.clickable(onClick = onSeeAllClick)
         )
@@ -489,7 +489,7 @@ private fun HomeNewsCard(
             Text(
                 text = article.title,
                 color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 lineHeight = 16.sp,
                 textAlign = TextAlign.Center,

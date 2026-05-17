@@ -140,7 +140,7 @@ private fun CalendarModeButton(
             text = mode.displayName(),
             color = textColor,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
     }
@@ -286,7 +286,7 @@ private fun DayCalendarBody(
                     text = selectedDate.dayOfMonth.toString(),
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -458,7 +458,7 @@ private fun HeaderWithArrows(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimary
         )
 
@@ -483,7 +483,7 @@ private fun NavigationButton(
             text = symbol,
             color = MaterialTheme.colorScheme.onPrimary,
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -506,7 +506,7 @@ private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -532,7 +532,7 @@ private fun WeekStripDate(
             text = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
 
@@ -549,7 +549,7 @@ private fun WeekStripDate(
                 text = date.dayOfMonth.toString(),
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
         }
@@ -626,7 +626,7 @@ private fun MonthDateCell(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.Bold
             )
         }
 

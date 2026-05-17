@@ -112,7 +112,7 @@ private fun AgendaDateHeader(
             text = title,
             modifier = Modifier.weight(1f),
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 22.sp,
             lineHeight = 26.sp,
             maxLines = 1,
@@ -122,7 +122,7 @@ private fun AgendaDateHeader(
         Text(
             text = buildEventCountLabel(itemCount),
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             modifier = Modifier.clickable(onClick = onTodayClick),
             maxLines = 1
@@ -150,7 +150,7 @@ private fun EmptyAgendaMessage(selectedDate: LocalDate) {
             Text(
                 text = if (isToday) "No saved calendar items for today yet" else "No saved calendar items for this day yet",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimary
             )
 
@@ -198,7 +198,7 @@ private fun AgendaEventCard(item: AgendaItem) {
                     text = item.title,
                     fontSize = 15.sp,
                     lineHeight = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

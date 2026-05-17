@@ -34,7 +34,8 @@ fun CalendarScreen(
     onBack: () -> Unit,
     initialShowClassDialog: Boolean = false,
     onProfileClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    showHeader: Boolean = true
 ) {
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
@@ -208,9 +209,10 @@ fun CalendarScreen(
             .padding(horizontal = 24.dp)
             .padding(top = 18.dp, bottom = 110.dp)
     ) {
-        CalendarHeader()
-
-        Spacer(modifier = Modifier.height(10.dp))
+        if(showHeader) {
+            CalendarHeader()
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
         CalendarModeSection(
             selectedMode = calendarMode,

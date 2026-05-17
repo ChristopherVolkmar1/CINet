@@ -39,6 +39,7 @@ fun ProfileScreen(
     onOpenConversation: (Conversation) -> Unit,
     onBack: () -> Unit,
     onEditProfile: () -> Unit = {},
+    showTopBar: Boolean = true
 ) {
     val isOwnProfile = user.uid == currentUserProfile.uid
     val repository = remember { SocialRepository() }
@@ -61,17 +62,19 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+            if (showTopBar) {
+                TopAppBar(
+                    title = { },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
                 )
-            )
+            }
         }
     ) { padding ->
         Column(

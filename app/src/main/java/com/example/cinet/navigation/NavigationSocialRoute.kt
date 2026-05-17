@@ -46,6 +46,7 @@ internal fun NavigationSocialRoute(
             onOpenConversation = onOpenConversationFromNew,
             onBack = onProfileBack,
             onEditProfile = onEditProfile,
+            showTopBar = false,
         )
 
         showNewConversation -> NewConversationScreen(
@@ -56,7 +57,8 @@ internal fun NavigationSocialRoute(
 
         showSocialScreen -> SocialScreen(
             onOpenProfile = onOpenProfile,
-            onOpenConversation = onOpenConversationWithFriend
+            onOpenConversation = onOpenConversationWithFriend,
+            showHeader = false
         )
 
         else -> ConversationsListScreen(
@@ -65,6 +67,7 @@ internal fun NavigationSocialRoute(
             onOpenFriends = onOpenFriends,
             openedConversationTimestamps = openedConversationTimestamps,
             onSeedTimestamps = onSeedTimestamps,
+            showHeader = false,
         )
     }
 }

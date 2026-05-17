@@ -38,7 +38,7 @@ fun NewsSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "CI View - Latest News",
+                text = "Latest News",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )

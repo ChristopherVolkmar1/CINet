@@ -17,7 +17,8 @@ internal fun NavigationNewsRoute(
         selectedArticleUrl = selectedNewsArticle?.url,
         selectedArticleTitle = selectedNewsArticle?.title,
         onArticleClick = onArticleClick,
-        onBack = onBack
+        onBack = onBack,
+        showTopBar = false
     )
 }
 
@@ -32,6 +33,7 @@ internal fun NavigationClubsRoute(
         selectedClubUrl = selectedClub?.url,
         selectedClubTitle = selectedClub?.title,
         onClubClick = onClubClick,
-        onBack = onBack
+        onBack = onBack,
+        showTopBar = false
     )
 }

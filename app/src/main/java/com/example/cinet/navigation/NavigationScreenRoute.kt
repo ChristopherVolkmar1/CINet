@@ -60,7 +60,8 @@ internal fun NavigationScreenRoute(
 
         Screen.Calendar -> CalendarScreen(
             onBack = callbacks.onCalendarBack,
-            initialShowClassDialog = uiState.showAddClassOnCalendar
+            initialShowClassDialog = uiState.showAddClassOnCalendar,
+            showHeader = false
         )
 
         Screen.Settings -> NavigationSettingsRoute(

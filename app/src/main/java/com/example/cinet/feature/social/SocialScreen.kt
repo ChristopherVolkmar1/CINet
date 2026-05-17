@@ -32,6 +32,7 @@ import kotlinx.coroutines.tasks.await
 fun SocialScreen(
     onOpenProfile: (UserProfile) -> Unit,
     onOpenConversation: (UserProfile) -> Unit,
+    showHeader: Boolean = true,
 ) {
     val repository = remember { SocialRepository() }
     val scope = rememberCoroutineScope()
@@ -92,17 +93,19 @@ fun SocialScreen(
                         .padding(16.dp)
                 ) {
                     item {
-                        Text("Social", style = MaterialTheme.typography.headlineMedium)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        if (showHeader) {
+                            Text("Social", style = MaterialTheme.typography.headlineMedium)
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            label = { Text("Search by nickname") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                label = { Text("Search by nickname") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
                     }
 
                     if (searchResults.isNotEmpty()) {

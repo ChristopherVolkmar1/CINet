@@ -33,12 +33,14 @@ internal fun NavigationSettingsRoute(
     when {
         showCanvasScreen -> CanvasConnectionScreen(
             onBack = onCanvasBack,
-            onSyncComplete = onCanvasSyncComplete
+            onSyncComplete = onCanvasSyncComplete,
+            showTopBar = false
         )
 
         showProfileEdit -> ProfileEditScreen(
             onBack = onProfileEditBack,
             onSaved = onProfileSaved,
+            showTopBar = false,
         )
 
         selectedProfile != null -> {
@@ -54,6 +56,7 @@ internal fun NavigationSettingsRoute(
                 onOpenConversation = onOpenConversation,
                 onBack = onSelectedProfileBack,
                 onEditProfile = onEditProfile,
+                showTopBar = false,
             )
         }
 
@@ -67,6 +70,7 @@ internal fun NavigationSettingsRoute(
             userProfile = userProfile,
             onViewProfile = onViewProfile,
             onOpenCanvas = onOpenCanvas,
+            showHeader = false,
         )
     }
 }

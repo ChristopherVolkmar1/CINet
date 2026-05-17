@@ -29,7 +29,8 @@ fun ClubsScreen(
     selectedClubUrl: String? = null,
     selectedClubTitle: String? = null,
     onClubClick: (ClubItem) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showTopBar: Boolean = true
 ) {
     val clubsRepository = remember { ClubsRepository() }
     var clubs by remember { mutableStateOf<List<ClubItem>>(emptyList()) }
@@ -45,20 +46,25 @@ fun ClubsScreen(
         // club details - Zack
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { 
-                        Text(
-                            text = selectedClubTitle ?: "Club Details",
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        ) 
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                if (showTopBar) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = selectedClubTitle ?: "Club Details",
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { padding ->
             AndroidView(
@@ -84,14 +90,19 @@ fun ClubsScreen(
         // main clubs list - Zack
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Campus Clubs") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                if (showTopBar) {
+                    TopAppBar(
+                        title = { Text("Campus Clubs") },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { padding ->
             if (isLoading) {
