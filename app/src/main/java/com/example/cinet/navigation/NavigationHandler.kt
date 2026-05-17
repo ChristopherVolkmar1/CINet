@@ -1,14 +1,83 @@
 package com.example.cinet.navigation
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cinet.feature.home.news.CIViewScreen
+import com.example.cinet.feature.home.news.NewsArticle
+import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.data.model.Conversation
+import com.example.cinet.data.model.UserProfile
+import com.example.cinet.data.remote.SocialRepository
 import com.example.cinet.feature.auth.AuthState
 import com.example.cinet.feature.auth.ErrorScreen
 import com.example.cinet.feature.auth.LoadingScreen
 import com.example.cinet.feature.auth.LoginScreen
 import com.example.cinet.feature.auth.ProfileSetupScreen
+import com.example.cinet.feature.auth.viewmodel.AuthViewModel
+import com.example.cinet.feature.calendar.calendarFiles.CalendarScreen
+import com.example.cinet.feature.calendar.calendarFiles.CalendarViewModel
+import com.example.cinet.feature.clubs.ClubItem
+import com.example.cinet.feature.clubs.ClubsScreen
+import com.example.cinet.feature.home.HomeScreen
+import com.example.cinet.feature.home.buildHomeUpcomingEventItems
+import com.example.cinet.feature.map.CampusLocation
+import com.example.cinet.feature.map.CampusMapScreen
+import com.example.cinet.feature.profile.ProfileEditScreen
+import com.example.cinet.feature.profile.ProfileScreen
 import com.example.cinet.feature.settings.AppSettings
+import com.example.cinet.feature.settings.SettingScreen
+import com.example.cinet.feature.social.ConversationScreen
+import com.example.cinet.feature.social.ConversationsListScreen
+import com.example.cinet.feature.social.NewConversationScreen
+import com.example.cinet.feature.social.SocialScreen
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.util.Calendar
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import com.google.firebase.firestore.GeoPoint
+import java.util.Locale
 
+enum class Screen(val label: String, val icon: ImageVector) {
+    Home("Home", Icons.Default.Home),
+    Social("Social", Icons.Default.People),
+    Map("Map", Icons.Default.LocationOn),
+    Calendar("Calendar", Icons.Default.CalendarMonth),
+    Settings("Settings", Icons.Default.Settings)
+}
 
 @Composable
 fun NavigationHandler(
@@ -31,7 +100,9 @@ fun NavigationHandler(
     when (authState) {
         is AuthState.Loading -> LoadingScreen()
         is AuthState.Unauthenticated -> LoginScreen()
-        is AuthState.ProfileSetup -> ProfileSetupScreen(onSaveProfile = onSaveProfile)
+        is AuthState.ProfileSetup -> ProfileSetupScreen(
+            onSaveProfile = onSaveProfile
+        )
         is AuthState.Error -> ErrorScreen(
             message = authState.message,
             onRetry = onRetry
