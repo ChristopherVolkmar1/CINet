@@ -1,5 +1,6 @@
 package com.example.cinet.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
@@ -34,14 +35,17 @@ internal fun NavigationSocialRoute(
     onSeedTimestamps: (List<String>) -> Unit,
     onNewConversationTopBarChange: (NewConversationTopBarState?) -> Unit,
 ) {
-    when {
-        activeConversation != null -> ConversationScreen(
-            conversation = activeConversation,
-            onBack = onConversationBack,
-            onNavigateToLocation = onNavigateToLocation,
-            onNavigateToCoordinates = onNavigateToCoordinates
-        )
+    // Intercept system back when a profile is visible — ensures we return
+    // to the conversation (or wherever we came from) rather than letting
+    // NavigationBackHandler's fallback fire and go home.
+    if (selectedProfile != null) {
+        BackHandler { onProfileBack() }
+    }
 
+    when {
+        // selectedProfile checked FIRST — lets tapping a user from inside a conversation
+        // navigate to their ProfileScreen without clearing the active conversation.
+        // Back press clears selectedProfile and returns to the conversation.
         selectedProfile != null -> ProfileScreen(
             user = if (selectedProfile.uid == userProfile.uid) userProfile else selectedProfile,
             currentUserProfile = userProfile,
@@ -49,6 +53,14 @@ internal fun NavigationSocialRoute(
             onBack = onProfileBack,
             onEditProfile = onEditProfile,
             showTopBar = false,
+        )
+
+        activeConversation != null -> ConversationScreen(
+            conversation = activeConversation,
+            onBack = onConversationBack,
+            onNavigateToLocation = onNavigateToLocation,
+            onNavigateToCoordinates = onNavigateToCoordinates,
+            onOpenProfile = onOpenProfile,
         )
 
         showNewConversation -> NewConversationScreen(

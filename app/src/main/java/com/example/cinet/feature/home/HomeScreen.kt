@@ -28,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.data.model.UserProfile
 import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.feature.home.news.NewsRepository
 import com.example.cinet.feature.map.BusScheduleSheet
@@ -56,7 +57,8 @@ fun HomeScreen(
     onNotificationClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
-    onNavigateToLocation: (String) -> Unit
+    onNavigateToLocation: (String) -> Unit,
+    onOpenChatFromHome: (UserProfile) -> Unit = {}
 ) {
     val context = LocalContext.current
     val newsRepository = remember { NewsRepository() }
@@ -95,6 +97,22 @@ fun HomeScreen(
                 )
             )
         },
+        onDiningClick = {
+            val cal = Calendar.getInstance()
+            val dateStr = "%04d-%02d-%02d".format(
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH) + 1,
+                cal.get(Calendar.DAY_OF_MONTH)
+            )
+            onArticleClick(
+                NewsArticle(
+                    title = "Dining",
+                    date = "",
+                    previewText = "View CSUCI campus dining menus.",
+                    url = "https://dineoncampus.com/CSUCI/whats-on-the-menu/islands-kitchen/$dateStr/breakfast"
+                )
+            )
+        },
         modifier = modifier
     )
 
@@ -122,6 +140,7 @@ private fun HomeScreenContent(
     onSeeAllNewsClick: () -> Unit,
     onArticleClick: (NewsArticle) -> Unit,
     onStudyRoomsClick: () -> Unit,
+    onDiningClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -167,7 +186,8 @@ private fun HomeScreenContent(
             onClubsClick = onClubsClick,
             onStudyRoomsClick = onStudyRoomsClick,
             onProfileClick = onProfileClick,
-            onNotificationClick = onNotificationClick
+            onNotificationClick = onNotificationClick,
+            onDiningClick = onDiningClick
         )
     }
 }
@@ -526,7 +546,8 @@ private fun QuickActionGrid(
     onClubsClick: () -> Unit,
     onStudyRoomsClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onNotificationClick: () -> Unit
+    onNotificationClick: () -> Unit,
+    onDiningClick: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -565,6 +586,12 @@ private fun QuickActionGrid(
                 icon = Icons.Default.DirectionsBus,
                 title = "Bus Schedule",
                 onClick = onNotificationClick
+            )
+
+            QuickActionCircleButton(
+                icon = Icons.Default.Restaurant,
+                title = "Dining",
+                onClick = onDiningClick
             )
         }
     }
@@ -671,7 +698,8 @@ fun HomeScreenPreview() {
             onSocialClick = {},
             onNotificationClick = {},
             onProfileClick = {},
-            onNavigateToLocation = {}
+            onNavigateToLocation = {},
+            onOpenChatFromHome = {}
         )
     }
 }

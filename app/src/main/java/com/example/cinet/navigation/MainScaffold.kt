@@ -1,6 +1,7 @@
 package com.example.cinet.navigation
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
@@ -57,6 +58,8 @@ internal fun MainScaffold(
     var pendingRequestCount by remember { mutableStateOf(0) }
 
     var currentScreen by remember { mutableStateOf(Screen.Home) }
+    var backStack by remember { mutableStateOf(listOf(Screen.Home)) }
+
     var showAddClassOnCalendar by remember { mutableStateOf(false) }
     var showCanvasScreen by remember { mutableStateOf(false) }
     var showProfileEdit by remember { mutableStateOf(false) }
@@ -100,6 +103,21 @@ internal fun MainScaffold(
         while (true) {
             delay(30000)
             currentTimeMillis = System.currentTimeMillis()
+        }
+    }
+
+    fun navigateToScreen(screen: Screen) {
+        if (currentScreen != screen) {
+            backStack = backStack + screen
+            currentScreen = screen
+        }
+    }
+
+    fun popBackStack() {
+        if (backStack.size > 1) {
+            val newStack = backStack.dropLast(1)
+            backStack = newStack
+            currentScreen = newStack.last()
         }
     }
 
@@ -222,7 +240,7 @@ internal fun MainScaffold(
     }
 
     fun handleBottomScreenSelected(screen: Screen) {
-        currentScreen = screen
+        navigateToScreen(screen)
         clearOverlays()
         profileOpenedFromHome = false
         newConversationTopBarState = null
@@ -250,6 +268,19 @@ internal fun MainScaffold(
         }
     }
 
+    val handleClearProfile = {
+        selectedProfile = null
+        // Only pop the back stack when there is no active conversation.
+        // If a profile was opened from inside a conversation, clearing it
+        // must return to the conversation — not navigate away from the screen.
+        if (profileOpenedFromHome && activeConversation == null) {
+            profileOpenedFromHome = false
+            popBackStack()
+        } else {
+            profileOpenedFromHome = false
+        }
+    }
+
     LaunchedEffect(initialConversationId) {
         val id = initialConversationId ?: return@LaunchedEffect
         try {
@@ -261,7 +292,7 @@ internal fun MainScaffold(
             val conversation = snap.toObject(Conversation::class.java)
 
             if (conversation != null) {
-                currentScreen = Screen.Social
+                navigateToScreen(Screen.Social)
                 openConversation(conversation)
                 onConversationOpened()
             }
@@ -280,7 +311,7 @@ internal fun MainScaffold(
         if (location != null) {
             preSelectedMapLocation = location
             autoRouteToPreSelectedMapLocation = true
-            currentScreen = Screen.Map
+            navigateToScreen(Screen.Map)
             onMapLocationOpened()
         } else {
             Log.e("NavigationHandler", "Failed to find map location from notification: $locationName")
@@ -381,10 +412,10 @@ internal fun MainScaffold(
             manualUpcomingEventsItems = it
             sharedPrefs.savePairItems("event_items", it)
         },
-        onGoToScreen = { currentScreen = it },
+        onGoToScreen = { navigateToScreen(it) },
         onShowAddClass = {
             showAddClassOnCalendar = true
-            currentScreen = Screen.Calendar
+            navigateToScreen(Screen.Calendar)
         },
         onShowClubs = { showClubs = true },
         onShowCIView = { showCIView = true },
@@ -392,7 +423,7 @@ internal fun MainScaffold(
         onOpenHomeProfile = {
             profileOpenedFromHome = true
             selectedProfile = userProfile
-            currentScreen = Screen.Settings
+            navigateToScreen(Screen.Settings)
         },
         onNavigateToLocation = { navigateToLocation(it) },
         onClearActiveConversation = { activeConversation = null },
@@ -415,14 +446,11 @@ internal fun MainScaffold(
             if (!alreadyExists) sharedLocations = sharedLocations + sharedLocation
             preSelectedMapLocation = sharedLocation
             autoRouteToPreSelectedMapLocation = false
-            currentScreen = Screen.Map
+            navigateToScreen(Screen.Map)
         },
         onClearSelectedProfile = { selectedProfile = null },
         onShowProfileEdit = { showProfileEdit = true },
-        onHideNewConversation = {
-            showNewConversation = false
-            newConversationTopBarState = null
-        },
+        onHideNewConversation = { showNewConversation = false },
         onOpenConversationFromNew = {
             showNewConversation = false
             newConversationTopBarState = null
@@ -451,7 +479,7 @@ internal fun MainScaffold(
         onShowSocialScreen = { showSocialScreen = true },
         onSeedTimestamps = ::seedConversationTimestamps,
         onCalendarBack = {
-            currentScreen = Screen.Home
+            popBackStack()
             showAddClassOnCalendar = false
         },
         onHideCanvas = { showCanvasScreen = false },
@@ -460,15 +488,9 @@ internal fun MainScaffold(
         onProfileSaved = { authViewModel.silentReloadProfile() },
         onSettingsConversationOpened = {
             activeConversation = it
-            currentScreen = Screen.Social
+            navigateToScreen(Screen.Social)
         },
-        onSettingsSelectedProfileBack = {
-            selectedProfile = null
-            if (profileOpenedFromHome) {
-                profileOpenedFromHome = false
-                currentScreen = Screen.Home
-            }
-        },
+        onSettingsSelectedProfileBack = handleClearProfile,
         onSignOut = onSignOut,
         onSettingsChange = { dark, notify, theme ->
             authViewModel.updateSettings(dark, notify, theme)
@@ -479,21 +501,37 @@ internal fun MainScaffold(
         },
         onOpenCanvas = { showCanvasScreen = true },
         onNewConversationTopBarChange = { newConversationTopBarState = it },
+        onOpenChatFromHome = { otherUser ->
+            socialScope.launch {
+                socialRepository.getOrCreateConversation(
+                    participantIds = listOf(userProfile.uid, otherUser.uid),
+                    participantNicknames = mapOf(
+                        userProfile.uid to userProfile.nickname,
+                        otherUser.uid to otherUser.nickname
+                    )
+                ).onSuccess {
+                    activeConversation = it
+                }
+            }
+        },
     )
 
     NavigationBackHandler(
         currentScreen = currentScreen,
+        backStackSize = backStack.size,
         activeConversation = activeConversation,
         selectedProfile = selectedProfile,
         showNewConversation = showNewConversation,
         showSocialScreen = showSocialScreen,
         showProfileEdit = showProfileEdit,
         showCanvasScreen = showCanvasScreen,
+        showAddClassOnCalendar = showAddClassOnCalendar,
         showCIView = showCIView,
         selectedNewsArticle = selectedNewsArticle,
         showClubs = showClubs,
         selectedClub = selectedClub,
         onHideCanvas = { showCanvasScreen = false },
+        onHideAddClass = { showAddClassOnCalendar = false },
         onClearSelectedNewsArticle = { selectedNewsArticle = null },
         onShowCIView = { showCIView = true },
         onHideCIView = { showCIView = false },
@@ -501,10 +539,10 @@ internal fun MainScaffold(
         onHideClubs = { showClubs = false },
         onClearActiveConversation = { activeConversation = null },
         onHideNewConversation = { showNewConversation = false },
-        onClearSelectedProfile = { selectedProfile = null },
+        onClearSelectedProfile = handleClearProfile,
         onHideSocialScreen = { showSocialScreen = false },
         onHideProfileEdit = { showProfileEdit = false },
-        onGoHome = { currentScreen = Screen.Home }
+        onGoBack = ::popBackStack
     )
 
     NavigationScaffoldContent(
@@ -525,7 +563,8 @@ internal fun MainScaffold(
             newConversationTopBarState = null
             showNewConversation = true
         },
-        onMapBack = { currentScreen = Screen.Home },
+        //onMapBack = { currentScreen = Screen.Home },
+        onMapBack = ::popBackStack,
         onMapFinishedLoading = {
             preSelectedMapLocation = null
             autoRouteToPreSelectedMapLocation = false
@@ -533,7 +572,7 @@ internal fun MainScaffold(
         onRemoveExtraLocation = { sharedLocations = sharedLocations - it },
         onArticleClick = { selectedNewsArticle = it },
         onNewsBack = {
-            if (selectedNewsArticle?.title == "Study Rooms") {
+            if (selectedNewsArticle?.title == "Study Rooms" || selectedNewsArticle?.title == "Dining") {
                 selectedNewsArticle = null
                 showCIView = false
             } else if (selectedNewsArticle != null) {

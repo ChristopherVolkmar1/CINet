@@ -40,5 +40,6 @@ internal data class NavigationRouteCallbacks(
     val onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
     val onViewProfile: () -> Unit,
     val onOpenCanvas: () -> Unit,
+    val onOpenChatFromHome: (UserProfile) -> Unit,
     val onNewConversationTopBarChange: (NewConversationTopBarState?) -> Unit,
 )

@@ -11,17 +11,20 @@ import com.example.cinet.feature.home.news.NewsArticle
 @Composable
 internal fun NavigationBackHandler(
     currentScreen: Screen,
+    backStackSize: Int,
     activeConversation: Conversation?,
     selectedProfile: UserProfile?,
     showNewConversation: Boolean,
     showSocialScreen: Boolean,
     showProfileEdit: Boolean,
     showCanvasScreen: Boolean,
+    showAddClassOnCalendar: Boolean,
     showCIView: Boolean,
     selectedNewsArticle: NewsArticle?,
     showClubs: Boolean,
     selectedClub: ClubItem?,
     onHideCanvas: () -> Unit,
+    onHideAddClass: () -> Unit,
     onClearSelectedNewsArticle: () -> Unit,
     onShowCIView: () -> Unit,
     onHideCIView: () -> Unit,
@@ -32,17 +35,18 @@ internal fun NavigationBackHandler(
     onClearSelectedProfile: () -> Unit,
     onHideSocialScreen: () -> Unit,
     onHideProfileEdit: () -> Unit,
-    onGoHome: () -> Unit,
+    onGoBack: () -> Unit,
 ) {
     val socialBackStackActive = currentScreen == Screen.Social &&
             (activeConversation != null || selectedProfile != null ||
                     showNewConversation || showSocialScreen)
 
     BackHandler(
-        enabled = currentScreen != Screen.Home ||
+        enabled = backStackSize > 1 ||
                 socialBackStackActive ||
                 showProfileEdit ||
                 showCanvasScreen ||
+                showAddClassOnCalendar ||
                 showCIView ||
                 selectedNewsArticle != null ||
                 showClubs ||
@@ -51,6 +55,7 @@ internal fun NavigationBackHandler(
     ) {
         when {
             showCanvasScreen -> onHideCanvas()
+            showAddClassOnCalendar -> onHideAddClass()
             selectedNewsArticle != null -> {
                 if (selectedNewsArticle.title == "Study Rooms") {
                     onClearSelectedNewsArticle()
@@ -63,12 +68,15 @@ internal fun NavigationBackHandler(
             showCIView -> onHideCIView()
             selectedClub != null -> onClearSelectedClub()
             showClubs -> onHideClubs()
+            // selectedProfile is checked BEFORE activeConversation so that
+            // pressing system-back while viewing a profile opened from inside
+            // a conversation returns to the conversation, not the list.
+            selectedProfile != null -> onClearSelectedProfile()
             activeConversation != null -> onClearActiveConversation()
             showNewConversation -> onHideNewConversation()
-            selectedProfile != null -> onClearSelectedProfile()
             showSocialScreen -> onHideSocialScreen()
             showProfileEdit -> onHideProfileEdit()
-            else -> onGoHome()
+            else -> onGoBack()
         }
     }
 }

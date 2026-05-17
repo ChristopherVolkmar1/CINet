@@ -2,6 +2,7 @@ package com.example.cinet.feature.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -59,6 +60,11 @@ fun ProfileScreen(
             }
         }
     }
+
+    // Intercept system back so it always calls onBack regardless of
+    // NavigationBackHandler's priority order — ensures returning to
+    // the conversation rather than home when opened from inside a chat.
+    BackHandler { onBack() }
 
     Scaffold(
         topBar = {
