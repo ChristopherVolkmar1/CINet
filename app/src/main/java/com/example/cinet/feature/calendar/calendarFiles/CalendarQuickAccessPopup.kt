@@ -57,7 +57,30 @@ fun CalendarQuickAccessPopup(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = popupTitle(type))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = popupTitle(type),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineSmall
+                )
+
+                IconButton(onClick = onAddClick) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add"
+                    )
+                }
+
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close"
+                    )
+                }
+            }
         },
         text = {
             Column(
@@ -99,16 +122,8 @@ fun CalendarQuickAccessPopup(
                 }
             }
         },
-        confirmButton = {
-            Button(onClick = onAddClick) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Close")
-            }
-        }
+        confirmButton = {},
+        dismissButton = {}
     )
 }
 
