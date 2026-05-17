@@ -1,0 +1,418 @@
+package com.example.cinet.navigation
+
+import android.content.Context
+import android.util.Log
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.data.model.Conversation
+import com.example.cinet.data.model.UserProfile
+import com.example.cinet.data.remote.SocialRepository
+import com.example.cinet.feature.calendar.calendarFiles.CalendarViewModel
+import com.example.cinet.feature.home.buildHomeUpcomingEventItems
+import com.example.cinet.feature.home.news.NewsArticle
+import com.example.cinet.feature.map.CampusLocation
+import com.example.cinet.feature.settings.AppSettings
+import com.example.cinet.feature.auth.viewmodel.AuthViewModel
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.GeoPoint
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.util.Calendar
+import java.util.Locale
+import com.example.cinet.feature.home.HomeUpcomingEventItem
+import com.example.cinet.ui.theme.AppThemeColor
+
+@Composable
+internal fun MainScaffold(
+    userProfile: UserProfile,
+    onSignOut: () -> Unit,
+    initialConversationId: String? = null,
+    onConversationOpened: () -> Unit = {},
+    initialMapLocationName: String? = null,
+    onMapLocationOpened: () -> Unit = {},
+) {
+    val authViewModel: AuthViewModel = viewModel()
+    val calendarViewModel: CalendarViewModel = viewModel()
+    val campusRegistryViewModel: CampusRegistry = viewModel()
+    val campusRegistry by campusRegistryViewModel.campusRegistry.collectAsState()
+    val context = LocalContext.current
+    val sharedPrefs = remember {
+        context.getSharedPreferences("cinet_prefs", Context.MODE_PRIVATE)
+    }
+    val socialScope = rememberCoroutineScope()
+    val socialRepository = remember { SocialRepository() }
+
+    var currentScreen by remember { mutableStateOf(Screen.Home) }
+    var showAddClassOnCalendar by remember { mutableStateOf(false) }
+    var showCanvasScreen by remember { mutableStateOf(false) }
+    var showProfileEdit by remember { mutableStateOf(false) }
+    var profileOpenedFromHome by remember { mutableStateOf(false) }
+
+    var activeConversation by remember { mutableStateOf<Conversation?>(null) }
+    var selectedProfile by remember { mutableStateOf<UserProfile?>(null) }
+    var showNewConversation by remember { mutableStateOf(false) }
+    var showSocialScreen by remember { mutableStateOf(false) }
+
+    var showCIView by remember { mutableStateOf(false) }
+    var selectedNewsArticle by remember { mutableStateOf<NewsArticle?>(null) }
+    var showClubs by remember { mutableStateOf(false) }
+    var selectedClub by remember { mutableStateOf<com.example.cinet.feature.clubs.ClubItem?>(null) }
+
+    var preSelectedMapLocation by remember { mutableStateOf<CampusLocation?>(null) }
+    var autoRouteToPreSelectedMapLocation by remember { mutableStateOf(false) }
+    var sharedLocations by remember { mutableStateOf<List<CampusLocation>>(emptyList()) }
+
+    var openedConversationTimestamps by remember {
+        mutableStateOf(
+            sharedPrefs.all
+                .filter { it.key.startsWith("opened_conv_") }
+                .mapKeys { it.key.removePrefix("opened_conv_") }
+                .mapValues { (it.value as? Long) ?: 0L }
+        )
+    }
+
+    var manualUpcomingEventsItems by remember {
+        mutableStateOf(sharedPrefs.loadPairItems("event_items"))
+    }
+    var currentTimeMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(userProfile) {
+        AppSettings.isDarkMode = userProfile.isDarkMode
+        AppSettings.notificationsEnabled = userProfile.notificationsEnabled
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30000)
+            currentTimeMillis = System.currentTimeMillis()
+        }
+    }
+
+    fun openConversation(conversation: Conversation) {
+        val now = System.currentTimeMillis()
+        openedConversationTimestamps = openedConversationTimestamps + (conversation.id to now)
+        sharedPrefs.edit().putLong("opened_conv_${conversation.id}", now).apply()
+        activeConversation = conversation
+    }
+
+    fun seedConversationTimestamps(ids: List<String>) {
+        val now = System.currentTimeMillis()
+        val seeded = ids.associateWith { now }
+        openedConversationTimestamps = openedConversationTimestamps + seeded
+
+        val editor = sharedPrefs.edit()
+        ids.forEach { id -> editor.putLong("opened_conv_$id", now) }
+        editor.apply()
+    }
+
+    fun navigateToLocation(locationName: String, shouldAutoRoute: Boolean = false) {
+        preSelectedMapLocation = campusRegistry.values.flatten()
+            .find { it.name.equals(locationName, ignoreCase = true) }
+        autoRouteToPreSelectedMapLocation = shouldAutoRoute
+        currentScreen = Screen.Map
+    }
+
+    fun clearOverlays() {
+        showCIView = false
+        selectedNewsArticle = null
+        showClubs = false
+        selectedClub = null
+    }
+
+    fun handleBottomScreenSelected(screen: Screen) {
+        currentScreen = screen
+        clearOverlays()
+        profileOpenedFromHome = false
+
+        if (screen == Screen.Social) {
+            activeConversation = null
+            selectedProfile = null
+            showNewConversation = false
+            showSocialScreen = false
+        }
+
+        if (screen == Screen.Settings) {
+            selectedProfile = null
+            showProfileEdit = false
+        }
+
+        if (screen != Screen.Calendar) {
+            showAddClassOnCalendar = false
+            if (screen != Screen.Settings) showProfileEdit = false
+        }
+
+        if (screen != Screen.Map) {
+            preSelectedMapLocation = null
+            autoRouteToPreSelectedMapLocation = false
+        }
+    }
+
+    LaunchedEffect(initialConversationId) {
+        val id = initialConversationId ?: return@LaunchedEffect
+        try {
+            val snap = FirebaseFirestore.getInstance()
+                .collection("conversations")
+                .document(id)
+                .get()
+                .await()
+            val conversation = snap.toObject(Conversation::class.java)
+
+            if (conversation != null) {
+                currentScreen = Screen.Social
+                openConversation(conversation)
+                onConversationOpened()
+            }
+        } catch (e: Exception) {
+            Log.e("NavigationHandler", "Failed to open conversation from notification: ${e.message}")
+        }
+    }
+
+    LaunchedEffect(initialMapLocationName, campusRegistry) {
+        val locationName = initialMapLocationName ?: return@LaunchedEffect
+        if (campusRegistry.isEmpty()) return@LaunchedEffect
+
+        val location = campusRegistry.values.flatten()
+            .find { it.name.equals(locationName, ignoreCase = true) }
+
+        if (location != null) {
+            preSelectedMapLocation = location
+            autoRouteToPreSelectedMapLocation = true
+            currentScreen = Screen.Map
+            onMapLocationOpened()
+        } else {
+            Log.e("NavigationHandler", "Failed to find map location from notification: $locationName")
+        }
+    }
+
+    val calendarScheduleItems = remember(calendarViewModel.classItems, calendarViewModel.scheduleItems) {
+        val cal = Calendar.getInstance()
+        val dayName = cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.US) ?: ""
+        val dateStr = "%04d-%02d-%02d".format(
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.DAY_OF_MONTH)
+        )
+        val list = mutableListOf<Pair<String, String>>()
+        calendarViewModel.classItems
+            .filter { it.meetingDays.contains(dayName) }
+            .forEach { list.add(it.name to "${it.startTime} - ${it.endTime} | ${it.location}") }
+        calendarViewModel.scheduleItems
+            .filter { it.date == dateStr }
+            .forEach { list.add(it.assignmentName to "Due: ${it.dueTime} (${it.className})") }
+        list
+    }
+
+    val displayUpcomingEventsItems: List<HomeUpcomingEventItem> = remember(
+        manualUpcomingEventsItems,
+        calendarViewModel.campusEventItems,
+        calendarViewModel.userEventItems,
+        calendarViewModel.classItems,
+        currentTimeMillis
+    ) {
+        buildHomeUpcomingEventItems(
+            context = context,
+            manualItems = manualUpcomingEventsItems,
+            campusEvents = calendarViewModel.campusEventItems,
+            userEvents = calendarViewModel.userEventItems,
+            classItems = calendarViewModel.classItems,
+            currentTimeMillis = currentTimeMillis
+        )
+    }
+
+    val isShowingNews = showCIView || selectedNewsArticle != null
+    val isShowingClubs = showClubs || selectedClub != null
+    val density = LocalDensity.current
+    val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
+    val hideBottomBarForConversationTyping =
+        currentScreen == Screen.Social && activeConversation != null && isKeyboardOpen
+
+    val uiState = NavigationUiState(
+        currentScreen = currentScreen,
+        userProfile = userProfile,
+        calendarScheduleItems = calendarScheduleItems,
+        manualUpcomingEventsItems = manualUpcomingEventsItems,
+        displayUpcomingEventsItems = displayUpcomingEventsItems,
+        activeConversation = activeConversation,
+        selectedProfile = selectedProfile,
+        showNewConversation = showNewConversation,
+        showSocialScreen = showSocialScreen,
+        showAddClassOnCalendar = showAddClassOnCalendar,
+        showCanvasScreen = showCanvasScreen,
+        showProfileEdit = showProfileEdit,
+        openedConversationTimestamps = openedConversationTimestamps,
+        showCIView = showCIView,
+        selectedNewsArticle = selectedNewsArticle,
+        showClubs = showClubs,
+        selectedClub = selectedClub,
+        preSelectedMapLocation = preSelectedMapLocation,
+        autoRouteToPreSelectedMapLocation = autoRouteToPreSelectedMapLocation,
+        sharedLocations = sharedLocations,
+        isShowingNews = isShowingNews,
+        isShowingClubs = isShowingClubs,
+        hideBottomBarForConversationTyping = hideBottomBarForConversationTyping,
+    )
+
+    val routeCallbacks = NavigationRouteCallbacks(
+        onUpdateManualEvents = {
+            manualUpcomingEventsItems = it
+            sharedPrefs.savePairItems("event_items", it)
+        },
+        onGoToScreen = { currentScreen = it },
+        onShowAddClass = {
+            showAddClassOnCalendar = true
+            currentScreen = Screen.Calendar
+        },
+        onShowClubs = { showClubs = true },
+        onShowCIView = { showCIView = true },
+        onSelectNewsArticle = { selectedNewsArticle = it },
+        onOpenHomeProfile = {
+            profileOpenedFromHome = true
+            selectedProfile = userProfile
+            currentScreen = Screen.Settings
+        },
+        onNavigateToLocation = { navigateToLocation(it) },
+        onClearActiveConversation = { activeConversation = null },
+        onResetSocialStack = {
+            activeConversation = null
+            selectedProfile = null
+            showNewConversation = false
+            showSocialScreen = false
+        },
+        onNavigateToCoordinates = { lat, lng, nickname, photoUrl ->
+            val sharedLocation = CampusLocation(
+                name = "$nickname's Location",
+                category = "SHARED",
+                description = photoUrl,
+                coordinates = GeoPoint(lat, lng)
+            )
+            val alreadyExists = sharedLocations.any {
+                it.coordinates.latitude == lat && it.coordinates.longitude == lng
+            }
+            if (!alreadyExists) sharedLocations = sharedLocations + sharedLocation
+            preSelectedMapLocation = sharedLocation
+            autoRouteToPreSelectedMapLocation = false
+            currentScreen = Screen.Map
+        },
+        onClearSelectedProfile = { selectedProfile = null },
+        onShowProfileEdit = { showProfileEdit = true },
+        onHideNewConversation = { showNewConversation = false },
+        onOpenConversationFromNew = {
+            showNewConversation = false
+            activeConversation = it
+        },
+        onOpenProfile = { selectedProfile = it },
+        onOpenConversationWithFriend = { friend ->
+            socialScope.launch {
+                socialRepository.getOrCreateConversation(
+                    participantIds = listOf(userProfile.uid, friend.uid),
+                    participantNicknames = mapOf(
+                        userProfile.uid to userProfile.nickname,
+                        friend.uid to friend.nickname
+                    )
+                ).onSuccess {
+                    showSocialScreen = false
+                    activeConversation = it
+                }
+            }
+        },
+        onOpenConversationFromList = ::openConversation,
+        onShowNewConversation = { showNewConversation = true },
+        onShowSocialScreen = { showSocialScreen = true },
+        onSeedTimestamps = ::seedConversationTimestamps,
+        onCalendarBack = {
+            currentScreen = Screen.Home
+            showAddClassOnCalendar = false
+        },
+        onHideCanvas = { showCanvasScreen = false },
+        onCanvasSyncComplete = { calendarViewModel.refreshAllSavedCalendarItems() },
+        onHideProfileEdit = { showProfileEdit = false },
+        onProfileSaved = { authViewModel.silentReloadProfile() },
+        onSettingsConversationOpened = {
+            activeConversation = it
+            currentScreen = Screen.Social
+        },
+        onSettingsSelectedProfileBack = {
+            selectedProfile = null
+            if (profileOpenedFromHome) {
+                profileOpenedFromHome = false
+                currentScreen = Screen.Home
+            }
+        },
+        onSignOut = onSignOut,
+        onSettingsChange = { dark, notify, theme ->
+            authViewModel.updateSettings(dark, notify, theme)
+        },
+        onViewProfile = {
+            profileOpenedFromHome = false
+            selectedProfile = userProfile
+        },
+        onOpenCanvas = { showCanvasScreen = true },
+    )
+
+    NavigationBackHandler(
+        currentScreen = currentScreen,
+        activeConversation = activeConversation,
+        selectedProfile = selectedProfile,
+        showNewConversation = showNewConversation,
+        showSocialScreen = showSocialScreen,
+        showProfileEdit = showProfileEdit,
+        showCanvasScreen = showCanvasScreen,
+        showCIView = showCIView,
+        selectedNewsArticle = selectedNewsArticle,
+        showClubs = showClubs,
+        selectedClub = selectedClub,
+        onHideCanvas = { showCanvasScreen = false },
+        onClearSelectedNewsArticle = { selectedNewsArticle = null },
+        onShowCIView = { showCIView = true },
+        onHideCIView = { showCIView = false },
+        onClearSelectedClub = { selectedClub = null },
+        onHideClubs = { showClubs = false },
+        onClearActiveConversation = { activeConversation = null },
+        onHideNewConversation = { showNewConversation = false },
+        onClearSelectedProfile = { selectedProfile = null },
+        onHideSocialScreen = { showSocialScreen = false },
+        onHideProfileEdit = { showProfileEdit = false },
+        onGoHome = { currentScreen = Screen.Home }
+    )
+
+    NavigationScaffoldContent(
+        uiState = uiState,
+        routeCallbacks = routeCallbacks,
+        onBottomScreenSelected = ::handleBottomScreenSelected,
+        onMapBack = { currentScreen = Screen.Home },
+        onMapFinishedLoading = {
+            preSelectedMapLocation = null
+            autoRouteToPreSelectedMapLocation = false
+        },
+        onRemoveExtraLocation = { sharedLocations = sharedLocations - it },
+        onArticleClick = { selectedNewsArticle = it },
+        onNewsBack = {
+            if (selectedNewsArticle?.title == "Study Rooms") {
+                selectedNewsArticle = null
+                showCIView = false
+            } else if (selectedNewsArticle != null) {
+                selectedNewsArticle = null
+                showCIView = true
+            } else {
+                showCIView = false
+            }
+        },
+        onClubClick = { selectedClub = it },
+        onClubsBack = {
+            if (selectedClub != null) selectedClub = null else showClubs = false
+        },
+    )
+}
