@@ -8,12 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -22,15 +17,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.study.StudySession
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.ui.graphics.lerp
 
 /** Identifies which quick-access popup is currently open. */
@@ -46,11 +38,13 @@ fun CalendarQuickAccessPopup(
     type: CalendarQuickAccessType,
     selectedDate: LocalDate,
     classes: List<ClassItem>,
+    syncedCanvasClassNames: List<String> = emptyList(),
     studySessions: List<StudySession>,
     events: List<EventItem>,
     onDismiss: () -> Unit,
     onAddClick: () -> Unit,
     onClassClick: (ClassItem) -> Unit,
+    onCanvasClassClick: (String) -> Unit = {},
     onStudySessionClick: (StudySession) -> Unit,
     onEventClick: (EventItem) -> Unit
 ) {
@@ -107,7 +101,9 @@ fun CalendarQuickAccessPopup(
                 when (type) {
                     CalendarQuickAccessType.CLASSES -> ClassPopupList(
                         classes = classes,
-                        onClassClick = onClassClick
+                        syncedCanvasClassNames = syncedCanvasClassNames,
+                        onClassClick = onClassClick,
+                        onCanvasClassClick = onCanvasClassClick
                     )
 
                     CalendarQuickAccessType.STUDY -> StudyPopupList(
@@ -193,26 +189,68 @@ private fun PopupIcon(type: CalendarQuickAccessType) {
     }
 }
 
-/** Shows class rows in the quick-access popup. */
+/** Shows saved class meetings and Canvas-synced classes in the quick-access popup. */
 @Composable
 private fun ClassPopupList(
     classes: List<ClassItem>,
-    onClassClick: (ClassItem) -> Unit
+    syncedCanvasClassNames: List<String>,
+    onClassClick: (ClassItem) -> Unit,
+    onCanvasClassClick: (String) -> Unit
 ) {
-    if (classes.isEmpty()) {
-        EmptyPopupMessage(text = "No classes scheduled for this day yet.")
+    val hasSavedClasses = classes.isNotEmpty()
+    val hasCanvasClasses = syncedCanvasClassNames.isNotEmpty()
+
+    if (!hasSavedClasses && !hasCanvasClasses) {
+        EmptyPopupMessage(text = "No classes scheduled or synced yet.")
         return
     }
 
-    classes.forEach { classItem ->
-        PopupItemCard(
-            title = classItem.name,
-            primaryDetail = buildTimeRange(classItem.startTime, classItem.endTime),
-            secondaryDetail = classItem.meetingDays.joinToString(", "),
-            location = classItem.location,
-            onClick = { onClassClick(classItem) }
-        )
+    if (hasSavedClasses) {
+        PopupSectionLabel(text = "Saved class meetings")
+
+        classes.forEach { classItem ->
+            PopupItemCard(
+                title = classItem.name,
+                primaryDetail = buildTimeRange(classItem.startTime, classItem.endTime),
+                secondaryDetail = classItem.meetingDays.joinToString(", "),
+                location = classItem.location,
+                onClick = { onClassClick(classItem) }
+            )
+        }
     }
+
+    if (hasSavedClasses && hasCanvasClasses) {
+        Spacer(modifier = Modifier.height(8.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+
+    if (hasCanvasClasses) {
+        PopupSectionLabel(text = "Canvas synced classes")
+
+        syncedCanvasClassNames.forEach { canvasClassName ->
+            PopupItemCard(
+                title = canvasClassName,
+                primaryDetail = "Tap to add meeting time",
+                secondaryDetail = "Synced from Canvas",
+                location = "",
+                onClick = { onCanvasClassClick(canvasClassName) }
+            )
+        }
+    }
+}
+
+/** Shows a small label above a group of popup rows. */
+@Composable
+private fun PopupSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        fontWeight = FontWeight.SemiBold
+    )
+
+    Spacer(modifier = Modifier.height(6.dp))
 }
 
 /** Shows study-session rows in the quick-access popup. */

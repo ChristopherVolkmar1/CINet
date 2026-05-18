@@ -207,37 +207,46 @@ internal fun MainScaffold(
         }
     }
 
-    fun handleTopBarBack() {
-        when {
-            selectedNewsArticle?.title == "Study Rooms" -> {
-                selectedNewsArticle = null
-                showCIView = false
-            }
-            selectedNewsArticle != null -> {
-                selectedNewsArticle = null
-                showCIView = true
-            }
-            showCIView -> showCIView = false
-            selectedClub != null -> selectedClub = null
-            showClubs -> showClubs = false
-            currentScreen == Screen.Social && selectedProfile != null -> selectedProfile = null
-            currentScreen == Screen.Social && showNewConversation -> {
-                newConversationTopBarState?.onBackClick?.invoke() ?: run {
-                    showNewConversation = false
-                    newConversationTopBarState = null
+        fun handleTopBarBack() {
+            when {
+                selectedNewsArticle?.title == "Study Rooms" -> {
+                    selectedNewsArticle = null
+                    showCIView = false
                 }
-            }
-            currentScreen == Screen.Settings && showCanvasScreen -> showCanvasScreen = false
-            currentScreen == Screen.Settings && showProfileEdit -> showProfileEdit = false
-            currentScreen == Screen.Settings && selectedProfile != null -> {
-                selectedProfile = null
-                if (profileOpenedFromHome) {
-                    profileOpenedFromHome = false
-                    currentScreen = Screen.Home
+                selectedNewsArticle != null -> {
+                    selectedNewsArticle = null
+                    showCIView = true
+                }
+                showCIView -> showCIView = false
+                selectedClub != null -> selectedClub = null
+                showClubs -> showClubs = false
+
+                currentScreen == Screen.Social && selectedProfile != null -> selectedProfile = null
+
+                currentScreen == Screen.Social && showSocialScreen -> {
+                    activeConversation = null
+                    selectedProfile = null
+                    showNewConversation = false
+                    showSocialScreen = false
+                }
+
+                currentScreen == Screen.Social && showNewConversation -> {
+                    newConversationTopBarState?.onBackClick?.invoke() ?: run {
+                        showNewConversation = false
+                        newConversationTopBarState = null
+                    }
+                }
+                currentScreen == Screen.Settings && showCanvasScreen -> showCanvasScreen = false
+                currentScreen == Screen.Settings && showProfileEdit -> showProfileEdit = false
+                currentScreen == Screen.Settings && selectedProfile != null -> {
+                    selectedProfile = null
+                    if (profileOpenedFromHome) {
+                        profileOpenedFromHome = false
+                        currentScreen = Screen.Home
+                    }
                 }
             }
         }
-    }
 
     fun handleBottomScreenSelected(screen: Screen) {
         navigateToScreen(screen)

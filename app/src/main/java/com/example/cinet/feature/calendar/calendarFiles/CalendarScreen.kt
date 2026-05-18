@@ -47,6 +47,13 @@ fun CalendarScreen(
     }
 
     val classItems = viewModel.classItems
+
+    val syncedCanvasClassNames = viewModel.scheduleItems
+        .map { it.className.trim() }
+        .filter { it.isNotBlank() }
+        .distinctBy { it.lowercase() }
+        .sorted()
+
     val currentMonth = viewModel.currentMonth
     val selectedDate = viewModel.selectedDate
     val activeDate = selectedDate ?: today
@@ -134,6 +141,26 @@ fun CalendarScreen(
         selectedMeetingDays = emptySet()
     }
 
+    // Checks whether the class meeting being saved already exists.
+    fun hasDuplicateClassMeeting(
+        classToEdit: ClassItem?,
+        name: String,
+        meetingDays: List<String>,
+        startTime: String,
+        endTime: String
+    ): Boolean {
+        val normalizedName = name.trim()
+
+        return classItems.any { existingClass ->
+            val isSameSavedClass = classToEdit?.id == existingClass.id
+            val hasSameName = existingClass.name.equals(normalizedName, ignoreCase = true)
+            val hasSameTime = existingClass.startTime == startTime && existingClass.endTime == endTime
+            val hasOverlappingDay = existingClass.meetingDays.any { it in meetingDays }
+
+            !isSameSavedClass && hasSameName && hasSameTime && hasOverlappingDay
+        }
+    }
+
     fun resetStudySessionForm() {
         editingSession = null
         sessionClassName = ""
@@ -164,6 +191,13 @@ fun CalendarScreen(
         classStartTime = classItem.startTime
         classEndTime = classItem.endTime
         selectedMeetingDays = classItem.meetingDays.toSet()
+        showClassDialog = true
+    }
+
+    // Opens the normal class creation dialog with a Canvas class name prefilled.
+    fun openCanvasClassMeetingCreator(canvasClassName: String) {
+        resetClassForm()
+        className = canvasClassName
         showClassDialog = true
     }
 
@@ -271,6 +305,7 @@ fun CalendarScreen(
             type = quickAccessType,
             selectedDate = activeDate,
             classes = classesForSelectedDate,
+            syncedCanvasClassNames = syncedCanvasClassNames,
             studySessions = studySessionsForSelectedDate,
             events = eventsForSelectedDate,
             onDismiss = { selectedQuickAccessType = null },
@@ -296,6 +331,10 @@ fun CalendarScreen(
             onClassClick = { classItem ->
                 selectedQuickAccessType = null
                 openClassEditor(classItem)
+            },
+            onCanvasClassClick = { canvasClassName ->
+                selectedQuickAccessType = null
+                openCanvasClassMeetingCreator(canvasClassName)
             },
             onStudySessionClick = { session ->
                 selectedQuickAccessType = null
@@ -418,6 +457,24 @@ fun CalendarScreen(
                         classToEdit != null -> classToEdit.location
                         else -> ""
                     }
+
+                    val hasDuplicateMeeting = hasDuplicateClassMeeting(
+                        classToEdit = classToEdit,
+                        name = className,
+                        meetingDays = meetingDaysList,
+                        startTime = classStartTime,
+                        endTime = classEndTime
+                    )
+
+                    if (hasDuplicateMeeting) {
+                        Toast.makeText(
+                            context,
+                            "This class meeting already exists.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@ClassDialog
+                    }
+
 
                     if (classToEdit == null) {
                         viewModel.addClass(

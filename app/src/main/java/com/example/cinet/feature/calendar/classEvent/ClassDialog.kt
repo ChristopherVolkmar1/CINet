@@ -13,6 +13,7 @@ import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.SearchBar
 
+
 @Composable
 fun ClassDialog(
     editingClass: ClassItem?,
@@ -70,8 +71,7 @@ fun ClassDialog(
                         value = className,
                         onValueChange = onClassNameChange,
                         label = { Text("Class Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
