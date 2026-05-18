@@ -56,6 +56,7 @@ internal fun NavigationScreenRoute(
             onOpenFriends = callbacks.onShowSocialScreen,
             onSeedTimestamps = callbacks.onSeedTimestamps,
             onNewConversationTopBarChange = callbacks.onNewConversationTopBarChange,
+            onConversationTopBarChange = callbacks.onConversationTopBarChange,
         )
 
         Screen.Map -> Unit

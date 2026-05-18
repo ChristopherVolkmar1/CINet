@@ -34,6 +34,7 @@ internal fun NavigationSocialRoute(
     onOpenFriends: () -> Unit,
     onSeedTimestamps: (List<String>) -> Unit,
     onNewConversationTopBarChange: (NewConversationTopBarState?) -> Unit,
+    onConversationTopBarChange: (com.example.cinet.feature.social.ConversationTopBarState?) -> Unit,
 ) {
     // Intercept system back when a profile is visible — ensures we return
     // to the conversation (or wherever we came from) rather than letting
@@ -61,6 +62,7 @@ internal fun NavigationSocialRoute(
             onNavigateToLocation = onNavigateToLocation,
             onNavigateToCoordinates = onNavigateToCoordinates,
             onOpenProfile = onOpenProfile,
+            onTopBarStateChange = onConversationTopBarChange,
         )
 
         showNewConversation -> NewConversationScreen(

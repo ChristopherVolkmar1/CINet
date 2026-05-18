@@ -35,6 +35,7 @@ import java.util.Calendar
 import java.util.Locale
 import com.example.cinet.feature.home.HomeUpcomingEventItem
 import com.example.cinet.feature.social.NewConversationTopBarState
+import com.example.cinet.feature.social.ConversationTopBarState
 
 @Composable
 internal fun MainScaffold(
@@ -70,6 +71,7 @@ internal fun MainScaffold(
     var showNewConversation by remember { mutableStateOf(false) }
     var showSocialScreen by remember { mutableStateOf(false) }
     var newConversationTopBarState by remember { mutableStateOf<NewConversationTopBarState?>(null) }
+    var conversationTopBarState by remember { mutableStateOf<ConversationTopBarState?>(null) }
 
     var showCIView by remember { mutableStateOf(false) }
     var selectedNewsArticle by remember { mutableStateOf<NewsArticle?>(null) }
@@ -123,10 +125,10 @@ internal fun MainScaffold(
 
     LaunchedEffect(currentScreen, activeConversation, selectedProfile, showNewConversation, showSocialScreen) {
         val isMessagesList = currentScreen == Screen.Social &&
-            activeConversation == null &&
-            selectedProfile == null &&
-            !showNewConversation &&
-            !showSocialScreen
+                activeConversation == null &&
+                selectedProfile == null &&
+                !showNewConversation &&
+                !showSocialScreen
 
         if (isMessagesList) {
             socialRepository.getPendingRequests().onSuccess { requests ->
@@ -139,6 +141,7 @@ internal fun MainScaffold(
         val now = System.currentTimeMillis()
         openedConversationTimestamps = openedConversationTimestamps + (conversation.id to now)
         sharedPrefs.edit().putLong("opened_conv_${conversation.id}", now).apply()
+        conversationTopBarState = null   // will be re-pushed by ConversationScreen on open
         activeConversation = conversation
     }
 
@@ -176,6 +179,7 @@ internal fun MainScaffold(
             currentScreen == Screen.Home -> "Home"
 
             currentScreen == Screen.Social -> when {
+                conversationTopBarState != null -> conversationTopBarState?.title ?: ""
                 showNewConversation -> newConversationTopBarState?.title ?: "New Message"
                 selectedProfile != null -> if (selectedProfile?.uid == userProfile.uid) "Profile" else selectedProfile?.nickname ?: "Profile"
                 showSocialScreen -> "Friends"
@@ -197,6 +201,7 @@ internal fun MainScaffold(
         return when {
             selectedNewsArticle != null || showCIView -> true
             selectedClub != null || showClubs -> true
+            currentScreen == Screen.Social && activeConversation != null -> true
             currentScreen == Screen.Social && selectedProfile != null -> true
             currentScreen == Screen.Social && showSocialScreen -> true
             currentScreen == Screen.Settings && showCanvasScreen -> true
@@ -207,46 +212,41 @@ internal fun MainScaffold(
         }
     }
 
-        fun handleTopBarBack() {
-            when {
-                selectedNewsArticle?.title == "Study Rooms" -> {
-                    selectedNewsArticle = null
-                    showCIView = false
-                }
-                selectedNewsArticle != null -> {
-                    selectedNewsArticle = null
-                    showCIView = true
-                }
-                showCIView -> showCIView = false
-                selectedClub != null -> selectedClub = null
-                showClubs -> showClubs = false
-
-                currentScreen == Screen.Social && selectedProfile != null -> selectedProfile = null
-
-                currentScreen == Screen.Social && showSocialScreen -> {
-                    activeConversation = null
-                    selectedProfile = null
+    fun handleTopBarBack() {
+        when {
+            selectedNewsArticle?.title == "Study Rooms" -> {
+                selectedNewsArticle = null
+                showCIView = false
+            }
+            selectedNewsArticle != null -> {
+                selectedNewsArticle = null
+                showCIView = true
+            }
+            showCIView -> showCIView = false
+            selectedClub != null -> selectedClub = null
+            showClubs -> showClubs = false
+            currentScreen == Screen.Social && selectedProfile != null -> selectedProfile = null
+            currentScreen == Screen.Social && activeConversation != null -> {
+                activeConversation = null
+                conversationTopBarState = null
+            }
+            currentScreen == Screen.Social && showNewConversation -> {
+                newConversationTopBarState?.onBackClick?.invoke() ?: run {
                     showNewConversation = false
-                    showSocialScreen = false
+                    newConversationTopBarState = null
                 }
-
-                currentScreen == Screen.Social && showNewConversation -> {
-                    newConversationTopBarState?.onBackClick?.invoke() ?: run {
-                        showNewConversation = false
-                        newConversationTopBarState = null
-                    }
-                }
-                currentScreen == Screen.Settings && showCanvasScreen -> showCanvasScreen = false
-                currentScreen == Screen.Settings && showProfileEdit -> showProfileEdit = false
-                currentScreen == Screen.Settings && selectedProfile != null -> {
-                    selectedProfile = null
-                    if (profileOpenedFromHome) {
-                        profileOpenedFromHome = false
-                        currentScreen = Screen.Home
-                    }
+            }
+            currentScreen == Screen.Settings && showCanvasScreen -> showCanvasScreen = false
+            currentScreen == Screen.Settings && showProfileEdit -> showProfileEdit = false
+            currentScreen == Screen.Settings && selectedProfile != null -> {
+                selectedProfile = null
+                if (profileOpenedFromHome) {
+                    profileOpenedFromHome = false
+                    currentScreen = Screen.Home
                 }
             }
         }
+    }
 
     fun handleBottomScreenSelected(screen: Screen) {
         navigateToScreen(screen)
@@ -259,6 +259,7 @@ internal fun MainScaffold(
             selectedProfile = null
             showNewConversation = false
             showSocialScreen = false
+            conversationTopBarState = null
         }
 
         if (screen == Screen.Settings) {
@@ -389,6 +390,11 @@ internal fun MainScaffold(
                 newConversationTopBarState
             } else {
                 null
+            },
+            conversationTopBarState = if (currentScreen == Screen.Social && activeConversation != null) {
+                conversationTopBarState
+            } else {
+                null
             }
         ),
         currentScreen = currentScreen,
@@ -441,6 +447,7 @@ internal fun MainScaffold(
             selectedProfile = null
             showNewConversation = false
             showSocialScreen = false
+            conversationTopBarState = null
         },
         onNavigateToCoordinates = { lat, lng, nickname, photoUrl ->
             val sharedLocation = CampusLocation(
@@ -510,6 +517,7 @@ internal fun MainScaffold(
         },
         onOpenCanvas = { showCanvasScreen = true },
         onNewConversationTopBarChange = { newConversationTopBarState = it },
+        onConversationTopBarChange = { conversationTopBarState = it },
         onOpenChatFromHome = { otherUser ->
             socialScope.launch {
                 socialRepository.getOrCreateConversation(

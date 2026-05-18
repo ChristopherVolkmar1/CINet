@@ -19,15 +19,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
@@ -43,7 +40,6 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import android.app.DownloadManager
 import android.content.Intent
@@ -92,6 +88,7 @@ fun ConversationScreen(
     onNavigateToLocation: ((String) -> Unit)? = null,
     onNavigateToCoordinates: ((Double, Double, String, String) -> Unit)? = null,
     onOpenProfile: ((UserProfile) -> Unit)? = null,
+    onTopBarStateChange: (ConversationTopBarState?) -> Unit = {},
 ) {
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
@@ -208,6 +205,34 @@ fun ConversationScreen(
         conversation.participantNicknames.entries
             .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
     }
+
+    // Push the current conversation header into the persistent top bar.
+    // Re-runs whenever title, photo, or interactive state changes so the bar stays in sync.
+    LaunchedEffect(
+        conversationTitle, otherUserPhotoUrl, otherUserProfile,
+        conversation.isGroup, showSearchBar, showGroupInfo
+    ) {
+        onTopBarStateChange(
+            ConversationTopBarState(
+                title = conversationTitle,
+                photoUrl = otherUserPhotoUrl,
+                isGroup = conversation.isGroup,
+                onTitleClick = if (!conversation.isGroup && otherUserProfile != null && onOpenProfile != null) {
+                    { onOpenProfile(otherUserProfile!!) }
+                } else null,
+                onSearchClick = { showSearchBar = !showSearchBar },
+                onInfoClick = if (conversation.isGroup) {
+                    { showGroupInfo = true }
+                } else null,
+                onRemoveFriendClick = if (!conversation.isGroup && otherUid.isNotBlank()) {
+                    { showRemoveFriendDialog = true }
+                } else null,
+            )
+        )
+    }
+
+    // Clear the persistent top bar when this conversation leaves composition.
+    DisposableEffect(Unit) { onDispose { onTopBarStateChange(null) } }
 
     // Load both participants' photos on open
     LaunchedEffect(conversation.id) {
@@ -370,162 +395,7 @@ fun ConversationScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
 
-                // Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // iOS-style back: bare chevron + conversation count pill
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(onClick = onBack),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp),
-                        )
-                        if (conversationCount > 0) {
-                            Surface(
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                            ) {
-                                Text(
-                                    text = conversationCount.toString(),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    if (conversation.isGroup) {
-                        // Group: avatar placeholder
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
-                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = conversationTitle.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = conversationTitle,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f),
-                        )
-                        // Search messages
-                        IconButton(onClick = { showSearchBar = !showSearchBar }) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search messages",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        }
-                        // Group info sheet
-                        IconButton(onClick = { showGroupInfo = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Group info",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        }
-                    } else {
-                        // DM: avatar + name — tappable to open the other user's ProfileScreen
-                        val headerPhoto = otherUserPhotoUrl.takeIf { it.isNotBlank() }
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .then(
-                                    if (otherUserProfile != null && onOpenProfile != null)
-                                        Modifier.clickable { onOpenProfile(otherUserProfile!!) }
-                                    else Modifier
-                                ),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (headerPhoto != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(headerPhoto)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = "Profile photo",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = conversationTitle.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = conversationTitle,
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        // DM MoreVert: search + remove friend
-                        if (otherUid.isNotBlank()) {
-                            var expanded by remember { mutableStateOf(false) }
-                            Box {
-                                IconButton(onClick = { expanded = true }) {
-                                    Icon(
-                                        Icons.Default.MoreVert,
-                                        contentDescription = "More options",
-                                        tint = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = expanded,
-                                    onDismissRequest = { expanded = false },
-                                    offset = DpOffset(x = 0.dp, y = 4.dp)
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Search Messages") },
-                                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                                        onClick = { expanded = false; showSearchBar = true }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Remove Friend") },
-                                        leadingIcon = { Icon(Icons.Default.PersonRemove, null) },
-                                        onClick = { expanded = false; showRemoveFriendDialog = true }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider()
-
-                // ── Search bar — animates in/out below the header divider ──────
+                // ── Search bar — animates in/out below the top bar ──────────────────
                 AnimatedVisibility(
                     visible = showSearchBar,
                     enter = expandVertically(),

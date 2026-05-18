@@ -1,6 +1,8 @@
 package com.example.cinet.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,20 +13,34 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,6 +49,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.cinet.feature.social.ConversationTopBarState
 
 // Draws the persistent page title bar used across the app.
 @Composable
@@ -58,6 +77,7 @@ internal fun AppTopBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val newConversationTopBarState = state.newConversationTopBarState
+            val conversationTopBarState = state.conversationTopBarState
             if (state.showBackButton) {
                 IconButton(onClick = onBack) {
                     Icon(
@@ -70,6 +90,13 @@ internal fun AppTopBar(
             }
 
             when {
+                conversationTopBarState != null -> {
+                    ConversationTopBarContent(
+                        state = conversationTopBarState,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
                 newConversationTopBarState != null -> {
                     Text(
                         text = newConversationTopBarState.title,
@@ -104,7 +131,9 @@ internal fun AppTopBar(
                 }
             }
 
-            if (newConversationTopBarState != null) {
+            if (conversationTopBarState != null) {
+                ConversationTopBarActions(state = conversationTopBarState)
+            } else if (newConversationTopBarState != null) {
                 NewConversationTopBarAction(state = newConversationTopBarState)
             } else if (state.showSocialActions) {
                 SocialTopBarActions(
@@ -145,7 +174,96 @@ private fun NewConversationTopBarAction(
     }
 }
 
-// Displays the home greeting inside the persistent top bar.
+// Renders the avatar + title section for an open conversation in the persistent top bar.
+@Composable
+private fun ConversationTopBarContent(
+    state: ConversationTopBarState,
+    modifier: Modifier = Modifier,
+) {
+    val photoUrl = state.photoUrl.takeIf { it.isNotBlank() }
+    val initial = state.title.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    Row(
+        modifier = modifier
+            .then(if (state.onTitleClick != null) Modifier.clickable { state.onTitleClick.invoke() } else Modifier),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (!state.isGroup && photoUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Profile photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.25f))
+                    .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = initial, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = state.title,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+// Shows the action buttons for an open conversation (search, info, or more-options menu).
+@Composable
+private fun ConversationTopBarActions(state: ConversationTopBarState) {
+    if (state.isGroup) {
+        // Group: Search + Info
+        IconButton(onClick = state.onSearchClick) {
+            Icon(Icons.Default.Search, contentDescription = "Search messages", tint = Color.White)
+        }
+        if (state.onInfoClick != null) {
+            IconButton(onClick = state.onInfoClick) {
+                Icon(Icons.Default.Info, contentDescription = "Group info", tint = Color.White)
+            }
+        }
+    } else {
+        // DM: MoreVert dropdown — Search Messages, Remove Friend
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { expanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenuItem(
+                    text = { Text("Search Messages") },
+                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    onClick = { expanded = false; state.onSearchClick() }
+                )
+                if (state.onRemoveFriendClick != null) {
+                    DropdownMenuItem(
+                        text = { Text("Remove Friend") },
+                        leadingIcon = { Icon(Icons.Default.PersonRemove, null) },
+                        onClick = { expanded = false; state.onRemoveFriendClick.invoke() }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Shows the friend greeting inside the persistent top bar.
 @Composable
 private fun WelcomeHeader(
     nickname: String,
