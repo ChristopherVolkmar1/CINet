@@ -23,13 +23,21 @@ class FirestoreRepository(
             val loginUpdate = mapOf(
                 "uid"         to user.uid,
                 "email"       to (user.email ?: ""),
-                "photoUrl"    to (user.photoUrl?.toString() ?: ""),
                 "lastLoginAt" to FieldValue.serverTimestamp(),
             )
 
             docRef.set(loginUpdate, SetOptions.merge()).await()
 
             val snapshot = docRef.get().await()
+
+            // Seed photoUrl from Google auth only on first login (never overwrite a
+            // custom Storage upload the user has already set).
+            if (snapshot.getString("photoUrl").isNullOrEmpty()) {
+                val googlePhoto = user.photoUrl?.toString() ?: ""
+                if (googlePhoto.isNotEmpty()) {
+                    docRef.set(mapOf("photoUrl" to googlePhoto), SetOptions.merge()).await()
+                }
+            }
             if (snapshot.getTimestamp("createdAt") == null) {
                 docRef.update("createdAt", FieldValue.serverTimestamp()).await()
             }
@@ -138,6 +146,13 @@ class FirestoreRepository(
         db.collection(FirestoreCollections.USERS)
             .document(uid)
             .set(mapOf("photoUrl" to photoUrl), SetOptions.merge())
+            .await()
+    }
+
+    suspend fun updateBannerUrl(uid: String, bannerUrl: String) {
+        db.collection(FirestoreCollections.USERS)
+            .document(uid)
+            .set(mapOf("bannerUrl" to bannerUrl), SetOptions.merge())
             .await()
     }
 
