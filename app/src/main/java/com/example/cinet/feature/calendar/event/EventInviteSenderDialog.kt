@@ -177,7 +177,7 @@ fun EventInviteSenderDialog(
                     ) {
                         Text("Your Events", style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = { isCreatingNew = true }) {
+                        Button(onClick = { isCreatingNew = true }) {
                             Text("Create new")
                         }
                     }

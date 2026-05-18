@@ -287,6 +287,12 @@ fun ConversationScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
+    LaunchedEffect(Unit) {
+        myScheduleItems = calendarRepository.loadAssignments()
+        myStudySessions = calendarRepository.loadStudySessions()
+        myEvents = calendarRepository.loadEvents()
+    }
+
     // User location
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }

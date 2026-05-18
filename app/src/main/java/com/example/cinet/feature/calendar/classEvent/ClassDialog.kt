@@ -1,19 +1,28 @@
 package com.example.cinet.feature.calendar.classEvent
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.feature.calendar.calendarFiles.CalendarFirestoreRepository
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.SearchBar
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClassDialog(
     editingClass: ClassItem?,
@@ -21,23 +30,23 @@ fun ClassDialog(
     onClassNameChange: (String) -> Unit,
     classStartTime: String,
     classEndTime: String,
+    onExistingClassSelected: (ClassItem) -> Unit = {},
     selectedMeetingDays: Set<String>,
     onMeetingDaysChange: (Set<String>) -> Unit,
-    weekdayOptions: List<String>,
     onPickStartTime: () -> Unit,
     onPickEndTime: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: (CampusLocation?, Boolean) -> Unit,
-    onDelete: (() -> Unit)?,
-    viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel()
+    onDelete: (() -> Unit)?
 ) {
     var locationField by remember { mutableStateOf<CampusLocation?>(null) }
-
+    val isPreview = LocalInspectionMode.current
+    val vm: CampusRegistry? = if (isPreview) null else androidx.lifecycle.viewmodel.compose.viewModel()
+    val academic by (vm?.academic ?: MutableStateFlow(emptyList())).collectAsState(initial = emptyList())
     var remindersEnabled by remember {
         mutableStateOf(editingClass?.remindersEnabled ?: true)
     }
 
-    val academic by viewModel.academic.collectAsState(initial = emptyList())
     val textFieldState = rememberTextFieldState()
 
     val academicNames = remember(textFieldState.text, academic) {
@@ -46,6 +55,26 @@ fun ClassDialog(
             .map { it.name }
     }
 
+    val days = listOf("M", "T", "W", "TH", "F")
+    val dayDisplayToStored = mapOf(
+        "M" to "Mon",
+        "T" to "Tue",
+        "W" to "Wed",
+        "TH" to "Thu",
+        "F" to "Fri"
+    )
+    var expanded by remember { mutableStateOf(false) }
+    var classList by remember { mutableStateOf<List<ClassItem>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        scope.launch {
+            try {
+                classList = CalendarFirestoreRepository().loadClasses()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
     AlertDialog(
         modifier = Modifier.width(850.dp),
         onDismissRequest = onDismiss,
@@ -53,109 +82,93 @@ fun ClassDialog(
             Text(if (editingClass == null) "Create Class" else "Edit Class")
         },
         text = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 520.dp)
-                    .padding(4.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(0.85f)
-                        .fillMaxHeight()
-                        .padding(end = 10.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ){
-                    OutlinedTextField(
-                        value = className,
-                        onValueChange = onClassNameChange,
-                        label = { Text("Class Name") },
+                Column(modifier = Modifier.verticalScroll(rememberScrollState()).imePadding()){
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
                         modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Meeting Days",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    weekdayOptions.forEach { day ->
-                        Row(
+                    ) {
+                        OutlinedTextField(
+                            value = className,
+                            onValueChange = {onClassNameChange(it)},
+                            readOnly = false,
+                            label = { Text("Class Name") },
+                            placeholder = { Text("Select your class") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(36.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = selectedMeetingDays.contains(day),
-                                onCheckedChange = { checked ->
-                                    onMeetingDaysChange(
-                                        if (checked) selectedMeetingDays + day
-                                        else selectedMeetingDays - day
+                                .menuAnchor(MenuAnchorType.PrimaryEditable)
+                        )
+                        val filtering = classList.filter { it.name.contains(className, ignoreCase = true) }
+                        if (filtering.isNotEmpty()) {
+                            ExposedDropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                filtering.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.name) },
+                                        onClick = { onClassNameChange(option.name); onExistingClassSelected(option); expanded = false }
                                     )
                                 }
-                            )
-
-                            Text(
-                                text = day,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1
-                            )
+                            }
                         }
-                    }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1.15f)
-                        .padding(start = 10.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    OutlinedTextField(
-                        value = classStartTime,
-                        onValueChange = {},
-                        label = { Text("Start Time") },
-                        modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        singleLine = true
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Button(
-                        onClick = onPickStartTime,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Pick Start Time",
-                            maxLines = 1,
-                            style = MaterialTheme.typography.labelMedium
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    OutlinedTextField(
-                        value = classEndTime,
-                        onValueChange = {},
-                        label = { Text("End Time") },
-                        modifier = Modifier.fillMaxWidth(),
-                        readOnly = true,
-                        singleLine = true
-                    )
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        days.forEach { day ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = day,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Checkbox(
+                                    checked = selectedMeetingDays.contains(dayDisplayToStored[day]),
+                                    onCheckedChange = { checked ->
+                                        val stored = dayDisplayToStored[day] ?: day
+                                        onMeetingDaysChange(
+                                            if (checked) selectedMeetingDays + stored
+                                            else selectedMeetingDays - stored
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Button(
-                        onClick = onPickEndTime,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Pick End Time",
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = classStartTime,
+                            onValueChange = {},
+                            label = { Text("Start Time") },
+                            readOnly = true,
+                            singleLine = true,
                             maxLines = 1,
-                            style = MaterialTheme.typography.labelMedium
+                            trailingIcon = {
+                                IconButton(onClick = onPickStartTime) {
+                                    Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        OutlinedTextField(
+                            value = classEndTime,
+                            onValueChange = {},
+                            label = { Text("End Time") },
+                            readOnly = true,
+                            singleLine = true,
+                            maxLines = 1,
+                            trailingIcon = {
+                                IconButton(onClick = onPickEndTime) {
+                                    Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
                         )
                     }
 
@@ -205,8 +218,7 @@ fun ClassDialog(
                         )
                     }
                 }
-            }
-        },
+              },
         confirmButton = {},
 
         dismissButton = {
@@ -248,5 +260,51 @@ fun ClassDialog(
                 }
             }
         }
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ClassDialogCreatePreview() {
+    ClassDialog(
+        editingClass = null,
+        className = "Computer Science 101",
+        onClassNameChange = {},
+        classStartTime = "9:00 AM",
+        classEndTime = "10:15 AM",
+        selectedMeetingDays = setOf("M", "W"),
+        onMeetingDaysChange = {},
+        onPickStartTime = {},
+        onPickEndTime = {},
+        onDismiss = {},
+        onConfirm = { _, _ -> },
+        onDelete = null
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ClassDialogEditPreview() {
+    ClassDialog(
+        editingClass = ClassItem(
+            id = "1",
+            name = "Mathematics 201",
+            meetingDays = listOf("T", "TH"),
+            startTime = "11:00 AM",
+            endTime = "12:15 PM",
+            location = "Broome Library 1360",
+            remindersEnabled = true
+        ),
+        className = "Mathematics 201",
+        onClassNameChange = {},
+        classStartTime = "11:00 AM",
+        classEndTime = "12:15 PM",
+        selectedMeetingDays = setOf("T", "TH"),
+        onMeetingDaysChange = {},
+        onPickStartTime = {},
+        onPickEndTime = {},
+        onDismiss = {},
+        onConfirm = { _, _ -> },
+        onDelete = {}
     )
 }
