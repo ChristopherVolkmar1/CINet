@@ -66,6 +66,9 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.Timestamp
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -1005,43 +1008,77 @@ fun MessageBubble(
                 }
             }
 
-            // ── Read receipts — small avatar initials shown below own sent messages ──
-            // Only the sender sees these, and only when the feature is enabled.
-            // For DMs: shows the other person's initial once they've read.
-            // For groups: shows up to 5 reader initials side by side.
+            // ── Read receipts — profile pictures + time, iMessage-style ──────────
+            // Only the sender sees these. DMs show avatar + "Read h:mm a".
+            // Groups show up to 5 stacked avatars + "Read" label.
             if (isCurrentUser && readReceiptsEnabled) {
                 val readers = readBy.keys.filter { it != message.senderId }
                 if (readers.isNotEmpty()) {
+                    // Find the latest read timestamp across all readers for the time label
+                    val latestReadTime = readers.mapNotNull { uid ->
+                        (readBy[uid] as? Timestamp)?.toDate()
+                    }.maxOrNull()
+                    val timeString = latestReadTime?.let {
+                        SimpleDateFormat("h:mm a", Locale.getDefault()).format(it)
+                    } ?: ""
+
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.padding(top = 3.dp, end = 2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp, end = 2.dp)
                     ) {
+                        // Reader profile picture bubbles
                         readers.take(5).forEach { uid ->
-                            val initial = if (isGroup) {
-                                memberProfiles[uid]?.nickname?.firstOrNull()
-                                    ?.uppercaseChar()?.toString() ?: "·"
-                            } else {
-                                // DM — just use the checkmark initial placeholder
-                                memberProfiles[uid]?.nickname?.firstOrNull()
-                                    ?.uppercaseChar()?.toString() ?: "✓"
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .size(14.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = initial,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 8.sp
-                                    ),
-                                    color = MaterialTheme.colorScheme.onPrimary,
+                            val profile = memberProfiles[uid]
+                            val photoUrl = profile?.photoUrl?.takeIf { it.isNotBlank() }
+                            val initial = profile?.nickname?.firstOrNull()
+                                ?.uppercaseChar()?.toString() ?: "·"
+
+                            if (photoUrl != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(photoUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.background,
+                                            CircleShape
+                                        )
                                 )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = initial,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 7.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                    )
+                                }
                             }
+                        }
+
+                        // "Read h:mm a" for DMs; "Read" for groups (avatars speak for themselves)
+                        if (timeString.isNotBlank()) {
+                            Text(
+                                text = if (!isGroup) "Read $timeString" else "Read",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            )
                         }
                     }
                 }
