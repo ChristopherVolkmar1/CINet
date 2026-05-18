@@ -55,13 +55,16 @@ internal fun NavigationScreenRoute(
             onNewConversation = callbacks.onShowNewConversation,
             onOpenFriends = callbacks.onShowSocialScreen,
             onSeedTimestamps = callbacks.onSeedTimestamps,
+            onNewConversationTopBarChange = callbacks.onNewConversationTopBarChange,
+            onConversationTopBarChange = callbacks.onConversationTopBarChange,
         )
 
         Screen.Map -> Unit
 
         Screen.Calendar -> CalendarScreen(
             onBack = callbacks.onCalendarBack,
-            initialShowClassDialog = uiState.showAddClassOnCalendar
+            initialShowClassDialog = uiState.showAddClassOnCalendar,
+            showHeader = false
         )
 
         Screen.Settings -> NavigationSettingsRoute(

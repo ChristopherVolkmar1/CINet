@@ -24,18 +24,8 @@ import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.School
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -145,7 +135,7 @@ fun FilterMenu(
         ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp,
             ) {
                 Column(
@@ -163,7 +153,7 @@ fun FilterMenu(
                             modifier = Modifier
                                 .padding(16.dp),
                             style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSecondary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         ElevatedButton(
                             onClick = { onFiltersChanged(emptySet()) },
@@ -179,14 +169,14 @@ fun FilterMenu(
                         ) {
                             Text(
                                 text = "Clear",
-                                color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                                 style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1,
                                 softWrap = false
                             )
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surface)
+
                     Spacer(modifier = Modifier.padding(start = 2.dp))
                     categories.forEach { category ->
                         val isSelected = activeFilters.contains(category)
@@ -197,7 +187,8 @@ fun FilterMenu(
                             Icon(
                                 imageVector = categoryIcons[category.uppercase().trim()] ?: Icons.Default.Place,
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(28.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.padding(start = 6.dp))
                             Text(
@@ -207,7 +198,7 @@ fun FilterMenu(
                                         word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                                     },
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSecondary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.weight(1f))
                             Switch(
@@ -219,12 +210,12 @@ fun FilterMenu(
                                         activeFilters - category
                                     }
                                     onFiltersChanged(newFilters)
-                                },
-                                colors = SwitchDefaults.colors(
+                                }
+                                /*colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
                                     checkedTrackColor = MaterialTheme.colorScheme.secondary,
                                     uncheckedTrackColor = Color.White
-                                )
+                                )*/
                             )
                         }
                     }

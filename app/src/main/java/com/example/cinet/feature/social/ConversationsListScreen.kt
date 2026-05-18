@@ -49,6 +49,7 @@ fun ConversationsListScreen(
     // is empty but conversations already exist. Seeds all conversation IDs with "now"
     // so existing threads don't incorrectly appear unread after a data clear.
     onSeedTimestamps: (List<String>) -> Unit = {},
+    showHeader: Boolean = true,
 ) {
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val repository = remember { SocialRepository() }
@@ -102,45 +103,47 @@ fun ConversationsListScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Messages",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // Friends button with pending request badge
-                BadgedBox(
-                    badge = {
-                        if (pendingRequestCount > 0) {
-                            Badge { Text(pendingRequestCount.toString()) }
-                        }
-                    },
-                    modifier = Modifier.padding(end = 8.dp)
+            if (showHeader) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onOpenFriends) {
+                    Text(
+                        text = "Messages",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Friends button with pending request badge
+                    BadgedBox(
+                        badge = {
+                            if (pendingRequestCount > 0) {
+                                Badge { Text(pendingRequestCount.toString()) }
+                            }
+                        },
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        IconButton(onClick = onOpenFriends) {
+                            Icon(
+                                imageVector = Icons.Default.People,
+                                contentDescription = "Friends",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    // Compose new conversation
+                    IconButton(onClick = onNewConversation) {
                         Icon(
-                            imageVector = Icons.Default.People,
-                            contentDescription = "Friends",
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "New conversation",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                }
-
-                // Compose new conversation
-                IconButton(onClick = onNewConversation) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "New conversation",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
                 }
             }
 

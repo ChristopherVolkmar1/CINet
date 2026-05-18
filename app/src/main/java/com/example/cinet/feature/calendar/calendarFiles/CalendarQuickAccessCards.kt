@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.lerp
 
 /** Shows the circular calendar action buttons at the bottom of the card. */
 @Composable
@@ -75,7 +76,11 @@ private fun CalendarQuickAccessCircle(
         Surface(
             modifier = Modifier.size(75.dp),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
+            color = lerp(
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.primary,
+                0.80f
+            ),
             shadowElevation = 5.dp
         ) {
             Box(contentAlignment = Alignment.Center) {

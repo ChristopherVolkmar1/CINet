@@ -4,6 +4,8 @@ import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.ui.theme.AppThemeColor
+import com.example.cinet.feature.social.NewConversationTopBarState
+import com.example.cinet.feature.social.ConversationTopBarState
 
 // Groups page-specific callbacks so route functions stay readable.
 internal data class NavigationRouteCallbacks(
@@ -40,4 +42,6 @@ internal data class NavigationRouteCallbacks(
     val onViewProfile: () -> Unit,
     val onOpenCanvas: () -> Unit,
     val onOpenChatFromHome: (UserProfile) -> Unit,
+    val onNewConversationTopBarChange: (NewConversationTopBarState?) -> Unit,
+    val onConversationTopBarChange: (ConversationTopBarState?) -> Unit,
 )

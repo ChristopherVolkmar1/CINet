@@ -9,6 +9,7 @@ import com.example.cinet.feature.social.ConversationsListScreen
 import com.example.cinet.feature.social.NewConversationScreen
 import com.example.cinet.feature.social.SocialScreen
 import com.example.cinet.feature.profile.ProfileScreen
+import com.example.cinet.feature.social.NewConversationTopBarState
 
 // Chooses which social subpage is currently visible.
 @Composable
@@ -32,6 +33,8 @@ internal fun NavigationSocialRoute(
     onNewConversation: () -> Unit,
     onOpenFriends: () -> Unit,
     onSeedTimestamps: (List<String>) -> Unit,
+    onNewConversationTopBarChange: (NewConversationTopBarState?) -> Unit,
+    onConversationTopBarChange: (com.example.cinet.feature.social.ConversationTopBarState?) -> Unit,
 ) {
     // Intercept system back when a profile is visible — ensures we return
     // to the conversation (or wherever we came from) rather than letting
@@ -50,6 +53,7 @@ internal fun NavigationSocialRoute(
             onOpenConversation = onOpenConversationFromNew,
             onBack = onProfileBack,
             onEditProfile = onEditProfile,
+            showTopBar = false,
         )
 
         activeConversation != null -> ConversationScreen(
@@ -58,17 +62,20 @@ internal fun NavigationSocialRoute(
             onNavigateToLocation = onNavigateToLocation,
             onNavigateToCoordinates = onNavigateToCoordinates,
             onOpenProfile = onOpenProfile,
+            onTopBarStateChange = onConversationTopBarChange,
         )
 
         showNewConversation -> NewConversationScreen(
             currentUserProfile = userProfile,
             onBack = onNewConversationBack,
-            onOpenConversation = onOpenConversationFromNew
+            onOpenConversation = onOpenConversationFromNew,
+            onTopBarStateChange = onNewConversationTopBarChange
         )
 
         showSocialScreen -> SocialScreen(
             onOpenProfile = onOpenProfile,
-            onOpenConversation = onOpenConversationWithFriend
+            onOpenConversation = onOpenConversationWithFriend,
+            showHeader = false
         )
 
         else -> ConversationsListScreen(
@@ -77,6 +84,7 @@ internal fun NavigationSocialRoute(
             onOpenFriends = onOpenFriends,
             openedConversationTimestamps = openedConversationTimestamps,
             onSeedTimestamps = onSeedTimestamps,
+            showHeader = false,
         )
     }
 }

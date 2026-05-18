@@ -38,7 +38,8 @@ private val interestOptions = listOf(
 fun ProfileEditScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit = {},
-    viewModel: ProfileEditViewModel = viewModel()
+    viewModel: ProfileEditViewModel = viewModel(),
+    showTopBar: Boolean = true
 ) {
     val profile by viewModel.profile.collectAsState()
     val state by viewModel.state.collectAsState()
@@ -73,17 +74,19 @@ fun ProfileEditScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Edit Profile") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text("Edit Profile") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
                 )
-            )
+            }
         }
     ) { padding ->
         Column(

@@ -34,6 +34,7 @@ import com.example.cinet.feature.home.news.NewsRepository
 import com.example.cinet.feature.map.BusScheduleSheet
 import com.example.cinet.ui.theme.CINetTheme
 import java.util.Calendar
+import androidx.compose.ui.graphics.lerp
 
 @Suppress("UNUSED_PARAMETER")
 @Composable
@@ -151,11 +152,7 @@ private fun HomeScreenContent(
             .padding(top = 18.dp, bottom = 24.dp)
     ) {
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        WelcomeHeader(nickname = nickname)
-
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         HomeWeatherBanner(
             temp = weatherInfo.temp,
@@ -176,11 +173,11 @@ private fun HomeScreenContent(
             NextUpcomingEventBanner(nextUpcomingEvent = nextUpcomingEvent)
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        //Spacer(modifier = Modifier.height(24.dp))
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
+        //HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         QuickActionGrid(
             onMapClick = onMapClick,
@@ -195,32 +192,6 @@ private fun HomeScreenContent(
     }
 }
 
-/** Displays the greeting and keeps it locked to one line by scaling long names down. */
-@Composable
-private fun WelcomeHeader(nickname: String) {
-    val displayName = nickname.ifBlank { "there" }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Welcome back, $displayName 👋",
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = greetingFontSizeFor(displayName),
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-/** Chooses a smaller greeting size when the name is longer so the greeting stays on one line. */
-private fun greetingFontSizeFor(displayName: String) = when {
-    displayName.length > 22 -> 20.sp
-    displayName.length > 16 -> 22.sp
-    displayName.length > 10 -> 24.sp
-    else -> 26.sp
-}
-
 /** Displays the weather summary without the "Campus Weather" label. */
 @Composable
 private fun HomeWeatherBanner(
@@ -233,7 +204,11 @@ private fun HomeWeatherBanner(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(34.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Row(
@@ -253,7 +228,7 @@ private fun HomeWeatherBanner(
                 Text(
                     text = "$temp • $displayCondition",
                     color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     fontSize = 21.sp,
                     lineHeight = 25.sp,
                     maxLines = 1,
@@ -281,11 +256,15 @@ private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(34.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -296,14 +275,14 @@ private fun NextUpcomingEventBanner(nextUpcomingEvent: HomeUpcomingEventItem) {
                     .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.42f))
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
+            //Spacer(modifier = Modifier.width(5.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = nextUpcomingEvent.title,
                     fontSize = 15.sp,
                     lineHeight = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -436,8 +415,8 @@ private fun LatestNewsHeader(
         Text(
             text = "CI View - Latest News",
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -446,7 +425,7 @@ private fun LatestNewsHeader(
         Text(
             text = "See all",
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             modifier = Modifier.clickable(onClick = onSeeAllClick)
         )
@@ -461,14 +440,18 @@ private fun LoadingNewsCard() {
             .fillMaxWidth()
             .height(170.dp),
         shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surface,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 2.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.14f))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = "Loading latest campus news...",
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f),
                 fontWeight = FontWeight.Medium
             )
         }
@@ -487,7 +470,11 @@ private fun HomeNewsCard(
             .height(165.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Column(
@@ -509,7 +496,7 @@ private fun HomeNewsCard(
             Text(
                 text = article.title,
                 color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
                 lineHeight = 16.sp,
                 textAlign = TextAlign.Center,
@@ -627,7 +614,11 @@ private fun QuickActionCircleButton(
         Surface(
             modifier = Modifier.size(75.dp),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
+            color = lerp(
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.primary,
+                0.80f
+            ),
             shadowElevation = 5.dp
         ) {
             Box(contentAlignment = Alignment.Center) {

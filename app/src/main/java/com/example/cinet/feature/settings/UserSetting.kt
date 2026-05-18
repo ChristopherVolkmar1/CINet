@@ -50,6 +50,7 @@ fun SettingScreen(
     userProfile: UserProfile? = null,
     onViewProfile: () -> Unit = {},
     onOpenCanvas: () -> Unit = {},
+    showHeader: Boolean = true,
 ) {
     Column(
         modifier = Modifier
@@ -131,23 +132,25 @@ fun SettingScreen(
         }
 
         // Header section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Return to previous screen"
+        if (showHeader) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Return to previous screen"
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.headlineMedium
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineMedium
-            )
         }
 
         ThemeSelector(
@@ -209,7 +212,7 @@ fun SettingScreen(
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+         Spacer(modifier = Modifier.weight(1f))
 
         // Canvas LMS sync entry
         OutlinedButton(

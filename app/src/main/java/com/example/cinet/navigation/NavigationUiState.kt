@@ -9,6 +9,7 @@ import com.example.cinet.feature.home.HomeUpcomingEventItem
 
 // Holds the current navigation values that the scaffold needs to render.
 internal data class NavigationUiState(
+    val topBarState: NavigationTopBarState,
     val currentScreen: Screen,
     val userProfile: UserProfile,
     val calendarScheduleItems: List<Pair<String, String>>,

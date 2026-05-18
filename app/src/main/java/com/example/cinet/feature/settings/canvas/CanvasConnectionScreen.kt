@@ -39,24 +39,27 @@ import com.example.cinet.feature.settings.canvas.viewmodel.CanvasSyncViewModel
 fun CanvasConnectionScreen(
     onBack: () -> Unit,
     onSyncComplete: () -> Unit = {},
-    viewModel: CanvasSyncViewModel = viewModel()
+    viewModel: CanvasSyncViewModel = viewModel(),
+    showTopBar: Boolean = true
 ) {
     val state by viewModel.uiState.collectAsState()
     val showCanvasInCalendar = CanvasDisplaySettings.showCanvasInCalendar
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Canvas Sync") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+            if (showTopBar) {
+                TopAppBar(
+                    title = { Text("Canvas Sync") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         Column(

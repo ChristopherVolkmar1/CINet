@@ -24,7 +24,8 @@ fun CIViewScreen(
     selectedArticleUrl: String? = null,
     selectedArticleTitle: String? = null,
     onArticleClick: (NewsArticle) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showTopBar: Boolean = true
 ) {
     val newsRepository = remember { NewsRepository() }
     var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
@@ -46,20 +47,25 @@ fun CIViewScreen(
         }
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { 
-                        Text(
-                            text = selectedArticleTitle ?: "CI View",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        ) 
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                if (showTopBar) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = selectedArticleTitle ?: "CI News",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { padding ->
             AndroidView(
@@ -85,14 +91,19 @@ fun CIViewScreen(
     } else {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("CI View") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                if (showTopBar) {
+                    TopAppBar(
+                        title = { Text("CI News") },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { padding ->
             if (isLoading) {

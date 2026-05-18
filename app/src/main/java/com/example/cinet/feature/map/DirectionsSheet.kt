@@ -236,7 +236,7 @@ private fun StatusBox(status: String, modifier: Modifier = Modifier) {
             Text(
                 text = status.uppercase(),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSecondary,
                 letterSpacing = 1.sp,
                 maxLines = 1

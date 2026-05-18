@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,11 +31,39 @@ import kotlinx.coroutines.launch
 
 private enum class NewConvStep { Selecting, Naming }
 
+// Returns the title shown in the persistent top bar for each step.
+private fun titleForStep(step: NewConvStep): String = when (step) {
+    NewConvStep.Selecting -> "New Message"
+    NewConvStep.Naming -> "New Group"
+}
+
+// Returns the action label shown on the right side of the persistent top bar.
+private fun actionLabelForStep(step: NewConvStep, selectedCount: Int): String = when (step) {
+    NewConvStep.Selecting -> if (selectedCount >= 2) "Next" else "Chat"
+    NewConvStep.Naming -> "Create"
+}
+
+// Decides whether the persistent top bar action can be tapped.
+private fun canUseTopBarAction(
+    step: NewConvStep,
+    selectedFriends: List<UserProfile>,
+    groupName: String,
+    isCreating: Boolean,
+): Boolean {
+    if (isCreating) return false
+
+    return when (step) {
+        NewConvStep.Selecting -> selectedFriends.isNotEmpty()
+        NewConvStep.Naming -> groupName.isNotBlank()
+    }
+}
+
 @Composable
 fun NewConversationScreen(
     currentUserProfile: UserProfile,
     onBack: () -> Unit,
     onOpenConversation: (Conversation) -> Unit,
+    onTopBarStateChange: (NewConversationTopBarState?) -> Unit,
 ) {
     val repository = remember { SocialRepository() }
     val scope = rememberCoroutineScope()
@@ -62,113 +89,85 @@ fun NewConversationScreen(
         else friends.filter { it.nickname.contains(searchQuery, ignoreCase = true) }
     }
 
+    // Sends the current New Message title and actions to the persistent top bar.
+    LaunchedEffect(step, selectedFriends, groupName, isCreating) {
+        onTopBarStateChange(
+            NewConversationTopBarState(
+                title = titleForStep(step),
+                actionLabel = actionLabelForStep(step, selectedFriends.size),
+                actionEnabled = canUseTopBarAction(
+                    step = step,
+                    selectedFriends = selectedFriends,
+                    groupName = groupName,
+                    isCreating = isCreating
+                ),
+                isActionLoading = isCreating,
+                onBackClick = {
+                    when (step) {
+                        NewConvStep.Selecting -> onBack()
+                        NewConvStep.Naming -> step = NewConvStep.Selecting
+                    }
+                },
+                onActionClick = {
+                    when (step) {
+                        NewConvStep.Selecting -> {
+                            when {
+                                selectedFriends.size == 1 -> {
+                                    val friend = selectedFriends.first()
+                                    isCreating = true
+                                    scope.launch {
+                                        repository.getOrCreateConversation(
+                                            participantIds = listOf(currentUserProfile.uid, friend.uid),
+                                            participantNicknames = mapOf(
+                                                currentUserProfile.uid to currentUserProfile.nickname,
+                                                friend.uid to friend.nickname
+                                            )
+                                        ).onSuccess { onOpenConversation(it) }
+                                        isCreating = false
+                                    }
+                                }
+
+                                selectedFriends.size >= 2 -> {
+                                    step = NewConvStep.Naming
+                                }
+                            }
+                        }
+
+                        NewConvStep.Naming -> {
+                            if (groupName.isNotBlank() && !isCreating) {
+                                isCreating = true
+                                scope.launch {
+                                    val allIds = listOf(currentUserProfile.uid) + selectedFriends.map { it.uid }
+                                    val nicknames = (listOf(currentUserProfile) + selectedFriends)
+                                        .associate { it.uid to it.nickname }
+
+                                    repository.getOrCreateConversation(
+                                        participantIds = allIds,
+                                        participantNicknames = nicknames,
+                                        isGroup = true,
+                                        groupName = groupName.trim()
+                                    ).onSuccess { onOpenConversation(it) }
+
+                                    isCreating = false
+                                }
+                            }
+                        }
+                    }
+                }
+            )
+        )
+    }
+
+// Clears the custom top bar when this screen leaves composition.
+    DisposableEffect(Unit) {
+        onDispose { onTopBarStateChange(null) }
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-
-            // ── Header ──────────────────────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    when (step) {
-                        NewConvStep.Selecting -> onBack()
-                        NewConvStep.Naming -> step = NewConvStep.Selecting
-                    }
-                }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                }
-
-                Text(
-                    text = when (step) {
-                        NewConvStep.Selecting -> "New Message"
-                        NewConvStep.Naming -> "New Group"
-                    },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f)
-                )
-
-                // Action button — changes label based on step and selection
-                when (step) {
-                    NewConvStep.Selecting -> {
-                        val canProceed = selectedFriends.isNotEmpty() && !isCreating
-                        TextButton(
-                            onClick = {
-                                when {
-                                    selectedFriends.size == 1 -> {
-                                        // Single friend → open DM directly
-                                        val friend = selectedFriends.first()
-                                        isCreating = true
-                                        scope.launch {
-                                            repository.getOrCreateConversation(
-                                                participantIds = listOf(currentUserProfile.uid, friend.uid),
-                                                participantNicknames = mapOf(
-                                                    currentUserProfile.uid to currentUserProfile.nickname,
-                                                    friend.uid to friend.nickname
-                                                )
-                                            ).onSuccess { onOpenConversation(it) }
-                                            isCreating = false
-                                        }
-                                    }
-                                    selectedFriends.size >= 2 -> {
-                                        // Multiple → go to naming step
-                                        step = NewConvStep.Naming
-                                    }
-                                }
-                            },
-                            enabled = canProceed
-                        ) {
-                            if (isCreating) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                            } else {
-                                Text(
-                                    text = when {
-                                        selectedFriends.size >= 2 -> "Next"
-                                        else -> "Chat"
-                                    },
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                    NewConvStep.Naming -> {
-                        TextButton(
-                            onClick = {
-                                if (groupName.isNotBlank() && !isCreating) {
-                                    isCreating = true
-                                    scope.launch {
-                                        val allIds = listOf(currentUserProfile.uid) + selectedFriends.map { it.uid }
-                                        val nicknames = (listOf(currentUserProfile) + selectedFriends)
-                                            .associate { it.uid to it.nickname }
-                                        repository.getOrCreateConversation(
-                                            participantIds = allIds,
-                                            participantNicknames = nicknames,
-                                            isGroup = true,
-                                            groupName = groupName.trim()
-                                        ).onSuccess { onOpenConversation(it) }
-                                        isCreating = false
-                                    }
-                                }
-                            },
-                            enabled = groupName.isNotBlank() && !isCreating
-                        ) {
-                            if (isCreating) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                            } else {
-                                Text("Create", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-
-            HorizontalDivider()
 
             // ── Step: Friend Selection ───────────────────────────────
             if (step == NewConvStep.Selecting) {
