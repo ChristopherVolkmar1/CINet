@@ -860,6 +860,30 @@ class SocialRepository(
         }
     }
 
+
+    /**
+     * Stamps readBy[currentUid] = serverTimestamp() on each message the
+     * current user has not yet read. Uses dot-notation updates so concurrent
+     * writes from other readers never clobber each other.
+     * Silently ignores failures — read receipts are best-effort.
+     */
+    suspend fun markMessagesRead(conversationId: String, messageIds: List<String>) {
+        if (messageIds.isEmpty()) return
+        val messagesRef = db.collection("conversations")
+            .document(conversationId)
+            .collection("messages")
+        val batch = db.batch()
+        messageIds.forEach { msgId ->
+            batch.update(
+                messagesRef.document(msgId),
+                "readBy.$currentUid", FieldValue.serverTimestamp()
+            )
+        }
+        try { batch.commit().await() } catch (e: Exception) {
+            Log.w("SocialRepository", "markMessagesRead failed: ${e.message}")
+        }
+    }
+
     /** Builds a message object using the current sender's profile data. */
     private fun buildMessage(
         sender: UserProfile,

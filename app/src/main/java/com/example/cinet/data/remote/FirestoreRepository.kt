@@ -70,7 +70,8 @@ class FirestoreRepository(
                 } catch (_: Exception) {
                     AppThemeColor.Green
                 }
-                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled, selectedTheme = selectedTheme)
+                val readReceiptsEnabled = settingsSnapshot.getBoolean("readReceiptsEnabled") ?: profile.readReceiptsEnabled
+                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled, selectedTheme = selectedTheme, readReceiptsEnabled = readReceiptsEnabled)
             }
 
             Result.success(profile)
@@ -107,6 +108,19 @@ class FirestoreRepository(
 
             // After saving profile, reload the full profile including settings
             createOrLoadUserProfile()
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateReadReceiptsEnabled(enabled: Boolean): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: error("No signed-in user.")
+            db.collection(FirestoreCollections.APP_SETTINGS)
+                .document(uid)
+                .set(mapOf("readReceiptsEnabled" to enabled), SetOptions.merge())
+                .await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }

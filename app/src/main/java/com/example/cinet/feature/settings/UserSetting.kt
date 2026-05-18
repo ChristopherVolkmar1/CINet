@@ -33,6 +33,7 @@ object AppSettings {
     var classReminderMinutesBefore: Long = 10L
     var assignmentReminderMinutesBefore: Long = 60L
     var selectedTheme by mutableStateOf(AppThemeColor.Green)
+    var readReceiptsEnabled by mutableStateOf(true)
 }
 
 // settings stuff - Zack
@@ -51,6 +52,8 @@ fun SettingScreen(
     onViewProfile: () -> Unit = {},
     onOpenCanvas: () -> Unit = {},
     showHeader: Boolean = true,
+    readReceiptsEnabled: Boolean = true,
+    onReadReceiptsChange: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -212,7 +215,31 @@ fun SettingScreen(
             )
         }
 
-         Spacer(modifier = Modifier.weight(1f))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Read receipts toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Read Receipts", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "Show others when you've read their messages",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = readReceiptsEnabled,
+                onCheckedChange = onReadReceiptsChange
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
 
         // Canvas LMS sync entry
         OutlinedButton(

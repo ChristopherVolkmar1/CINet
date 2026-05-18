@@ -41,6 +41,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import android.app.DownloadManager
 import android.content.Intent
 import android.net.Uri as AndroidUri
@@ -89,6 +90,7 @@ fun ConversationScreen(
     onNavigateToCoordinates: ((Double, Double, String, String) -> Unit)? = null,
     onOpenProfile: ((UserProfile) -> Unit)? = null,
     onTopBarStateChange: (ConversationTopBarState?) -> Unit = {},
+    readReceiptsEnabled: Boolean = true,
 ) {
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
@@ -244,6 +246,8 @@ fun ConversationScreen(
                 .collection("users").document(otherUid).get().await()
             otherUserPhotoUrl = otherSnapshot.getString("photoUrl") ?: ""
             otherUserProfile = otherSnapshot.toObject(UserProfile::class.java)
+            // Populate memberProfiles for DMs so reader initials can resolve the other user
+            otherUserProfile?.let { memberProfiles = mapOf(it.uid to it) }
         }
         val currentSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(currentUid).get().await()
@@ -285,6 +289,20 @@ fun ConversationScreen(
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    }
+
+    // Mark incoming messages as read whenever the message list changes.
+    // Only stamps messages the current user hasn't already read — the
+    // dot-notation batch write in the repository is safe for concurrent readers.
+    LaunchedEffect(messages) {
+        val unread = messages
+            .filter { msg ->
+                msg.senderId != currentUid && currentUid !in msg.readBy
+            }
+            .map { it.id }
+        if (unread.isNotEmpty()) {
+            repository.markMessagesRead(conversation.id, unread)
+        }
     }
 
     // User location
@@ -503,6 +521,10 @@ fun ConversationScreen(
                             ) {
                                 { scope.launch { repository.deleteMessage(conversation.id, message.id) } }
                             } else null,
+                            readBy = message.readBy,
+                            memberProfiles = memberProfiles,
+                            readReceiptsEnabled = readReceiptsEnabled,
+                            isGroup = conversation.isGroup,
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                                 (message.type == "study_invite" || message.type == "event_invite")) {
                                 {
@@ -811,6 +833,10 @@ fun MessageBubble(
     onDecline: (() -> Unit)? = null,
     onDeleteMessage: (() -> Unit)? = null,
     onOpenSenderProfile: (() -> Unit)? = null,
+    readBy: Map<String, Any> = emptyMap(),
+    memberProfiles: Map<String, UserProfile> = emptyMap(),
+    readReceiptsEnabled: Boolean = true,
+    isGroup: Boolean = false,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -975,6 +1001,48 @@ fun MessageBubble(
                             style = MaterialTheme.typography.bodyMedium,
                             color = textColor,
                         )
+                    }
+                }
+            }
+
+            // ── Read receipts — small avatar initials shown below own sent messages ──
+            // Only the sender sees these, and only when the feature is enabled.
+            // For DMs: shows the other person's initial once they've read.
+            // For groups: shows up to 5 reader initials side by side.
+            if (isCurrentUser && readReceiptsEnabled) {
+                val readers = readBy.keys.filter { it != message.senderId }
+                if (readers.isNotEmpty()) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.padding(top = 3.dp, end = 2.dp)
+                    ) {
+                        readers.take(5).forEach { uid ->
+                            val initial = if (isGroup) {
+                                memberProfiles[uid]?.nickname?.firstOrNull()
+                                    ?.uppercaseChar()?.toString() ?: "·"
+                            } else {
+                                // DM — just use the checkmark initial placeholder
+                                memberProfiles[uid]?.nickname?.firstOrNull()
+                                    ?.uppercaseChar()?.toString() ?: "✓"
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = initial,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 8.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                        }
                     }
                 }
             }

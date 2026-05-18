@@ -15,4 +15,8 @@ data class Message(
     // or List<String> (acceptedBy, declinedBy) — hence Any.
     val metadata: Map<String, Any> = emptyMap(),
     @ServerTimestamp val createdAt: Date? = null,
+    // uid → server timestamp of when each participant read this message.
+    // Stored as Map<String, Any> because Firestore returns Timestamp objects,
+    // not Longs — same pattern as metadata. Use .keys to check reader presence.
+    val readBy: Map<String, Any> = emptyMap(),
 )

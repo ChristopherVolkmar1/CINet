@@ -21,6 +21,7 @@ data class UserProfile(
     val isDarkMode: Boolean = false,
     val notificationsEnabled: Boolean = true,
     val selectedTheme: AppThemeColor = AppThemeColor.Green,
+    val readReceiptsEnabled: Boolean = true,  // show/hide read receipts under sent bubbles
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val lastLoginAt: Date? = null,
 )

@@ -27,6 +27,7 @@ internal fun NavigationSettingsRoute(
     onSettingsBack: () -> Unit,
     onSignOut: () -> Unit,
     onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
+    onReadReceiptsChange: (Boolean) -> Unit,
     onViewProfile: () -> Unit,
     onOpenCanvas: () -> Unit,
 ) {
@@ -71,6 +72,8 @@ internal fun NavigationSettingsRoute(
             onViewProfile = onViewProfile,
             onOpenCanvas = onOpenCanvas,
             showHeader = false,
+            readReceiptsEnabled = userProfile.readReceiptsEnabled,
+            onReadReceiptsChange = onReadReceiptsChange,
         )
     }
 }

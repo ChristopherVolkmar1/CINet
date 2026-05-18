@@ -39,6 +39,7 @@ internal data class NavigationRouteCallbacks(
     val onSettingsSelectedProfileBack: () -> Unit,
     val onSignOut: () -> Unit,
     val onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
+    val onReadReceiptsChange: (Boolean) -> Unit,
     val onViewProfile: () -> Unit,
     val onOpenCanvas: () -> Unit,
     val onOpenChatFromHome: (UserProfile) -> Unit,
