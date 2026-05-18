@@ -48,10 +48,9 @@ fun CalendarScreen(
 
     val classItems = viewModel.classItems
 
-    val syncedCanvasClassNames = viewModel.scheduleItems
-        .map { it.className.trim() }
-        .filter { it.isNotBlank() }
-        .distinctBy { it.lowercase() }
+    val syncedCanvasClassNames = classItems
+        .filter { it.canvasId != null && it.meetingDays.isEmpty() }
+        .map { it.name }
         .sorted()
 
     val currentMonth = viewModel.currentMonth
@@ -197,7 +196,16 @@ fun CalendarScreen(
     // Opens the normal class creation dialog with a Canvas class name prefilled.
     fun openCanvasClassMeetingCreator(canvasClassName: String) {
         resetClassForm()
-        className = canvasClassName
+        val existing = classItems.firstOrNull { it.name == canvasClassName && it.canvasId != null }
+        if (existing != null) {
+            editingClass = existing
+            className = existing.name
+            classStartTime = existing.startTime
+            classEndTime = existing.endTime
+            selectedMeetingDays = existing.meetingDays.toSet()
+        } else {
+            className = canvasClassName
+        }
         showClassDialog = true
     }
 
@@ -304,7 +312,7 @@ fun CalendarScreen(
         CalendarQuickAccessPopup(
             type = quickAccessType,
             selectedDate = activeDate,
-            classes = classesForSelectedDate,
+            classes = classItems,
             syncedCanvasClassNames = syncedCanvasClassNames,
             studySessions = studySessionsForSelectedDate,
             events = eventsForSelectedDate,
@@ -432,7 +440,12 @@ fun CalendarScreen(
             classEndTime = classEndTime,
             selectedMeetingDays = selectedMeetingDays,
             onMeetingDaysChange = { selectedMeetingDays = it },
-            weekdayOptions = weekdayOptions,
+            onExistingClassSelected = { existing ->
+                editingClass = existing
+                classStartTime = existing.startTime
+                classEndTime = existing.endTime
+                selectedMeetingDays = existing.meetingDays.toSet()
+            },
             onPickStartTime = {
                 openTimePicker(context) { picked -> classStartTime = picked }
             },
@@ -458,25 +471,24 @@ fun CalendarScreen(
                         else -> ""
                     }
 
-                    val hasDuplicateMeeting = hasDuplicateClassMeeting(
-                        classToEdit = classToEdit,
-                        name = className,
-                        meetingDays = meetingDaysList,
-                        startTime = classStartTime,
-                        endTime = classEndTime
-                    )
-
-                    if (hasDuplicateMeeting) {
-                        Toast.makeText(
-                            context,
-                            "This class meeting already exists.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@ClassDialog
-                    }
-
-
                     if (classToEdit == null) {
+                        val hasDuplicateMeeting = hasDuplicateClassMeeting(
+                            classToEdit = classToEdit,
+                            name = className,
+                            meetingDays = meetingDaysList,
+                            startTime = classStartTime,
+                            endTime = classEndTime
+                        )
+
+                        if (hasDuplicateMeeting) {
+                            Toast.makeText(
+                                context,
+                                "This class meeting already exists.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            return@ClassDialog
+                        }
+
                         viewModel.addClass(
                             name = className,
                             meetingDays = meetingDaysList,
@@ -546,13 +558,11 @@ fun CalendarScreen(
         StudySessionDialog(
             editingSession = editingSession,
             date = dateStr,
-            className = sessionClassName,
-            onClassNameChange = { sessionClassName = it },
             topic = sessionTopic,
             onTopicChange = { sessionTopic = it },
             startTime = sessionStartTime,
-            location = sessionLocation,
-            onLocationChange = { sessionLocation = it },
+            className = sessionClassName,
+            onClassNameChange = { sessionClassName = it },
             onPickStartTime = { openTimePicker(context) { picked -> sessionStartTime = picked } },
             onDismiss = { showStudySessionDialog = false; resetStudySessionForm() },
             onConfirm = {
