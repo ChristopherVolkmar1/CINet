@@ -306,6 +306,7 @@ fun ConversationScreen(
         if (unread.isNotEmpty()) {
             repository.markMessagesRead(conversation.id, unread)
         }
+    }
     LaunchedEffect(Unit) {
         myScheduleItems = calendarRepository.loadAssignments()
         myStudySessions = calendarRepository.loadStudySessions()
