@@ -16,10 +16,12 @@ data class UserProfile(
     val bio: String = "",            // short free-text blurb
     val interests: List<String> = emptyList(), // e.g. ["Gaming", "Hiking", "Music"]
     val photoUrl: String = "",
+    val bannerUrl: String = "",      // custom profile banner image
     val fcmToken: String? = null,    // used to send push notifications to this user's device
     val isDarkMode: Boolean = false,
     val notificationsEnabled: Boolean = true,
     val selectedTheme: AppThemeColor = AppThemeColor.Green,
+    val readReceiptsEnabled: Boolean = true,  // show/hide read receipts under sent bubbles
     @ServerTimestamp val createdAt: Date? = null,
     @ServerTimestamp val lastLoginAt: Date? = null,
 )

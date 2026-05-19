@@ -19,6 +19,7 @@ internal fun NavigationSocialRoute(
     showNewConversation: Boolean,
     showSocialScreen: Boolean,
     userProfile: UserProfile,
+    readReceiptsEnabled: Boolean = true,
     openedConversationTimestamps: Map<String, Long>,
     onConversationBack: () -> Unit,
     onNavigateToLocation: (String) -> Unit,
@@ -63,6 +64,7 @@ internal fun NavigationSocialRoute(
             onNavigateToCoordinates = onNavigateToCoordinates,
             onOpenProfile = onOpenProfile,
             onTopBarStateChange = onConversationTopBarChange,
+            readReceiptsEnabled = readReceiptsEnabled,
         )
 
         showNewConversation -> NewConversationScreen(

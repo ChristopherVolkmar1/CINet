@@ -1,8 +1,8 @@
 package com.example.cinet.feature.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -11,7 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -20,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -31,6 +32,10 @@ import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.SocialRepository
 import kotlinx.coroutines.launch
+
+private val BANNER_HEIGHT  = 200.dp
+private val AVATAR_SIZE    = 108.dp
+private val AVATAR_OVERLAP = 54.dp  // avatar extends this far below the banner
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -46,8 +51,8 @@ fun ProfileScreen(
     val repository = remember { SocialRepository() }
     val scope = rememberCoroutineScope()
 
-    var isFriend by remember { mutableStateOf(false) }
-    var requestSent by remember { mutableStateOf(false) }
+    var isFriend        by remember { mutableStateOf(false) }
+    var requestSent     by remember { mutableStateOf(false) }
     var isLoadingAction by remember { mutableStateOf(false) }
 
     LaunchedEffect(user.uid) {
@@ -66,23 +71,7 @@ fun ProfileScreen(
     // the conversation rather than home when opened from inside a chat.
     BackHandler { onBack() }
 
-    Scaffold(
-        topBar = {
-            if (showTopBar) {
-                TopAppBar(
-                    title = { },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    )
-                )
-            }
-        }
-    ) { padding ->
+    Scaffold { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -90,39 +79,138 @@ fun ProfileScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
 
-            // Avatar
-            val photoUrl = user.photoUrl.takeIf { it.isNotBlank() }
-            if (photoUrl != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(photoUrl).crossfade(true).build(),
-                    contentDescription = "Profile photo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(108.dp)
-                        .clip(CircleShape)
-                        .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                )
-            } else {
+            // ── Banner + Avatar header ────────────────────────────────────────
+            Box(modifier = Modifier.fillMaxWidth()) {
+
+                // Banner (200 dp tall)
                 Box(
                     modifier = Modifier
-                        .size(108.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .height(BANNER_HEIGHT)
                 ) {
-                    Text(
-                        text = user.nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    val bannerUrl = user.bannerUrl.takeIf { it.isNotBlank() }
+                    if (bannerUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(bannerUrl).crossfade(true).build(),
+                            contentDescription = "Profile banner",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        // Attractive gradient fallback
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primaryContainer,
+                                            MaterialTheme.colorScheme.secondaryContainer
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                    // Bottom gradient so the avatar ring blends in
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.3f))
+                                )
+                            )
                     )
+                }
+
+                // Floating back button — top-start of banner
+                if (showTopBar) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .size(40.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.35f),
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                // Floating edit button — top-end of banner (own profile)
+                if (isOwnProfile) {
+                    IconButton(
+                        onClick = onEditProfile,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(40.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.35f),
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit profile",
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                // Avatar — centred, offset below the banner bottom
+                val photoUrl = user.photoUrl.takeIf { it.isNotBlank() }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = AVATAR_OVERLAP)
+                        .size(AVATAR_SIZE)
+                ) {
+                    if (photoUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(photoUrl).crossfade(true).build(),
+                            contentDescription = "Profile photo",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .border(3.dp, MaterialTheme.colorScheme.background, CircleShape)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .border(3.dp, MaterialTheme.colorScheme.background, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = user.nickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                style = MaterialTheme.typography.displaySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // Space for overlapping avatar
+            Spacer(modifier = Modifier.height(AVATAR_OVERLAP + 12.dp))
+
+            // ── Profile info ──────────────────────────────────────────────────
 
             // Name
             Text(
@@ -238,27 +326,15 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Action buttons
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (isOwnProfile) {
-                    Button(
-                        onClick = onEditProfile,
-                        modifier = Modifier.fillMaxWidth().height(50.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Edit Profile")
-                    }
-                } else {
+            // Action button — other users only.
+            // Own profile editing is handled by the pencil icon in the banner header.
+            if (!isOwnProfile) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     if (isFriend) {
                         Button(
                             onClick = {
@@ -308,8 +384,8 @@ fun ProfileScreen(
                             Text(
                                 when {
                                     isLoadingAction -> "Sending..."
-                                    requestSent -> "Request Sent"
-                                    else -> "Add Friend"
+                                    requestSent     -> "Request Sent"
+                                    else            -> "Add Friend"
                                 }
                             )
                         }

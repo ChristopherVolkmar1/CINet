@@ -41,6 +41,7 @@ internal fun NavigationScreenRoute(
             showNewConversation = uiState.showNewConversation,
             showSocialScreen = uiState.showSocialScreen,
             userProfile = uiState.userProfile,
+            readReceiptsEnabled = uiState.userProfile.readReceiptsEnabled,
             openedConversationTimestamps = uiState.openedConversationTimestamps,
             onConversationBack = callbacks.onClearActiveConversation,
             onNavigateToLocation = callbacks.onNavigateToLocation,
@@ -82,6 +83,7 @@ internal fun NavigationScreenRoute(
             onSettingsBack = { callbacks.onGoToScreen(Screen.Home) },
             onSignOut = callbacks.onSignOut,
             onSettingsChange = callbacks.onSettingsChange,
+            onReadReceiptsChange = callbacks.onReadReceiptsChange,
             onViewProfile = callbacks.onViewProfile,
             onOpenCanvas = callbacks.onOpenCanvas,
         )

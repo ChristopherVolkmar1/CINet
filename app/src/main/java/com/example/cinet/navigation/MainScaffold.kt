@@ -518,6 +518,7 @@ internal fun MainScaffold(
         onSettingsChange = { dark, notify, theme ->
             authViewModel.updateSettings(dark, notify, theme)
         },
+        onReadReceiptsChange = { authViewModel.updateReadReceiptsEnabled(it) },
         onViewProfile = {
             profileOpenedFromHome = false
             selectedProfile = userProfile

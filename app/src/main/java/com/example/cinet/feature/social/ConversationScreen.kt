@@ -41,6 +41,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import android.app.DownloadManager
 import android.content.Intent
 import android.net.Uri as AndroidUri
@@ -65,6 +66,9 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.Timestamp
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -89,6 +93,7 @@ fun ConversationScreen(
     onNavigateToCoordinates: ((Double, Double, String, String) -> Unit)? = null,
     onOpenProfile: ((UserProfile) -> Unit)? = null,
     onTopBarStateChange: (ConversationTopBarState?) -> Unit = {},
+    readReceiptsEnabled: Boolean = true,
 ) {
     val repository = remember { SocialRepository() }
     val calendarRepository = remember { CalendarFirestoreRepository() }
@@ -244,6 +249,8 @@ fun ConversationScreen(
                 .collection("users").document(otherUid).get().await()
             otherUserPhotoUrl = otherSnapshot.getString("photoUrl") ?: ""
             otherUserProfile = otherSnapshot.toObject(UserProfile::class.java)
+            // Populate memberProfiles for DMs so reader initials can resolve the other user
+            otherUserProfile?.let { memberProfiles = mapOf(it.uid to it) }
         }
         val currentSnapshot = FirebaseFirestore.getInstance()
             .collection("users").document(currentUid).get().await()
@@ -287,6 +294,18 @@ fun ConversationScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
+    // Mark incoming messages as read whenever the message list changes.
+    // Only stamps messages the current user hasn't already read — the
+    // dot-notation batch write in the repository is safe for concurrent readers.
+    LaunchedEffect(messages) {
+        val unread = messages
+            .filter { msg ->
+                msg.senderId != currentUid && currentUid !in msg.readBy
+            }
+            .map { it.id }
+        if (unread.isNotEmpty()) {
+            repository.markMessagesRead(conversation.id, unread)
+        }
     LaunchedEffect(Unit) {
         myScheduleItems = calendarRepository.loadAssignments()
         myStudySessions = calendarRepository.loadStudySessions()
@@ -509,6 +528,10 @@ fun ConversationScreen(
                             ) {
                                 { scope.launch { repository.deleteMessage(conversation.id, message.id) } }
                             } else null,
+                            readBy = message.readBy,
+                            memberProfiles = memberProfiles,
+                            readReceiptsEnabled = readReceiptsEnabled,
+                            isGroup = conversation.isGroup,
                             onAccept = if (!alreadyResponded && message.senderId != currentUid &&
                                 (message.type == "study_invite" || message.type == "event_invite")) {
                                 {
@@ -817,6 +840,10 @@ fun MessageBubble(
     onDecline: (() -> Unit)? = null,
     onDeleteMessage: (() -> Unit)? = null,
     onOpenSenderProfile: (() -> Unit)? = null,
+    readBy: Map<String, Any> = emptyMap(),
+    memberProfiles: Map<String, UserProfile> = emptyMap(),
+    readReceiptsEnabled: Boolean = true,
+    isGroup: Boolean = false,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -981,6 +1008,82 @@ fun MessageBubble(
                             style = MaterialTheme.typography.bodyMedium,
                             color = textColor,
                         )
+                    }
+                }
+            }
+
+            // ── Read receipts — profile pictures + time, iMessage-style ──────────
+            // Only the sender sees these. DMs show avatar + "Read h:mm a".
+            // Groups show up to 5 stacked avatars + "Read" label.
+            if (isCurrentUser && readReceiptsEnabled) {
+                val readers = readBy.keys.filter { it != message.senderId }
+                if (readers.isNotEmpty()) {
+                    // Find the latest read timestamp across all readers for the time label
+                    val latestReadTime = readers.mapNotNull { uid ->
+                        (readBy[uid] as? Timestamp)?.toDate()
+                    }.maxOrNull()
+                    val timeString = latestReadTime?.let {
+                        SimpleDateFormat("h:mm a", Locale.getDefault()).format(it)
+                    } ?: ""
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp, end = 2.dp)
+                    ) {
+                        // Reader profile picture bubbles
+                        readers.take(5).forEach { uid ->
+                            val profile = memberProfiles[uid]
+                            val photoUrl = profile?.photoUrl?.takeIf { it.isNotBlank() }
+                            val initial = profile?.nickname?.firstOrNull()
+                                ?.uppercaseChar()?.toString() ?: "·"
+
+                            if (photoUrl != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(photoUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.background,
+                                            CircleShape
+                                        )
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = initial,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 7.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                    )
+                                }
+                            }
+                        }
+
+                        // "Read h:mm a" for DMs; "Read" for groups (avatars speak for themselves)
+                        if (timeString.isNotBlank()) {
+                            Text(
+                                text = if (!isGroup) "Read $timeString" else "Read",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            )
+                        }
                     }
                 }
             }

@@ -109,6 +109,25 @@ class AuthViewModel(
         }
     }
 
+    fun updateReadReceiptsEnabled(enabled: Boolean) {
+        val currentState = _authState.value
+        if (currentState is AuthState.Authenticated) {
+            _authState.value = AuthState.Authenticated(
+                currentState.userProfile.copy(readReceiptsEnabled = enabled)
+            )
+        } else if (currentState is AuthState.ProfileSetup) {
+            _authState.value = AuthState.ProfileSetup(
+                currentState.userProfile.copy(readReceiptsEnabled = enabled)
+            )
+        }
+        viewModelScope.launch {
+            repository.updateReadReceiptsEnabled(enabled)
+                .onFailure { e ->
+                    android.util.Log.e(TAG, "Failed to update readReceiptsEnabled: ${e.message}")
+                }
+        }
+    }
+
     // Routes to ProfileSetup if nickname is blank, otherwise Authenticated
     private fun resolveState(profile: UserProfile) {
         _authState.value = if (profile.nickname.isBlank()) {
