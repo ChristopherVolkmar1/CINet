@@ -36,6 +36,7 @@ import java.util.Locale
 import com.example.cinet.feature.home.HomeUpcomingEventItem
 import com.example.cinet.feature.social.NewConversationTopBarState
 import com.example.cinet.feature.social.ConversationTopBarState
+import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
 
 @Composable
 internal fun MainScaffold(
@@ -346,11 +347,15 @@ internal fun MainScaffold(
         list
     }
 
+    val showCanvasItemsInCalendar = CanvasDisplaySettings.showCanvasInCalendar
+
     val displayUpcomingEventsItems: List<HomeUpcomingEventItem> = remember(
         manualUpcomingEventsItems,
         calendarViewModel.campusEventItems,
         calendarViewModel.userEventItems,
         calendarViewModel.classItems,
+        calendarViewModel.scheduleItems,
+        showCanvasItemsInCalendar,
         currentTimeMillis
     ) {
         buildHomeUpcomingEventItems(
@@ -359,6 +364,8 @@ internal fun MainScaffold(
             campusEvents = calendarViewModel.campusEventItems,
             userEvents = calendarViewModel.userEventItems,
             classItems = calendarViewModel.classItems,
+            scheduleItems = calendarViewModel.scheduleItems,
+            showCanvasItems = showCanvasItemsInCalendar,
             currentTimeMillis = currentTimeMillis
         )
     }

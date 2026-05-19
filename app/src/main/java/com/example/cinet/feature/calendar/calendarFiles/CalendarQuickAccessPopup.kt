@@ -197,7 +197,8 @@ private fun ClassPopupList(
     onClassClick: (ClassItem) -> Unit,
     onCanvasClassClick: (String) -> Unit
 ) {
-    val hasSavedClasses = classes.isNotEmpty()
+    val savedClasses = classes.filter { it.meetingDays.isNotEmpty() }
+    val hasSavedClasses = savedClasses.isNotEmpty()
     val hasCanvasClasses = syncedCanvasClassNames.isNotEmpty()
 
     if (!hasSavedClasses && !hasCanvasClasses) {
@@ -209,13 +210,16 @@ private fun ClassPopupList(
         PopupSectionLabel(text = "Saved class meetings")
 
         classes.forEach { classItem ->
-            PopupItemCard(
-                title = classItem.name,
-                primaryDetail = buildTimeRange(classItem.startTime, classItem.endTime),
-                secondaryDetail = classItem.meetingDays.joinToString(", "),
-                location = classItem.location,
-                onClick = { onClassClick(classItem) }
-            )
+            if (classItem.meetingDays.isNotEmpty()) {
+                PopupItemCard(
+                    title = classItem.name,
+                    primaryDetail = buildTimeRange(classItem.startTime, classItem.endTime),
+                    secondaryDetail = classItem.meetingDays.joinToString(", "),
+                    location = classItem.location,
+                    onClick = { onClassClick(classItem) }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
         }
     }
 
@@ -236,6 +240,7 @@ private fun ClassPopupList(
                 location = "",
                 onClick = { onCanvasClassClick(canvasClassName) }
             )
+            Spacer(modifier = Modifier.height(4.dp))
         }
     }
 }

@@ -70,17 +70,16 @@ internal fun NavigationScaffoldContent(
                 .fillMaxSize()
                 .padding(contentPadding)
         ) {
-            if (uiState.currentScreen == Screen.Map) {
-                NavigationMapLayer(
-                    currentScreen = uiState.currentScreen,
-                    preSelectedLocation = uiState.preSelectedMapLocation,
-                    autoRouteToPreSelectedLocation = uiState.autoRouteToPreSelectedMapLocation,
-                    extraLocations = uiState.sharedLocations,
-                    onBack = onMapBack,
-                    onFinishedLoading = onMapFinishedLoading,
-                    onRemoveExtraLocation = onRemoveExtraLocation
-                )
-            } else {
+            NavigationMapLayer(
+                currentScreen = uiState.currentScreen,
+                preSelectedLocation = uiState.preSelectedMapLocation,
+                autoRouteToPreSelectedLocation = uiState.autoRouteToPreSelectedMapLocation,
+                extraLocations = uiState.sharedLocations,
+                onBack = onMapBack,
+                onFinishedLoading = onMapFinishedLoading,
+                onRemoveExtraLocation = onRemoveExtraLocation
+            )
+            if (uiState.currentScreen != Screen.Map) {
                 when {
                     uiState.isShowingNews -> NavigationNewsRoute(
                         selectedNewsArticle = uiState.selectedNewsArticle,
