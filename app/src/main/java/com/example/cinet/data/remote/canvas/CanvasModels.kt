@@ -86,3 +86,58 @@ sealed class CanvasAuthResult {
     data class Success(val userName: String) : CanvasAuthResult()
     data class Failure(val reason: String) : CanvasAuthResult()
 }
+
+// =====================================================================
+// Messaging types (Canvas calls these "Conversations" in its API)
+// =====================================================================
+
+/**
+ * Summary of one Canvas conversation thread, as returned by GET /conversations.
+ *
+ * Note: Canvas's /conversations endpoint returns truncated messages — the full
+ * message bodies require a follow-up call to /conversations/:id. We pull only
+ * what's needed to render the inbox list: subject, last-message preview,
+ * timestamps, participant names, and unread state.
+ */
+data class CanvasConversation(
+    val id: Long,
+    val subject: String,
+    /** Short preview of the most recent message body. Not the full text. */
+    val lastMessagePreview: String,
+    /** ISO-8601 timestamp of the most recent message. */
+    val lastMessageAtIso: String?,
+    /** Display name of the participants other than the current user, comma-joined. */
+    val participantNames: String,
+    /** Canvas workflow_state: "read", "unread", or "archived". */
+    val workflowState: String,
+    val messageCount: Int
+) {
+    val isUnread: Boolean get() = workflowState == "unread"
+}
+
+/**
+ * A single message inside a conversation thread, as returned by
+ * GET /conversations/:id. Bodies are HTML in Canvas; we treat them as plain
+ * text in the UI for simplicity (HTML rendering would expand the surface
+ * area significantly with little benefit for typical Canvas messages).
+ */
+data class CanvasMessage(
+    val id: Long,
+    /** Sender Canvas user id. Match against the current user id to render right-aligned. */
+    val authorId: Long,
+    /** Display name of the sender. */
+    val authorName: String,
+    val body: String,
+    /** ISO-8601 timestamp. */
+    val createdAtIso: String?,
+    /** Names of any attachments — we don't download them, just acknowledge they exist. */
+    val attachmentNames: List<String>
+)
+
+/** Full content of one conversation thread, with all messages and participants. */
+data class CanvasConversationDetail(
+    val id: Long,
+    val subject: String,
+    val participantNames: String,
+    val messages: List<CanvasMessage>
+)

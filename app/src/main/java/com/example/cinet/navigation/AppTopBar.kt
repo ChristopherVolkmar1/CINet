@@ -3,34 +3,12 @@ package com.example.cinet.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonRemove
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +31,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.feature.social.ConversationTopBarState
 
+
 // Draws the persistent page title bar used across the app.
 @Composable
 internal fun AppTopBar(
@@ -62,6 +41,7 @@ internal fun AppTopBar(
     onBack: () -> Unit,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
+    onCanvasMessagesClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -138,8 +118,10 @@ internal fun AppTopBar(
             } else if (state.showSocialActions) {
                 SocialTopBarActions(
                     pendingRequestCount = state.pendingRequestCount,
+                    showCanvasMessages = state.showCanvasMessagesAction,
                     onFriendsClick = onFriendsClick,
-                    onNewMessageClick = onNewMessageClick
+                    onNewMessageClick = onNewMessageClick,
+                    onCanvasMessagesClick = onCanvasMessagesClick
                 )
             }
         }
@@ -296,9 +278,23 @@ private fun greetingFontSizeFor(displayName: String) = when {
 @Composable
 private fun SocialTopBarActions(
     pendingRequestCount: Int,
+    showCanvasMessages: Boolean,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
+    onCanvasMessagesClick: () -> Unit,
 ) {
+    if (showCanvasMessages) {
+        IconButton(onClick = onCanvasMessagesClick) {
+            Icon(
+                imageVector = Icons.Default.Email,
+                contentDescription = "Canvas inbox",
+                tint = Color.White,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+    }
     BadgedBox(
         badge = {
             if (pendingRequestCount > 0) {

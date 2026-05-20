@@ -25,7 +25,7 @@ internal fun NavigationHomeRoute(
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
     onNavigateToLocation: (String) -> Unit,
-    onOpenChatFromHome: (UserProfile) -> Unit,
+    onOpenChatFromHome: (UserProfile) -> Unit = {},
 ) {
     HomeScreen(
         nickname = nickname,
@@ -44,7 +44,7 @@ internal fun NavigationHomeRoute(
         onSocialClick = onSocialClick,
         onNotificationClick = onNotificationClick,
         onProfileClick = onProfileClick,
-        onNavigateToLocation = onNavigateToLocation,
-        onOpenChatFromHome = onOpenChatFromHome
+        onOpenChatFromHome = onOpenChatFromHome,
+        onNavigateToLocation = onNavigateToLocation
     )
 }

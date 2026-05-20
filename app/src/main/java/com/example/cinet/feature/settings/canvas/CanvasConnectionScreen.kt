@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
+import com.example.cinet.data.remote.canvas.CanvasMessagingSettings
 import com.example.cinet.feature.settings.canvas.viewmodel.CanvasSyncViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,6 +45,7 @@ fun CanvasConnectionScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val showCanvasInCalendar = CanvasDisplaySettings.showCanvasInCalendar
+    val showCanvasMessaging = CanvasMessagingSettings.showCanvasMessaging
 
     Scaffold(
         topBar = {
@@ -119,7 +121,6 @@ fun CanvasConnectionScreen(
             }
 
             if (!state.hasToken) {
-                // Token entry flow
                 Text(
                     text = "Generate a token",
                     style = MaterialTheme.typography.titleSmall,
@@ -170,42 +171,27 @@ fun CanvasConnectionScreen(
                 }
             }
 
-            // Master toggle: hides ALL Canvas content from the calendar at once.
-            // Stays useful even with per-course favorites — it's a single switch
-            // to silence everything Canvas-related without un-starring each course.
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Show Canvas items in calendar",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = if (showCanvasInCalendar)
-                                "Starred Canvas courses and their assignments appear in the calendar."
-                            else
-                                "All Canvas content is hidden from the calendar (data is still stored).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = showCanvasInCalendar,
-                        onCheckedChange = { CanvasDisplaySettings.showCanvasInCalendar = it }
-                    )
-                }
-            }
+            // -- Master toggle 1: calendar visibility --------------------------
+            ToggleRow(
+                title = "Show Canvas items in calendar",
+                subtitleOn = "Starred Canvas courses and their assignments appear in the calendar.",
+                subtitleOff = "All Canvas content is hidden from the calendar (data is still stored).",
+                checked = showCanvasInCalendar,
+                onChange = { CanvasDisplaySettings.showCanvasInCalendar = it }
+            )
+
+            // -- Master toggle 2: messaging visibility -------------------------
+            // Mirrors the calendar toggle — when off, the home-page inbox icon
+            // disappears entirely and the messaging surface is unreachable.
+            // Independent of token presence; off-by-default is not appropriate
+            // since the icon is also gated by hasToken at the home-screen level.
+            ToggleRow(
+                title = "Show Canvas messages",
+                subtitleOn = "A Messages icon appears on the home page once Canvas is connected.",
+                subtitleOff = "The Canvas Messages icon is hidden from the home page.",
+                checked = showCanvasMessaging,
+                onChange = { CanvasMessagingSettings.showCanvasMessaging = it }
+            )
 
             // Progress / status
             if (state.isBusy) {
@@ -255,6 +241,44 @@ fun CanvasConnectionScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Extracted so the calendar and messaging toggles render identically. */
+@Composable
+private fun ToggleRow(
+    title: String,
+    subtitleOn: String,
+    subtitleOff: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = if (checked) subtitleOn else subtitleOff,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = checked, onCheckedChange = onChange)
         }
     }
 }

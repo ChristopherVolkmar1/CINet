@@ -318,6 +318,13 @@ class CalendarViewModel : ViewModel() {
         }
     }
 
+    // Returns classes that are allowed to appear in calendar UI.
+    fun getVisibleClasses(): List<ClassItem> {
+        return sortClassesByTime(
+            classItems.filterNot { isHiddenByCanvasFilters(it) }
+        )
+    }
+
     // Returns assignments for the selected day, ordered by due time.
     fun getItemsForSelectedDate(): List<ScheduleItem> {
         val date = selectedDate ?: return emptyList()
