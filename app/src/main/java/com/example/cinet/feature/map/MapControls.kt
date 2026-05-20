@@ -66,29 +66,6 @@ fun MapControls(
     onRemoveLocation: ((CampusLocation) -> Unit)? = null,
     photoUrl: String = ""
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        FilterMenu(
-            categories = campusRegistry.keys.map { it.uppercase() }.toSet() + "TRANSIT" + "SHARED",
-            activeFilters = activeFilters,
-            onFiltersChanged = onFiltersChanged
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Box(Modifier.weight(1f)) {
-            SearchBar(
-                placeholderText = "Search Location",
-                textFieldState = searchState.textFieldState,
-                searchResults = searchState.results,
-                onSearch = searchState.onSearch
-            )
-        }
-
         DirectionsPopup(
             location = selectedLocation,
             onDismiss = onDismissPopup,
@@ -100,7 +77,7 @@ fun MapControls(
             photoUrl = photoUrl
         )
     }
-}
+
 
 // -------------------- Filter menu --------------------
 
@@ -118,7 +95,7 @@ fun FilterMenu(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
-        modifier = Modifier.size(56.dp)
+        modifier = Modifier.size(44.dp)
     ) {
         IconButton(onClick = { showDialog = true }) {
             Icon(

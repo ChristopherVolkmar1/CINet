@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.CampusMapScreen
+import com.example.cinet.feature.map.MapTopBarState
 
 // Keeps the map alive in the composition and hides it when another page is active.
 @Composable
@@ -19,6 +20,7 @@ internal fun NavigationMapLayer(
     onBack: () -> Unit,
     onFinishedLoading: () -> Unit,
     onRemoveExtraLocation: (CampusLocation) -> Unit,
+    onTopBarStateChanged: (MapTopBarState?) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -44,7 +46,8 @@ internal fun NavigationMapLayer(
             autoRouteToPreSelectedLocation = autoRouteToPreSelectedLocation,
             onFinishedLoading = onFinishedLoading,
             extraLocations = extraLocations,
-            onRemoveExtraLocation = onRemoveExtraLocation
+            onRemoveExtraLocation = onRemoveExtraLocation,
+            onTopBarStateChanged = onTopBarStateChanged
         )
     }
 }

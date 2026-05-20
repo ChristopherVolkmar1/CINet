@@ -50,6 +50,8 @@ internal fun AppTopBar(
             .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
     ) {
+        val topBarHeight = if (mapTopBarContent != null) 70.dp else 60.dp
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()

@@ -50,6 +50,7 @@ fun CampusMapScreen(
     onFinishedLoading: () -> Unit = {},
     extraLocations: List<CampusLocation> = emptyList(),
     onRemoveExtraLocation: ((CampusLocation) -> Unit)? = null,
+    onTopBarStateChanged: (MapTopBarState?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val textFieldState = rememberTextFieldState()
@@ -137,6 +138,23 @@ fun CampusMapScreen(
             textFieldState.edit { replace(0, length, "") }
         }
     )
+
+    val mapTopBarState = MapTopBarState(
+        searchState = searchState,
+        categories = campusRegistry.keys.map { it.uppercase() }.toSet() + "TRANSIT" + "SHARED",
+        activeFilters = activeFilters,
+        onFiltersChanged = { activeFilters = it }
+    )
+
+    SideEffect {
+        onTopBarStateChanged(mapTopBarState)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            onTopBarStateChanged(null)
+        }
+    }
 
     val repository = remember { SocialRepository() }
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }

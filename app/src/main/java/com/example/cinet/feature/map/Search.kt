@@ -3,12 +3,7 @@ package com.example.cinet.feature.map
 import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,16 +12,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +39,37 @@ data class SearchState(
     val results: List<String>,
     val onSearch: (String) -> Unit
 )
+
+// Holds the search and filter state that the persistent top bar needs on the map page.
+data class MapTopBarState(
+    val searchState: SearchState,
+    val categories: Set<String>,
+    val activeFilters: Set<String>,
+    val onFiltersChanged: (Set<String>) -> Unit
+)
+
+// Displays the map search bar and filter button inside the persistent top bar.
+@Composable
+fun RowScope.MapTopBarControls(
+    state: MapTopBarState
+) {
+    Box(modifier = Modifier.weight(1f)) {
+        SearchBar(
+            placeholderText = "Search Location",
+            textFieldState = state.searchState.textFieldState,
+            searchResults = state.searchState.results,
+            onSearch = state.searchState.onSearch
+        )
+    }
+
+    Spacer(modifier = Modifier.width(12.dp))
+
+    FilterMenu(
+        categories = state.categories,
+        activeFilters = state.activeFilters,
+        onFiltersChanged = state.onFiltersChanged
+    )
+}
 
 // -------------------- Search bar --------------------
 
