@@ -147,8 +147,6 @@ fun ConversationsListScreen(
                 }
             }
 
-            HorizontalDivider()
-
             if (isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
