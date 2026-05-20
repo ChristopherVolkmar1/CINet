@@ -38,21 +38,17 @@ internal fun AppTopBar(
     state: NavigationTopBarState,
     isHomeScreen: Boolean = false,
     nickname: String = "",
-    mapTopBarContent: (@Composable RowScope.() -> Unit)? = null,
-    calendarTopBarContent: (@Composable RowScope.() -> Unit)? = null,
     onBack: () -> Unit,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
     onCanvasMessagesClick: () -> Unit,
-){
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
     ) {
-        val topBarHeight = if (mapTopBarContent != null) 70.dp else 60.dp
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -92,25 +88,6 @@ internal fun AppTopBar(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                }
-
-                calendarTopBarContent != null -> {
-                    Text(
-                        text = state.title,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        lineHeight = 50.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    calendarTopBarContent()
-                }
-
-                mapTopBarContent != null -> {
-                    mapTopBarContent()
                 }
 
                 isHomeScreen -> {
@@ -234,7 +211,12 @@ private fun ConversationTopBarContent(
 @Composable
 private fun ConversationTopBarActions(state: ConversationTopBarState) {
     if (state.isGroup) {
-        // Group: Search + Info
+        // Group: PushPin (if pinned) + Search + Info
+        if (state.onPinnedClick != null) {
+            IconButton(onClick = state.onPinnedClick) {
+                Icon(Icons.Default.PushPin, contentDescription = "Pinned messages", tint = Color.White)
+            }
+        }
         IconButton(onClick = state.onSearchClick) {
             Icon(Icons.Default.Search, contentDescription = "Search messages", tint = Color.White)
         }
@@ -244,13 +226,20 @@ private fun ConversationTopBarActions(state: ConversationTopBarState) {
             }
         }
     } else {
-        // DM: MoreVert dropdown — Search Messages, Remove Friend
+        // DM: MoreVert dropdown — Pinned Messages, Search Messages, Remove Friend
         var expanded by remember { mutableStateOf(false) }
         Box {
             IconButton(onClick = { expanded = true }) {
                 Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                if (state.onPinnedClick != null) {
+                    DropdownMenuItem(
+                        text = { Text("Pinned Messages") },
+                        leadingIcon = { Icon(Icons.Default.PushPin, null) },
+                        onClick = { expanded = false; state.onPinnedClick.invoke() }
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Search Messages") },
                     leadingIcon = { Icon(Icons.Default.Search, null) },

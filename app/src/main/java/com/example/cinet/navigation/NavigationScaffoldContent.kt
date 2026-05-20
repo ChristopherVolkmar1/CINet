@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
@@ -15,10 +15,7 @@ import com.example.cinet.data.remote.canvas.CanvasConversation
 import com.example.cinet.feature.clubs.ClubItem
 import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.feature.map.CampusLocation
-import com.example.cinet.feature.map.MapTopBarControls
 import com.example.cinet.feature.map.MapTopBarState
-import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarActions
-import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState
 
 // Draws the scaffold, persistent top bar, bottom bar, map layer, and active page route.
 @Composable
@@ -38,9 +35,8 @@ internal fun NavigationScaffoldContent(
     onClubClick: (ClubItem) -> Unit,
     onClubsBack: () -> Unit,
     onCanvasConversationClick: (CanvasConversation) -> Unit,
+    onMapTopBarStateChanged: (MapTopBarState?) -> Unit,
 ) {
-    var mapTopBarState by remember { mutableStateOf<MapTopBarState?>(null) }
-    var calendarTopBarState by remember { mutableStateOf<CalendarTopBarState?>(null) }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -52,20 +48,6 @@ internal fun NavigationScaffoldContent(
                         !uiState.isShowingClubs &&
                         !uiState.isShowingCanvasInbox,
                 nickname = uiState.userProfile.nickname,
-                mapTopBarContent = if (uiState.currentScreen == Screen.Map && mapTopBarState != null) {
-                    {
-                        MapTopBarControls(state = mapTopBarState!!)
-                    }
-                } else {
-                    null
-                },
-                calendarTopBarContent = if (uiState.currentScreen == Screen.Calendar && calendarTopBarState != null) {
-                    {
-                        CalendarTopBarActions(state = calendarTopBarState!!)
-                    }
-                } else {
-                    null
-                },
                 onFriendsClick = onTopBarFriendsClick,
                 onNewMessageClick = onTopBarNewMessageClick,
                 onCanvasMessagesClick = onTopBarCanvasMessagesClick
@@ -93,23 +75,19 @@ internal fun NavigationScaffoldContent(
                 .fillMaxSize()
                 .padding(contentPadding)
         ) {
-            if (uiState.currentScreen == Screen.Map) {
-                NavigationMapLayer(
-                    preSelectedLocation = uiState.preSelectedMapLocation,
-                    autoRouteToPreSelectedLocation = uiState.autoRouteToPreSelectedMapLocation,
-                    extraLocations = uiState.sharedLocations,
-                    onBack = onMapBack,
-                    onFinishedLoading = onMapFinishedLoading,
-                    onRemoveExtraLocation = onRemoveExtraLocation,
-                    onTopBarStateChanged = { mapTopBarState = it }
-                )
-            }
+            NavigationMapLayer(
+                currentScreen = uiState.currentScreen,
+                preSelectedLocation = uiState.preSelectedMapLocation,
+                autoRouteToPreSelectedLocation = uiState.autoRouteToPreSelectedMapLocation,
+                extraLocations = uiState.sharedLocations,
+                onBack = onMapBack,
+                onFinishedLoading = onMapFinishedLoading,
+                onRemoveExtraLocation = onRemoveExtraLocation,
+                onTopBarStateChanged = onMapTopBarStateChanged,
+            )
 
             if (uiState.currentScreen != Screen.Map) {
                 when {
-                    // Canvas messaging overlay takes precedence over news/clubs
-                    // because the user explicitly opened it from a home tile;
-                    // they expect to see it regardless of what was open before.
                     uiState.isShowingCanvasInbox -> NavigationCanvasMessagesRoute(
                         selectedConversation = uiState.selectedCanvasConversation,
                         onOpenConversation = onCanvasConversationClick
@@ -129,8 +107,7 @@ internal fun NavigationScaffoldContent(
 
                     else -> NavigationScreenRoute(
                         uiState = uiState,
-                        callbacks = routeCallbacks,
-                        onCalendarTopBarStateChanged = { calendarTopBarState = it }
+                        callbacks = routeCallbacks
                     )
                 }
             }

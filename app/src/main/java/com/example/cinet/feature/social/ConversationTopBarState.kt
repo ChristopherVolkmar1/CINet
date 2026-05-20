@@ -9,4 +9,5 @@ data class ConversationTopBarState(
     val onSearchClick: () -> Unit,              // toggles in-conversation search bar
     val onInfoClick: (() -> Unit)?,             // group only — opens GroupInfoSheet
     val onRemoveFriendClick: (() -> Unit)?,     // DM only — triggers remove-friend confirmation
+    val onPinnedClick: (() -> Unit)? = null,    // non-null when any messages are pinned
 )
