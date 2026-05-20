@@ -28,8 +28,12 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.unit.sp
 import com.example.cinet.ui.theme.CINetTheme
 import kotlin.String
+import androidx.compose.foundation.text.BasicTextField
 
 // Rounded search bar with inline dropdown suggestions for campus location search.
 // Includes input field, suggestion items, and result deduplication logic.
@@ -142,7 +146,7 @@ private fun dedupeSearchResults(results: List<String>): List<String> =
         .distinctBy { it.lowercase() }
         .filter { it.isNotBlank() }
 
-/** Transparent single-line TextField used as the search input. */
+/** Compact single-line input used inside the map top bar search pill. */
 @Composable
 private fun SearchInputField(
     placeholderText: String,
@@ -150,36 +154,59 @@ private fun SearchInputField(
     onFocusChanged: (Boolean) -> Unit,
     onSubmit: () -> Unit
 ) {
-    TextField(
-        value = textFieldState.text.toString(),
-        onValueChange = { textFieldState.edit { replace(0, length, it) } },
-        placeholder = { Text(placeholderText, color = Color.Gray) },
-        singleLine = true,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-            cursorColor = MaterialTheme.colorScheme.primary,
-            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        ),
-        leadingIcon = {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        },
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(40.dp)
+            .padding(horizontal = 12.dp)
             .onFocusChanged { onFocusChanged(it.isFocused) },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSubmit() })
-    )
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = "Search",
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(20.dp)
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        BasicTextField(
+            value = textFieldState.text.toString(),
+            onValueChange = { textFieldState.edit { replace(0, length, it) } },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                lineHeight = 18.sp
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier
+                .weight(1f)
+                .height(24.dp)
+                .onFocusChanged { onFocusChanged(it.isFocused) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (textFieldState.text.isEmpty()) {
+                        Text(
+                            text = placeholderText,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                            maxLines = 1
+                        )
+                    }
+
+                    innerTextField()
+                }
+            }
+        )
+    }
 }
 
 /** One tappable search-suggestion row. */
