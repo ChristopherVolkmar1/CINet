@@ -3,12 +3,7 @@ package com.example.cinet.feature.map
 import android.content.res.Configuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,16 +12,7 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,8 +28,12 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.unit.sp
 import com.example.cinet.ui.theme.CINetTheme
 import kotlin.String
+import androidx.compose.foundation.text.BasicTextField
 
 // Rounded search bar with inline dropdown suggestions for campus location search.
 // Includes input field, suggestion items, and result deduplication logic.
@@ -53,6 +43,47 @@ data class SearchState(
     val results: List<String>,
     val onSearch: (String) -> Unit
 )
+
+// Holds the search and filter state that the persistent top bar needs on the map page.
+data class MapTopBarState(
+    val searchState: SearchState,
+    val categories: Set<String>,
+    val activeFilters: Set<String>,
+    val onFiltersChanged: (Set<String>) -> Unit
+)
+
+// Displays the map search bar and filter button inside the persistent top bar.
+@Composable
+fun RowScope.MapTopBarControls(
+    state: MapTopBarState
+) {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .align(Alignment.CenterVertically)
+    ) {
+        SearchBar(
+            placeholderText = "Search Location",
+            textFieldState = state.searchState.textFieldState,
+            searchResults = state.searchState.results,
+            onSearch = state.searchState.onSearch
+        )
+    }
+
+    Spacer(modifier = Modifier.width(12.dp))
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.CenterVertically)
+            .padding(bottom = 8.dp)
+    ) {
+        FilterMenu(
+            categories = state.categories,
+            activeFilters = state.activeFilters,
+            onFiltersChanged = state.onFiltersChanged
+        )
+    }
+}
 
 // -------------------- Search bar --------------------
 
@@ -125,7 +156,7 @@ private fun dedupeSearchResults(results: List<String>): List<String> =
         .distinctBy { it.lowercase() }
         .filter { it.isNotBlank() }
 
-/** Transparent single-line TextField used as the search input. */
+/** Compact single-line input used inside the map top bar search pill. */
 @Composable
 private fun SearchInputField(
     placeholderText: String,
@@ -133,36 +164,59 @@ private fun SearchInputField(
     onFocusChanged: (Boolean) -> Unit,
     onSubmit: () -> Unit
 ) {
-    TextField(
-        value = textFieldState.text.toString(),
-        onValueChange = { textFieldState.edit { replace(0, length, it) } },
-        placeholder = { Text(placeholderText, color = Color.Gray) },
-        singleLine = true,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-            cursorColor = MaterialTheme.colorScheme.primary,
-            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        ),
-        leadingIcon = {
-            Icon(
-                Icons.Default.Search,
-                contentDescription = "Search",
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-        },
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(44.dp)
+            .padding(horizontal = 12.dp)
             .onFocusChanged { onFocusChanged(it.isFocused) },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSubmit() })
-    )
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = "Search",
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(20.dp)
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        BasicTextField(
+            value = textFieldState.text.toString(),
+            onValueChange = { textFieldState.edit { replace(0, length, it) } },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 14.sp,
+                lineHeight = 18.sp
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier
+                .weight(1f)
+                .height(24.dp)
+                .onFocusChanged { onFocusChanged(it.isFocused) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    if (textFieldState.text.isEmpty()) {
+                        Text(
+                            text = placeholderText,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                            maxLines = 1
+                        )
+                    }
+
+                    innerTextField()
+                }
+            }
+        )
+    }
 }
 
 /** One tappable search-suggestion row. */

@@ -149,17 +149,17 @@ private fun HomeScreenContent(
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp)
-            .padding(top = 18.dp, bottom = 24.dp)
+            .padding(top = 15.dp, bottom = 15.dp)
     ) {
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(5.dp))
 
         HomeWeatherBanner(
             temp = weatherInfo.temp,
             condition = weatherInfo.condition
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         LatestNewsCarousel(
             articles = newsArticles,
@@ -172,10 +172,6 @@ private fun HomeScreenContent(
 
             NextUpcomingEventBanner(nextUpcomingEvent = nextUpcomingEvent)
         }
-
-        //Spacer(modifier = Modifier.height(24.dp))
-
-        //HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
 
         Spacer(modifier = Modifier.height(18.dp))
 
@@ -467,7 +463,7 @@ private fun HomeNewsCard(
     Surface(
         modifier = Modifier
             .width(165.dp)
-            .height(165.dp)
+            .height(150.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
         color = lerp(
@@ -491,7 +487,7 @@ private fun HomeNewsCard(
                 modifier = Modifier.size(24.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             Text(
                 text = article.title,
