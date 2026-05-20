@@ -24,6 +24,7 @@ internal fun NavigationScaffoldContent(
     onBottomScreenSelected: (Screen) -> Unit,
     onTopBarBack: () -> Unit,
     onTopBarFriendsClick: () -> Unit,
+    onTopBarCanvasMessagesClick: () -> Unit,
     onTopBarNewMessageClick: () -> Unit,
     onMapBack: () -> Unit,
     onMapFinishedLoading: () -> Unit,
@@ -46,7 +47,8 @@ internal fun NavigationScaffoldContent(
                         !uiState.isShowingCanvasInbox,
                 nickname = uiState.userProfile.nickname,
                 onFriendsClick = onTopBarFriendsClick,
-                onNewMessageClick = onTopBarNewMessageClick
+                onNewMessageClick = onTopBarNewMessageClick,
+                onCanvasMessagesClick = onTopBarCanvasMessagesClick
             )
         },
         bottomBar = {

@@ -5,14 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,6 +31,8 @@ import com.example.cinet.feature.social.NewConversationTopBarState
 import com.example.cinet.feature.social.ConversationTopBarState
 import com.example.cinet.data.remote.canvas.CanvasConversation
 import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
+import com.example.cinet.data.remote.canvas.CanvasMessagingSettings
+import com.example.cinet.data.remote.canvas.CanvasTokenStore
 
 @Composable
 internal fun MainScaffold(
@@ -56,6 +51,7 @@ internal fun MainScaffold(
     val sharedPrefs = remember {
         context.getSharedPreferences("cinet_prefs", Context.MODE_PRIVATE)
     }
+    val canvasTokenStore = remember(context) { CanvasTokenStore(context) }
     val socialScope = rememberCoroutineScope()
     val socialRepository = remember { SocialRepository() }
     var pendingRequestCount by remember { mutableStateOf(0) }
@@ -388,6 +384,11 @@ internal fun MainScaffold(
     val hideBottomBarForConversationTyping =
         currentScreen == Screen.Social && activeConversation != null && isKeyboardOpen
 
+    val showCanvasMessagesAction =
+        currentScreen == Screen.Social &&
+                CanvasMessagingSettings.showCanvasMessaging &&
+                canvasTokenStore.hasToken()
+
     val uiState = NavigationUiState(
         topBarState = NavigationTopBarState(
             title = resolveTopBarTitle(),
@@ -397,6 +398,7 @@ internal fun MainScaffold(
                     selectedProfile == null &&
                     !showNewConversation &&
                     !showSocialScreen,
+            showCanvasMessagesAction = showCanvasMessagesAction,
             pendingRequestCount = pendingRequestCount,
             isHomeScreen = currentScreen == Screen.Home &&
                     selectedNewsArticle == null &&
@@ -553,7 +555,15 @@ internal fun MainScaffold(
                 }
             }
         },
-        onShowCanvasInbox = { showCanvasInbox = true },
+        onShowCanvasInbox = {
+            activeConversation = null
+            selectedProfile = null
+            showNewConversation = false
+            showSocialScreen = false
+            newConversationTopBarState = null
+            conversationTopBarState = null
+            showCanvasInbox = true
+        },
         onOpenCanvasConversation = { selectedCanvasConversation = it },
     )
 
@@ -608,7 +618,7 @@ internal fun MainScaffold(
             newConversationTopBarState = null
             showNewConversation = true
         },
-        //onMapBack = { currentScreen = Screen.Home },
+        onTopBarCanvasMessagesClick = routeCallbacks.onShowCanvasInbox,
         onMapBack = ::popBackStack,
         onMapFinishedLoading = {
             preSelectedMapLocation = null

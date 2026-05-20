@@ -20,12 +20,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.remote.canvas.CanvasConversation
-import com.example.cinet.feature.messages.canvas.viewmodel.CanvasMessagingViewModel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.example.cinet.feature.messages.canvas.viewmodel.CanvasMessagingViewModel
 
 /**
  * Inbox list of Canvas conversations. Renders one row per conversation with

@@ -29,11 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.remote.canvas.CanvasMessage
-import com.example.cinet.feature.messages.canvas.viewmodel.CanvasMessagingViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.example.cinet.feature.messages.canvas.viewmodel.CanvasMessagingViewModel
 
 /**
  * Thread view for one Canvas conversation. Top to bottom:
