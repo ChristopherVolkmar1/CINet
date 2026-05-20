@@ -38,11 +38,12 @@ internal fun AppTopBar(
     state: NavigationTopBarState,
     isHomeScreen: Boolean = false,
     nickname: String = "",
+    mapTopBarContent: (@Composable RowScope.() -> Unit)? = null,
     onBack: () -> Unit,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
     onCanvasMessagesClick: () -> Unit,
-) {
+){
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -88,6 +89,22 @@ internal fun AppTopBar(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
+                }
+
+                mapTopBarContent != null -> {
+                    Text(
+                        text = state.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        lineHeight = 50.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    mapTopBarContent()
                 }
 
                 isHomeScreen -> {
