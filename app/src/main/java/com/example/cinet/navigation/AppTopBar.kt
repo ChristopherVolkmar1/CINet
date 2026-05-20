@@ -94,18 +94,6 @@ internal fun AppTopBar(
                 }
 
                 mapTopBarContent != null -> {
-                    Text(
-                        text = state.title,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        lineHeight = 50.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
                     mapTopBarContent()
                 }
 
