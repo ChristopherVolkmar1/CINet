@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,8 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.core.time.openTimePicker
 import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.feature.calendar.calendarFiles.CalendarFirestoreRepository
+import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
 import com.example.cinet.feature.map.SearchBar
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -53,20 +59,22 @@ fun StudyInviteDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
 
-    // Location state — shared ViewModel instead of a private Firestore fetch
-    val campusRegistry by campusRegistryViewModel.campusRegistry.collectAsState()
-    var locationCategory by remember { mutableStateOf("academic") }
     val locationTextFieldState = rememberTextFieldState()
 
-    // Names in the selected category, filtered by whatever is typed
-    val filteredLocationNames = remember(
-        locationTextFieldState.text, locationCategory, campusRegistry
-    ) {
-        val categoryLocations = campusRegistry[locationCategory] ?: emptyList()
-        categoryLocations
-            .filter { it.name.contains(locationTextFieldState.text.toString(), ignoreCase = true) }
-            .map { it.name }
+    val campusRegistry by campusRegistryViewModel.campusRegistry.collectAsState()
+    var expanded by remember { mutableStateOf(false) }
+    var classList by remember { mutableStateOf<List<ClassItem>>(emptyList()) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        scope.launch {
+            try {
+                classList = CalendarFirestoreRepository().loadClasses()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
+    val validClass = classList.any { it.name == newClassName }
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -96,88 +104,100 @@ fun StudyInviteDialog(
             Column {
                 if (isCreatingNew) {
                     // ── Create new study session on the spot ──────────────────
-                    OutlinedTextField(
-                        value = newClassName,
-                        onValueChange = { newClassName = it },
-                        label = { Text("Class name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        ExposedDropdownMenuBox(
+                            expanded = expanded,
+                            onExpandedChange = { expanded = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = newClassName,
+                                onValueChange = { newClassName = it },
+                                isError = newClassName.isNotBlank() && !validClass,
+                                supportingText = {
+                                    if (newClassName.isNotBlank() && !validClass)
+                                        Text("Please select a valid class.")
+                                },
+                                readOnly = false,
+                                label = { Text("Class Name") },
+                                placeholder = { Text("Select your class") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(MenuAnchorType.PrimaryEditable)
+                            )
+                            val filtering = classList.filter { it.name.contains(newClassName, ignoreCase = true) }
+                            if (filtering.isNotEmpty()) {
+                                ExposedDropdownMenu(
+                                    expanded = expanded,
+                                    onDismissRequest = { expanded = false }
+                                ) {
+                                    filtering.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option.name) },
+                                            onClick = { newClassName = option.name; expanded = false }
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
-                    OutlinedTextField(
-                        value = newAssignmentName,
-                        onValueChange = { newAssignmentName = it },
-                        label = { Text("What to study") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newAssignmentName,
+                            onValueChange = { newAssignmentName = it },
+                            label = { Text("Topic") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    OutlinedTextField(
-                        value = newDate,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Date") },
-                        placeholder = { Text("Tap to pick a date") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker = true }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newDate,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Date") },
+                            placeholder = { Text("Tap to pick a date") },
+                            trailingIcon = {
+                                IconButton(onClick = { showDatePicker = true }) {
+                                    Icon(Icons.Default.Schedule, contentDescription = "Pick date")
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showDatePicker = true }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    Button(
-                        onClick = { showDatePicker = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Pick Date") }
-                    Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newTime,
+                            onValueChange = {},
+                            label = { Text("Start Time") },
+                            readOnly = true,
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(onClick = { openTimePicker(context) { newTime = it } }) {
+                                    Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
-                        value = newTime,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Time") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Button(
-                        onClick = { openTimePicker(context) { newTime = it } },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Pick Time") }
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // ── Location: category chips + search bar ─────────────────
-                    Text(
-                        text = "Location (optional)",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        locationCategories.forEach { (key, label) ->
-                            FilterChip(
-                                selected = locationCategory == key,
-                                onClick = { locationCategory = key },
-                                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        Box(modifier = Modifier.imePadding()) {
+                            SearchBar(
+                                placeholderText = "Add a location...",
+                                textFieldState = locationTextFieldState,
+                                searchResults = campusRegistry.values.flatten()
+                                    .filter { it.name.contains(locationTextFieldState.text.toString(), ignoreCase = true) }
+                                    .map { it.name }
+                                    .distinct(),
+                                onSearch = { query ->
+                                    locationTextFieldState.edit { replace(0, length, query) }
+                                }
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    SearchBar(
-                        placeholderText = "Search Location",
-                        textFieldState = locationTextFieldState,
-                        searchResults = filteredLocationNames,
-                        onSearch = { query ->
-                            locationTextFieldState.edit { replace(0, length, query) }
-                        }
-                    )
-
                 } else {
                     // ── Pick from existing calendar items ────────────────────
                     val hasAnyItems =

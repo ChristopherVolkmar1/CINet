@@ -137,7 +137,10 @@ fun StudySessionDialog(
                     SearchBar(
                         placeholderText = "Add a location...",
                         textFieldState = textFieldState,
-                        searchResults = (campusRegistry["academic"] ?: emptyList()).map { it.name },
+                        searchResults = campusRegistry.values.flatten()
+                            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
+                            .map { it.name }
+                            .distinct(),
                         onSearch = { query ->
                             textFieldState.edit { replace(0, length, query) }
                         }
