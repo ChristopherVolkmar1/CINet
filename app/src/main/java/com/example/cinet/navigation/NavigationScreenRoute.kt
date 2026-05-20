@@ -2,12 +2,14 @@ package com.example.cinet.navigation
 
 import androidx.compose.runtime.Composable
 import com.example.cinet.feature.calendar.calendarFiles.CalendarScreen
+import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState
 
 // Routes the selected main tab to the correct smaller navigation file.
 @Composable
 internal fun NavigationScreenRoute(
     uiState: NavigationUiState,
     callbacks: NavigationRouteCallbacks,
+    onCalendarTopBarStateChanged: (CalendarTopBarState?) -> Unit = {},
 ) {
     when (uiState.currentScreen) {
         Screen.Home -> NavigationHomeRoute(
@@ -65,7 +67,8 @@ internal fun NavigationScreenRoute(
         Screen.Calendar -> CalendarScreen(
             onBack = callbacks.onCalendarBack,
             initialShowClassDialog = uiState.showAddClassOnCalendar,
-            showHeader = false
+            showHeader = false,
+            onTopBarStateChanged = onCalendarTopBarStateChanged
         )
 
         Screen.Settings -> NavigationSettingsRoute(

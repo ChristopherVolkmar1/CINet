@@ -9,11 +9,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.CampusMapScreen
 import com.example.cinet.feature.map.MapTopBarState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 
-// Keeps the map alive in the composition and hides it when another page is active.
+// Displays the campus map only when the navigation layer asks for the map screen.
 @Composable
 internal fun NavigationMapLayer(
-    currentScreen: Screen,
     preSelectedLocation: CampusLocation?,
     autoRouteToPreSelectedLocation: Boolean,
     extraLocations: List<CampusLocation>,
@@ -23,22 +24,7 @@ internal fun NavigationMapLayer(
     onTopBarStateChanged: (MapTopBarState?) -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer { alpha = if (currentScreen == Screen.Map) 1f else 0f }
-            .then(
-                if (currentScreen != Screen.Map) {
-                    Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent()
-                            }
-                        }
-                    }
-                } else {
-                    Modifier
-                }
-            )
+        modifier = Modifier.fillMaxSize()
     ) {
         CampusMapScreen(
             onBack = onBack,
