@@ -57,7 +57,11 @@ data class MapTopBarState(
 fun RowScope.MapTopBarControls(
     state: MapTopBarState
 ) {
-    Box(modifier = Modifier.weight(1f)) {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .align(Alignment.CenterVertically)
+    ) {
         SearchBar(
             placeholderText = "Search Location",
             textFieldState = state.searchState.textFieldState,
@@ -68,11 +72,17 @@ fun RowScope.MapTopBarControls(
 
     Spacer(modifier = Modifier.width(12.dp))
 
-    FilterMenu(
-        categories = state.categories,
-        activeFilters = state.activeFilters,
-        onFiltersChanged = state.onFiltersChanged
-    )
+    Box(
+        modifier = Modifier
+            .align(Alignment.CenterVertically)
+            .padding(bottom = 8.dp)
+    ) {
+        FilterMenu(
+            categories = state.categories,
+            activeFilters = state.activeFilters,
+            onFiltersChanged = state.onFiltersChanged
+        )
+    }
 }
 
 // -------------------- Search bar --------------------
@@ -157,7 +167,7 @@ private fun SearchInputField(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(44.dp)
             .padding(horizontal = 12.dp)
             .onFocusChanged { onFocusChanged(it.isFocused) },
         verticalAlignment = Alignment.CenterVertically
