@@ -93,16 +93,17 @@ internal fun NavigationScaffoldContent(
                 .fillMaxSize()
                 .padding(contentPadding)
         ) {
-            NavigationMapLayer(
-                currentScreen = uiState.currentScreen,
-                preSelectedLocation = uiState.preSelectedMapLocation,
-                autoRouteToPreSelectedLocation = uiState.autoRouteToPreSelectedMapLocation,
-                extraLocations = uiState.sharedLocations,
-                onBack = onMapBack,
-                onFinishedLoading = onMapFinishedLoading,
-                onRemoveExtraLocation = onRemoveExtraLocation,
-                onTopBarStateChanged = { mapTopBarState = it }
-            )
+            if (uiState.currentScreen == Screen.Map) {
+                NavigationMapLayer(
+                    preSelectedLocation = uiState.preSelectedMapLocation,
+                    autoRouteToPreSelectedLocation = uiState.autoRouteToPreSelectedMapLocation,
+                    extraLocations = uiState.sharedLocations,
+                    onBack = onMapBack,
+                    onFinishedLoading = onMapFinishedLoading,
+                    onRemoveExtraLocation = onRemoveExtraLocation,
+                    onTopBarStateChanged = { mapTopBarState = it }
+                )
+            }
 
             if (uiState.currentScreen != Screen.Map) {
                 when {
