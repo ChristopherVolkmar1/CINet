@@ -99,12 +99,22 @@ fun PollsBubble(
             ?: emptyList()
     }
     val hasVotedServer = votedUids.contains(currentUid)
-    var localSelectedIndex by remember(message.id) { mutableIntStateOf(-1) }
-    val finalSelectedIndex = if (hasVotedServer) {
-        votedUids.indexOf(currentUid)
-    } else {
-        localSelectedIndex
+
+    // userVotes: "uid1:0||uid2:2" — maps each uid to the option index they chose.
+    // We look this up instead of using votedUids.indexOf(), which would give the
+    // voter's position in the list (wrong) rather than their actual option choice.
+    val serverVotedIndex = remember(message.metadata) {
+        (message.metadata["userVotes"] as? String)
+            ?.split("||")
+            ?.filter { it.isNotBlank() }
+            ?.firstOrNull { it.startsWith("$currentUid:") }
+            ?.substringAfter(":")
+            ?.toIntOrNull()
+            ?: -1
     }
+
+    var localSelectedIndex by remember(message.id) { mutableIntStateOf(-1) }
+    val finalSelectedIndex = if (hasVotedServer) serverVotedIndex else localSelectedIndex
 
     Card(
         shape = cardShape,
@@ -227,17 +237,17 @@ fun PollCreation(
                             .fillMaxWidth()
                             .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
                     )
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            times.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = { duration = option; expanded = false }
-                                )
-                            }
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        times.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = { duration = option; expanded = false }
+                            )
                         }
+                    }
                 }
 
                 Button(
@@ -255,7 +265,7 @@ fun PollCreation(
                         //enabled = question.isNotBlank() && answers.all { it.isNotBlank() }
                     },
                     modifier = Modifier.align(Alignment.End)
-                    ) {
+                ) {
                     Text("Send")
                 }
             }
@@ -269,7 +279,7 @@ fun PollVoting(
     selectedIndex: Int,
     onVoteSelected: (Int) -> Unit
 ) {
-    val answers = remember {
+    val answers = remember(message.id) {
         (message.metadata["answers"] as? String)
             ?.split("||")
             ?.toMutableStateList()
