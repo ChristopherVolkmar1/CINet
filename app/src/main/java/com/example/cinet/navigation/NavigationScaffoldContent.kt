@@ -2,10 +2,8 @@ package com.example.cinet.navigation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-//import androidx.compose.foundation.layout.calculateBottomPadding
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
-//import androidx.compose.foundation.layout.calculateTopPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -13,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
+import com.example.cinet.data.remote.canvas.CanvasConversation
 import com.example.cinet.feature.clubs.ClubItem
 import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.feature.map.CampusLocation
@@ -25,6 +24,7 @@ internal fun NavigationScaffoldContent(
     onBottomScreenSelected: (Screen) -> Unit,
     onTopBarBack: () -> Unit,
     onTopBarFriendsClick: () -> Unit,
+    onTopBarCanvasMessagesClick: () -> Unit,
     onTopBarNewMessageClick: () -> Unit,
     onMapBack: () -> Unit,
     onMapFinishedLoading: () -> Unit,
@@ -33,6 +33,7 @@ internal fun NavigationScaffoldContent(
     onNewsBack: () -> Unit,
     onClubClick: (ClubItem) -> Unit,
     onClubsBack: () -> Unit,
+    onCanvasConversationClick: (CanvasConversation) -> Unit,
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -42,10 +43,12 @@ internal fun NavigationScaffoldContent(
                 onBack = onTopBarBack,
                 isHomeScreen = uiState.currentScreen == Screen.Home &&
                         !uiState.isShowingNews &&
-                        !uiState.isShowingClubs,
+                        !uiState.isShowingClubs &&
+                        !uiState.isShowingCanvasInbox,
                 nickname = uiState.userProfile.nickname,
                 onFriendsClick = onTopBarFriendsClick,
-                onNewMessageClick = onTopBarNewMessageClick
+                onNewMessageClick = onTopBarNewMessageClick,
+                onCanvasMessagesClick = onTopBarCanvasMessagesClick
             )
         },
         bottomBar = {
@@ -79,8 +82,17 @@ internal fun NavigationScaffoldContent(
                 onFinishedLoading = onMapFinishedLoading,
                 onRemoveExtraLocation = onRemoveExtraLocation
             )
+
             if (uiState.currentScreen != Screen.Map) {
                 when {
+                    // Canvas messaging overlay takes precedence over news/clubs
+                    // because the user explicitly opened it from a home tile;
+                    // they expect to see it regardless of what was open before.
+                    uiState.isShowingCanvasInbox -> NavigationCanvasMessagesRoute(
+                        selectedConversation = uiState.selectedCanvasConversation,
+                        onOpenConversation = onCanvasConversationClick
+                    )
+
                     uiState.isShowingNews -> NavigationNewsRoute(
                         selectedNewsArticle = uiState.selectedNewsArticle,
                         onArticleClick = onArticleClick,

@@ -24,6 +24,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import com.example.cinet.data.remote.canvas.CanvasTokenStore
 import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
+import com.example.cinet.data.remote.canvas.CanvasMessagingSettings
 
 class MainActivity : ComponentActivity() {
 
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
 
         CanvasDisplaySettings.init(this)
+        CanvasMessagingSettings.init(this)
 
         setContent {
             val authState by authViewModel.authState.collectAsState()
