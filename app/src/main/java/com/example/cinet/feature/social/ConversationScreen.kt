@@ -211,6 +211,8 @@ fun ConversationScreen(
             .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
     }
 
+    var showPollDialog by remember { mutableStateOf(false) }
+
     // Push the current conversation header into the persistent top bar.
     // Re-runs whenever title, photo, or interactive state changes so the bar stays in sync.
     LaunchedEffect(
@@ -573,7 +575,12 @@ fun ConversationScreen(
                                         repository.respondToInvite(conversation.id, message.id, "declined")
                                     }
                                 }
-                            } else null
+                            } else null,
+                            onVoteSubmitted = { messageId, selectedIndex ->
+                                scope.launch {
+                                    repository.castVote(conversation.id, messageId, selectedIndex, currentUid)
+                                }
+                            }
                         )
                     }
                 }
@@ -672,6 +679,7 @@ fun ConversationScreen(
                             }
                         }
                     },
+                    pollCreation = { showPollDialog = true },
                     modifier = Modifier.imePadding()
                 )
             }
@@ -823,6 +831,31 @@ fun ConversationScreen(
             }
         )
     }
+
+    if (showPollDialog) {
+        PollCreation(
+            onDismiss = { showPollDialog = false },
+            onSend = { question, answers, durationMillis ->
+                showPollDialog = false
+                scope.launch {
+                    val emptyVotes = List(answers.size) { "0" }.joinToString("||")
+                    repository.sendMessage(
+                        conversationId = conversation.id,
+                        content = question.replaceFirstChar { it.uppercaseChar() },
+                        type = "poll",
+                        metadata = mapOf(
+                            "question" to question,
+                            "answers" to answers.joinToString("||"),
+                            "votes" to emptyVotes,
+                            "votedUids" to "",
+                            "duration" to durationMillis.toString(),
+                            "createdAt" to System.currentTimeMillis().toString()
+                        )
+                    )
+                }
+            }
+        )
+    }
 }
 
 // Frontend team: restyle this bubble however you want
@@ -845,6 +878,7 @@ fun MessageBubble(
     memberProfiles: Map<String, UserProfile> = emptyMap(),
     readReceiptsEnabled: Boolean = true,
     isGroup: Boolean = false,
+    onVoteSubmitted: ((messageId: String, selectedIndex: Int) -> Unit)? = null
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -952,6 +986,15 @@ fun MessageBubble(
                     message = message,
                     isCurrentUser = isCurrentUser,
                     onPreviewImage = onPreviewImage,
+                )
+            } else if (message.type == "poll") {
+                PollsBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    currentUid = currentUid,
+                    onVoteSubmitted = { messageId, selectedIndex ->
+                        onVoteSubmitted?.invoke(messageId, selectedIndex)
+                    }
                 )
             } else {
                 val bubbleColor = if (isCurrentUser)
