@@ -2,10 +2,11 @@ package com.example.cinet.navigation
 
 import com.example.cinet.data.model.Conversation
 import com.example.cinet.data.model.UserProfile
+import com.example.cinet.data.remote.canvas.CanvasConversation
 import com.example.cinet.feature.home.news.NewsArticle
-import com.example.cinet.ui.theme.AppThemeColor
-import com.example.cinet.feature.social.NewConversationTopBarState
 import com.example.cinet.feature.social.ConversationTopBarState
+import com.example.cinet.feature.social.NewConversationTopBarState
+import com.example.cinet.ui.theme.AppThemeColor
 
 // Groups page-specific callbacks so route functions stay readable.
 internal data class NavigationRouteCallbacks(
@@ -39,10 +40,17 @@ internal data class NavigationRouteCallbacks(
     val onSettingsSelectedProfileBack: () -> Unit,
     val onSignOut: () -> Unit,
     val onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
-    val onReadReceiptsChange: (Boolean) -> Unit,
     val onViewProfile: () -> Unit,
     val onOpenCanvas: () -> Unit,
-    val onOpenChatFromHome: (UserProfile) -> Unit,
     val onNewConversationTopBarChange: (NewConversationTopBarState?) -> Unit,
+    // Restored from the read-receipts / profile-from-home refactor — these
+    // were inadvertently dropped from an earlier replacement of this file.
+    val onReadReceiptsChange: (Boolean) -> Unit,
     val onConversationTopBarChange: (ConversationTopBarState?) -> Unit,
+    val onOpenChatFromHome: (UserProfile) -> Unit,
+    // Canvas messaging callbacks. Inbox is opened from the home page; the
+    // conversation is selected from inside the inbox; back actions are
+    // dispatched through NavigationBackHandler in the usual pattern.
+    val onShowCanvasInbox: () -> Unit,
+    val onOpenCanvasConversation: (CanvasConversation) -> Unit,
 )
