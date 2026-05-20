@@ -243,6 +243,9 @@ internal fun MainScaffold(
                     newConversationTopBarState = null
                 }
             }
+            currentScreen == Screen.Social && showSocialScreen -> {
+                showSocialScreen = false
+            }
             currentScreen == Screen.Settings && showCanvasScreen -> showCanvasScreen = false
             currentScreen == Screen.Settings && showProfileEdit -> showProfileEdit = false
             currentScreen == Screen.Settings && selectedProfile != null -> {

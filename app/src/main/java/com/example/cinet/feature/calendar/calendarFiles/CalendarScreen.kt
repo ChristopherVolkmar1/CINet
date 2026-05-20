@@ -35,7 +35,8 @@ fun CalendarScreen(
     initialShowClassDialog: Boolean = false,
     onProfileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    showHeader: Boolean = true
+    showHeader: Boolean = true,
+    onTopBarStateChanged: (CalendarTopBarState?) -> Unit = {}
 ) {
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
@@ -243,6 +244,17 @@ fun CalendarScreen(
             viewModel.onDateSelected(date)
         }
     }
+    DisposableEffect(Unit) {
+        onTopBarStateChanged(
+            CalendarTopBarState(
+                onClassesClick = { selectedQuickAccessType = CalendarQuickAccessType.CLASSES },
+                onStudyClick = { selectedQuickAccessType = CalendarQuickAccessType.STUDY },
+                onEventsClick = { selectedQuickAccessType = CalendarQuickAccessType.EVENTS }
+            )
+        )
+
+        onDispose { onTopBarStateChanged(null) }
+    }
 
     Column(
         modifier = Modifier
@@ -286,26 +298,6 @@ fun CalendarScreen(
             onStudySessionClick = ::openStudySessionEditor,
             onAssignmentClick = ::openAssignmentEditor,
             onEventClick = ::openEventEditor
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        androidx.compose.material3.HorizontalDivider(
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        CalendarQuickAccessCards(
-            onClassesClick = {
-                selectedQuickAccessType = CalendarQuickAccessType.CLASSES
-            },
-            onStudyClick = {
-                selectedQuickAccessType = CalendarQuickAccessType.STUDY
-            },
-            onEventsClick = {
-                selectedQuickAccessType = CalendarQuickAccessType.EVENTS
-            }
         )
     }
 

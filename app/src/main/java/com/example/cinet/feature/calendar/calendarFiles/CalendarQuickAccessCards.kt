@@ -1,32 +1,22 @@
 package com.example.cinet.feature.calendar.calendarFiles
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.lerp
 
 /** Shows the circular calendar action buttons at the bottom of the card. */
 @Composable
@@ -61,48 +51,87 @@ fun CalendarQuickAccessCards(
     }
 }
 
-/** Draws one circular quick access button with its label below it. */
+/** Draws one circular quick access button for the old calendar card layout. */
 @Composable
 private fun CalendarQuickAccessCircle(
     title: String,
     icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     Column(
-        modifier = modifier.clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Surface(
-            modifier = Modifier.size(75.dp),
-            shape = CircleShape,
-            color = lerp(
-                MaterialTheme.colorScheme.surface,
-                MaterialTheme.colorScheme.primary,
-                0.80f
-            ),
-            shadowElevation = 5.dp
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(30.dp)
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(58.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape
                 )
-            }
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = Color.White,
+                modifier = Modifier.size(30.dp)
+            )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+/** Shows icon-only calendar action buttons in the persistent top bar. */
+@Composable
+fun CalendarTopBarActions(state: CalendarTopBarState) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(end = 4.dp)
+    ) {
+        CalendarTopBarIcon(
+            title = "Classes",
+            icon = Icons.Default.School,
+            onClick = state.onClassesClick
+        )
+
+        CalendarTopBarIcon(
+            title = "Study",
+            icon = Icons.Default.MenuBook,
+            onClick = state.onStudyClick
+        )
+
+        CalendarTopBarIcon(
+            title = "Events",
+            icon = Icons.Default.CalendarMonth,
+            onClick = state.onEventsClick
+        )
+    }
+}
+
+/** Draws one large white icon button for the calendar top bar. */
+@Composable
+private fun CalendarTopBarIcon(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(48.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = Color.White,
+            modifier = Modifier.size(32.dp)
         )
     }
 }

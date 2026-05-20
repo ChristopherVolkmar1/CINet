@@ -38,17 +38,21 @@ internal fun AppTopBar(
     state: NavigationTopBarState,
     isHomeScreen: Boolean = false,
     nickname: String = "",
+    mapTopBarContent: (@Composable RowScope.() -> Unit)? = null,
+    calendarTopBarContent: (@Composable RowScope.() -> Unit)? = null,
     onBack: () -> Unit,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
     onCanvasMessagesClick: () -> Unit,
-) {
+){
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
     ) {
+        val topBarHeight = if (mapTopBarContent != null) 70.dp else 60.dp
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -88,6 +92,25 @@ internal fun AppTopBar(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
+                }
+
+                calendarTopBarContent != null -> {
+                    Text(
+                        text = state.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        lineHeight = 50.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    calendarTopBarContent()
+                }
+
+                mapTopBarContent != null -> {
+                    mapTopBarContent()
                 }
 
                 isHomeScreen -> {
