@@ -48,8 +48,9 @@ fun CalendarScreen(
 
     val classItems = viewModel.classItems
 
-    val syncedCanvasClassNames = classItems
-        .filter { it.canvasId != null && it.meetingDays.isEmpty() }
+    val visibleClassItems = viewModel.getVisibleClasses()
+
+    val syncedCanvasClassNames = viewModel.getUnscheduledCanvasClasses()
         .map { it.name }
         .sorted()
 
@@ -312,7 +313,7 @@ fun CalendarScreen(
         CalendarQuickAccessPopup(
             type = quickAccessType,
             selectedDate = activeDate,
-            classes = classItems,
+            classes = visibleClassItems,
             syncedCanvasClassNames = syncedCanvasClassNames,
             studySessions = studySessionsForSelectedDate,
             events = eventsForSelectedDate,

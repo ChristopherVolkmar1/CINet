@@ -213,7 +213,7 @@ class CalendarFirestoreRepository(
             .document(uid)
             .collection("classes")
             .document(classId)
-            .set(classData)
+            .update(classData)
             .await()
 
         Log.d("FirestoreDebug", "Updated class successfully: $name, id=$classId")
