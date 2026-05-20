@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.DropdownMenu
@@ -50,6 +51,7 @@ fun MessageBox(
     eventSelected: () -> Unit,
     onAttachmentClick: () -> Unit,
     sendUserLocation: () -> Unit,
+    pollCreation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -81,7 +83,8 @@ fun MessageBox(
                 onStudyClick = studySelected,
                 onEventClick = eventSelected,
                 onAttachmentClick = onAttachmentClick,
-                sendUserLocation = sendUserLocation
+                sendUserLocation = sendUserLocation,
+                pollCreation = pollCreation,
             )
         }
         // Message bar section
@@ -140,6 +143,7 @@ fun AddAttachment(
     onEventClick: () -> Unit,
     onAttachmentClick: () -> Unit,
     sendUserLocation: () -> Unit,
+    pollCreation: () -> Unit,
     onDismiss: () -> Unit
 ) {
     DropdownMenu(
@@ -160,6 +164,14 @@ fun AddAttachment(
             leadingIcon = { Icon(Icons.Default.Event, "Event Invite") },
             onClick = {
                 onEventClick()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Create a Poll") },
+            leadingIcon = { Icon(Icons.Default.Poll, contentDescription = "Create a Poll") },
+            onClick = {
+                pollCreation()
                 onDismiss()
             }
         )
@@ -197,7 +209,8 @@ fun PreviewMessageBox() {
                 studySelected = { },
                 eventSelected = { },
                 onAttachmentClick = { },
-                sendUserLocation = { }
+                sendUserLocation = { },
+                pollCreation = {}
             )
         }
     }
