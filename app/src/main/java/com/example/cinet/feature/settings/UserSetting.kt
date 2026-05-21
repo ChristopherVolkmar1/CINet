@@ -43,14 +43,12 @@ object AppSettings {
 @Composable
 fun SettingScreen(
     onBack: () -> Unit,
-    onSignOut: () -> Unit,
     isDarkMode: Boolean,
     notificationsEnabled: Boolean,
     selectedTheme: AppThemeColor,
     onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
     userProfile: UserProfile? = null,
     onViewProfile: () -> Unit = {},
-    onOpenCanvas: () -> Unit = {},
     showHeader: Boolean = true,
     readReceiptsEnabled: Boolean = true,
     onReadReceiptsChange: (Boolean) -> Unit = {},
@@ -239,5 +237,6 @@ fun SettingScreen(
             )
         }
 
+        Spacer(modifier = Modifier.weight(1f))
     }
 }

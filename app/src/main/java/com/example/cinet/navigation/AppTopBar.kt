@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.feature.social.ConversationTopBarState
+import androidx.compose.foundation.layout.RowScope
+
 
 // Draws the persistent page title bar used across the app.
 @Composable
@@ -45,8 +47,8 @@ internal fun AppTopBar(
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
     onCanvasMessagesClick: () -> Unit,
-    onSettingsCanvasClick: () -> Unit = {},
-    onSettingsSignOutClick: () -> Unit = {},
+    onSettingsCanvasClick: () -> Unit,
+    onSettingsSignOutClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -137,7 +139,8 @@ internal fun AppTopBar(
                 }
             }
 
-            when {
+
+                        when {
                 conversationTopBarState != null ->
                     ConversationTopBarActions(state = conversationTopBarState)
 
@@ -161,6 +164,8 @@ internal fun AppTopBar(
 
                 settingsTopBarActions != null ->
                     settingsTopBarActions()
+            }
+
             }
         }
     }
