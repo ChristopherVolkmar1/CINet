@@ -402,6 +402,10 @@ internal fun MainScaffold(
                     !showNewConversation &&
                     !showSocialScreen,
             showCanvasMessagesAction = showCanvasMessagesAction,
+            showSettingsActions = currentScreen == Screen.Settings &&
+                    !showCanvasScreen &&
+                    !showProfileEdit &&
+                    selectedProfile == null,
             pendingRequestCount = pendingRequestCount,
             isHomeScreen = currentScreen == Screen.Home &&
                     selectedNewsArticle == null &&
@@ -622,6 +626,8 @@ internal fun MainScaffold(
             showNewConversation = true
         },
         onTopBarCanvasMessagesClick = routeCallbacks.onShowCanvasInbox,
+        onSettingsCanvasClick = routeCallbacks.onOpenCanvas,
+        onSettingsSignOutClick = routeCallbacks.onSignOut,
         onMapBack = ::popBackStack,
         onMapFinishedLoading = {
             preSelectedMapLocation = null

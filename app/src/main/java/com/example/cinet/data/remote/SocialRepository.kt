@@ -1032,4 +1032,38 @@ class SocialRepository(
         }
         return name
     }
+
+
+    /** Vote casting for polls */
+    suspend fun castVote(conversationId: String, messageId: String, selectedIndex: Int, currentUid: String) {
+        val messageDocRef = db.collection("conversations")
+            .document(conversationId)
+            .collection("messages")
+            .document(messageId)
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(messageDocRef)
+            val metadata = snapshot.get("metadata") as? Map<*, *> ?: return@runTransaction
+
+            val votesString = metadata["votes"] as? String ?: ""
+            val voteCounts = votesString.split("||").map { it.toIntOrNull() ?: 0 }.toMutableList()
+
+            val votedUidsString = metadata["votedUids"] as? String ?: ""
+            val votedUids = votedUidsString.split("||").filter { it.isNotBlank() }.toMutableList()
+
+            if (currentUid in votedUids) return@runTransaction
+
+            if (selectedIndex in voteCounts.indices) {
+                voteCounts[selectedIndex] = voteCounts[selectedIndex] + 1
+            }
+            votedUids.add(currentUid)
+
+            val updatedMetadata = metadata.toMutableMap().apply {
+                put("votes", voteCounts.joinToString("||"))
+                put("votedUids", votedUids.joinToString("||"))
+            }
+
+            transaction.update(messageDocRef, "metadata", updatedMetadata)
+        }.await()
+    }
 }
