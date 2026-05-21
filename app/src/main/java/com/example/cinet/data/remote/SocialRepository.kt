@@ -1,5 +1,8 @@
 package com.example.cinet.data.remote
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.schedule.ScheduleItem
@@ -13,11 +16,13 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 
 class SocialRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
 ) {
 
     /** Returns the current signed-in user's uid. */
@@ -272,6 +277,7 @@ class SocialRepository(
             )
 
             if (!isGroup) {
+                // DM path: find any existing active DM with exactly these participants.
                 val existingConversation = findExistingDirectConversation(participantIds)
                 if (existingConversation != null) {
                     Log.d(
@@ -279,6 +285,20 @@ class SocialRepository(
                         "Found existing conversation: ${existingConversation.id}"
                     )
                     return Result.success(existingConversation)
+                }
+            } else {
+                // Group path: deduplicate by exact participant set + group name.
+                // Without this check, network timeouts after a successful Firestore
+                // write let the creator tap "Create" again, producing a second group
+                // document. Creator ends up in G2 while other members reply in G1 —
+                // making replies appear "individual" from the creator's perspective.
+                val existingGroup = findExistingGroupConversation(participantIds, groupName)
+                if (existingGroup != null) {
+                    Log.d(
+                        "SocialRepository",
+                        "Found existing group conversation: ${existingGroup.id}"
+                    )
+                    return Result.success(existingGroup)
                 }
             }
 
@@ -302,11 +322,13 @@ class SocialRepository(
         return try {
             val snapshot = db.collection("conversations")
                 .whereArrayContains("participantIds", currentUid)
-                .orderBy("lastUpdated", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
-            Result.success(snapshot.toObjects(Conversation::class.java))
+            val conversations = snapshot.toObjects(Conversation::class.java)
+                .sortedByDescending { it.lastUpdated?.time ?: 0L }
+
+            Result.success(conversations)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -334,6 +356,60 @@ class SocialRepository(
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SocialRepository", "sendMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Picks a file URI, uploads it to Firebase Storage at
+     *   conversations/{conversationId}/attachments/{messageId}
+     * then sends a Message with type="attachment" and metadata keys:
+     *   url, fileName, mimeType, caption.
+     * The last-message preview is the caption when provided, otherwise "📎 <fileName>".
+     */
+    suspend fun sendAttachment(
+        conversationId: String,
+        uri: Uri,
+        context: Context,
+        caption: String = "",
+    ): Result<Unit> {
+        return try {
+            val currentUser = getCurrentUserProfile()
+            // Reserve the Firestore doc ID first so we can use it as the Storage file name.
+            val messageId = db.collection("conversations")
+                .document(conversationId)
+                .collection("messages")
+                .document()
+                .id
+
+            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val fileName = resolveFileName(context, uri)
+
+            val downloadUrl = uploadToStorage(conversationId, messageId, uri)
+
+            // Use the caption as the message content if provided so conversation list
+            // previews and search both show the caption text rather than just the filename.
+            val trimmedCaption = caption.trim()
+            val content = trimmedCaption.ifBlank { "📎 $fileName" }
+
+            val message = buildMessage(
+                sender = currentUser,
+                content = content,
+                type = "attachment",
+                metadata = mapOf(
+                    "url"      to downloadUrl,
+                    "fileName" to fileName,
+                    "mimeType" to mimeType,
+                    "caption"  to trimmedCaption,
+                ),
+                overrideId = messageId,
+            )
+            saveMessage(conversationId, message)
+            updateConversationLastMessage(conversationId, content)
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "sendAttachment failed: ${e.message}")
             Result.failure(e)
         }
     }
@@ -650,6 +726,29 @@ class SocialRepository(
             }
     }
 
+    /**
+     * Looks for an existing group conversation with exactly these participants and
+     * the same group name. Used to deduplicate group creation — if a Firestore write
+     * succeeds but the response times out, retrying would otherwise create a second
+     * identical group, splitting replies across two conversations.
+     */
+    private suspend fun findExistingGroupConversation(
+        participantIds: List<String>,
+        groupName: String,
+    ): Conversation? {
+        return db.collection("conversations")
+            .whereArrayContains("participantIds", currentUid)
+            .get()
+            .await()
+            .toObjects(Conversation::class.java)
+            .firstOrNull {
+                it.isGroup &&
+                        it.groupName.equals(groupName.trim(), ignoreCase = false) &&
+                        it.participantIds.size == participantIds.size &&
+                        it.participantIds.containsAll(participantIds)
+            }
+    }
+
     /** Creates and saves a new conversation document. */
     private suspend fun createConversation(
         participantIds: List<String>,
@@ -659,12 +758,16 @@ class SocialRepository(
     ): Conversation {
         val docRef = db.collection("conversations").document()
 
+        // For group chats the creator (currentUid) is automatically admin.
+        val roles: Map<String, String> = if (isGroup) mapOf(currentUid to "admin") else emptyMap()
+
         val conversation = Conversation(
             id = docRef.id,
             participantIds = participantIds,
             participantNicknames = participantNicknames,
             isGroup = isGroup,
             groupName = groupName,
+            roles = roles,
         )
 
         Log.d("SocialRepository", "Creating new conversation: ${docRef.id}")
@@ -673,14 +776,144 @@ class SocialRepository(
         return conversation
     }
 
+    // ── Group management ────────────────────────────────────────────────────
+
+    /** Loads full UserProfile objects for every UID in [uids]. Used by GroupInfoSheet. */
+    suspend fun getConversationMemberProfiles(uids: List<String>): List<UserProfile> {
+        return uids.mapNotNull { uid ->
+            try {
+                db.collection("users").document(uid).get().await()
+                    .toObject(UserProfile::class.java)
+            } catch (_: Exception) { null }
+        }
+    }
+
+    /** Adds [member] to an existing group conversation. */
+    suspend fun addGroupMember(conversationId: String, member: UserProfile): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update(
+                    mapOf(
+                        "participantIds" to FieldValue.arrayUnion(member.uid),
+                        "participantNicknames.${member.uid}" to member.nickname,
+                    )
+                )
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "addGroupMember failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Removes [uid] from the group. Also clears their roles entry.
+     * Passing currentUid serves as "leave group."
+     */
+    suspend fun removeGroupMember(conversationId: String, uid: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update(
+                    mapOf(
+                        "participantIds" to FieldValue.arrayRemove(uid),
+                        "roles.$uid" to FieldValue.delete(),
+                    )
+                )
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "removeGroupMember failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Hard-deletes a single message. Admins can delete any message;
+     * callers are responsible for the permission check before calling.
+     *
+     * After deletion, re-queries the most recent remaining message and
+     * updates conversations/{id}.lastMessage so the list preview stays accurate.
+     */
+    suspend fun deleteMessage(conversationId: String, messageId: String): Result<Unit> {
+        return try {
+            val conversationRef = db.collection("conversations").document(conversationId)
+            val messagesRef = conversationRef.collection("messages")
+
+            messagesRef.document(messageId).delete().await()
+
+            // Refresh lastMessage to the newest remaining message, or clear it if
+            // the conversation is now empty.
+            val remaining = messagesRef
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(1)
+                .get()
+                .await()
+
+            val newLastMessage = remaining.documents.firstOrNull()?.getString("content") ?: ""
+            val newLastSenderId = remaining.documents.firstOrNull()?.getString("senderId") ?: ""
+            conversationRef.update(
+                mapOf(
+                    "lastMessage" to newLastMessage,
+                    "lastSenderId" to newLastSenderId,
+                )
+            ).await()
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "deleteMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Promotes or demotes a member. Pass "admin" to promote, "member" to demote.
+     * Only the current admin should be calling this — enforce in the UI.
+     */
+    suspend fun updateMemberRole(conversationId: String, uid: String, role: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update("roles.$uid", role)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "updateMemberRole failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+
+    /**
+     * Stamps readBy[currentUid] = serverTimestamp() on each message the
+     * current user has not yet read. Uses dot-notation updates so concurrent
+     * writes from other readers never clobber each other.
+     * Silently ignores failures — read receipts are best-effort.
+     */
+    suspend fun markMessagesRead(conversationId: String, messageIds: List<String>) {
+        if (messageIds.isEmpty()) return
+        val messagesRef = db.collection("conversations")
+            .document(conversationId)
+            .collection("messages")
+        val batch = db.batch()
+        messageIds.forEach { msgId ->
+            batch.update(
+                messagesRef.document(msgId),
+                "readBy.$currentUid", FieldValue.serverTimestamp()
+            )
+        }
+        try { batch.commit().await() } catch (e: Exception) {
+            Log.w("SocialRepository", "markMessagesRead failed: ${e.message}")
+        }
+    }
+
     /** Builds a message object using the current sender's profile data. */
     private fun buildMessage(
         sender: UserProfile,
         content: String,
         type: String,
         metadata: Map<String, String>,
+        overrideId: String? = null,
     ): Message {
-        val messageId = db.collection("conversations")
+        val messageId = overrideId ?: db.collection("conversations")
             .document()
             .id
 
@@ -789,5 +1022,101 @@ class SocialRepository(
             time = time,
             location = location,
         )
+    }
+
+    /** Uploads [uri] to Storage and returns the HTTPS download URL. */
+    private suspend fun uploadToStorage(
+        conversationId: String,
+        messageId: String,
+        uri: Uri,
+    ): String {
+        val ref = storage.reference
+            .child("conversations/$conversationId/attachments/$messageId")
+        ref.putFile(uri).await()
+        return ref.downloadUrl.await().toString()
+    }
+
+    /**
+     * Resolves a human-readable file name from a content URI using
+     * [OpenableColumns.DISPLAY_NAME]. Falls back to "attachment" if the
+     * column is unavailable (e.g. a file:// URI without a name segment).
+     */
+    private fun resolveFileName(context: Context, uri: Uri): String {
+        var name = "attachment"
+        runCatching {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val col = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (col >= 0 && cursor.moveToFirst()) name = cursor.getString(col)
+            }
+        }
+        return name
+    }
+
+
+    /** Pins a message. Only the most recent 3 pins are shown in the UI. */
+    suspend fun pinMessage(conversationId: String, messageId: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update("pinnedMessageIds", FieldValue.arrayUnion(messageId))
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "pinMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** Removes a pin from a message. */
+    suspend fun unpinMessage(conversationId: String, messageId: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update("pinnedMessageIds", FieldValue.arrayRemove(messageId))
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "unpinMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** Vote casting for polls */
+    suspend fun castVote(conversationId: String, messageId: String, selectedIndex: Int, currentUid: String) {
+        val messageDocRef = db.collection("conversations")
+            .document(conversationId)
+            .collection("messages")
+            .document(messageId)
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(messageDocRef)
+            val metadata = snapshot.get("metadata") as? Map<*, *> ?: return@runTransaction
+
+            val votesString = metadata["votes"] as? String ?: ""
+            val voteCounts = votesString.split("||").map { it.toIntOrNull() ?: 0 }.toMutableList()
+
+            val votedUidsString = metadata["votedUids"] as? String ?: ""
+            val votedUids = votedUidsString.split("||").filter { it.isNotBlank() }.toMutableList()
+
+            if (currentUid in votedUids) return@runTransaction
+
+            if (selectedIndex in voteCounts.indices) {
+                voteCounts[selectedIndex] = voteCounts[selectedIndex] + 1
+            }
+            votedUids.add(currentUid)
+
+            // userVotes tracks which option each uid voted for: "uid1:0||uid2:2"
+            // This is separate from votedUids (which is just a presence set) so
+            // we can correctly restore the selected highlight after a recompose.
+            val userVotesString = metadata["userVotes"] as? String ?: ""
+            val userVoteEntries = userVotesString.split("||").filter { it.isNotBlank() }.toMutableList()
+            userVoteEntries.add("$currentUid:$selectedIndex")
+
+            val updatedMetadata = metadata.toMutableMap().apply {
+                put("votes", voteCounts.joinToString("||"))
+                put("votedUids", votedUids.joinToString("||"))
+                put("userVotes", userVoteEntries.joinToString("||"))
+            }
+
+            transaction.update(messageDocRef, "metadata", updatedMetadata)
+        }.await()
     }
 }

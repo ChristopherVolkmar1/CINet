@@ -17,7 +17,7 @@ fun CalendarHeader() {
         Text(
             text = "Calendar",
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 34.sp,
             lineHeight = 40.sp,
             maxLines = 1,

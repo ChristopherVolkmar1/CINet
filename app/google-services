@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "627501333241",
+    "project_id": "cinetpracticeuserauthenticator",
+    "storage_bucket": "cinetpracticeuserauthenticator.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:627501333241:android:bf0f0a166ae10fe1aec028",
+        "android_client_info": {
+          "package_name": "com.company.CINet"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "627501333241-edjf6jh7crtkvkgqb0rlhphmljap2c8v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzpXFZZNh3leXqqGgmMMBKY6V6khczIWY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "627501333241-edjf6jh7crtkvkgqb0rlhphmljap2c8v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

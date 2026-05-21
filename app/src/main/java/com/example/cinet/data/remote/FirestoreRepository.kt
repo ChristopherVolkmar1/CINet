@@ -23,13 +23,21 @@ class FirestoreRepository(
             val loginUpdate = mapOf(
                 "uid"         to user.uid,
                 "email"       to (user.email ?: ""),
-                "photoUrl"    to (user.photoUrl?.toString() ?: ""),
                 "lastLoginAt" to FieldValue.serverTimestamp(),
             )
 
             docRef.set(loginUpdate, SetOptions.merge()).await()
 
             val snapshot = docRef.get().await()
+
+            // Seed photoUrl from Google auth only on first login (never overwrite a
+            // custom Storage upload the user has already set).
+            if (snapshot.getString("photoUrl").isNullOrEmpty()) {
+                val googlePhoto = user.photoUrl?.toString() ?: ""
+                if (googlePhoto.isNotEmpty()) {
+                    docRef.set(mapOf("photoUrl" to googlePhoto), SetOptions.merge()).await()
+                }
+            }
             if (snapshot.getTimestamp("createdAt") == null) {
                 docRef.update("createdAt", FieldValue.serverTimestamp()).await()
             }
@@ -62,7 +70,8 @@ class FirestoreRepository(
                 } catch (_: Exception) {
                     AppThemeColor.Green
                 }
-                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled, selectedTheme = selectedTheme)
+                val readReceiptsEnabled = settingsSnapshot.getBoolean("readReceiptsEnabled") ?: profile.readReceiptsEnabled
+                profile = profile.copy(isDarkMode = isDarkMode, notificationsEnabled = notificationsEnabled, selectedTheme = selectedTheme, readReceiptsEnabled = readReceiptsEnabled)
             }
 
             Result.success(profile)
@@ -74,6 +83,7 @@ class FirestoreRepository(
     suspend fun saveProfileDetails(
         nickname: String,
         major: String,
+        minor: String,
         pronouns: String,
         year: String = "",
         bio: String = "",
@@ -87,6 +97,7 @@ class FirestoreRepository(
                 "nickname"      to nickname,
                 "nicknameLower" to nickname.lowercase(),
                 "major"         to major,
+                "minor"         to minor,
                 "pronouns"      to pronouns,
                 "year"          to year,
                 "bio"           to bio,
@@ -97,6 +108,19 @@ class FirestoreRepository(
 
             // After saving profile, reload the full profile including settings
             createOrLoadUserProfile()
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateReadReceiptsEnabled(enabled: Boolean): Result<Unit> {
+        return try {
+            val uid = auth.currentUser?.uid ?: error("No signed-in user.")
+            db.collection(FirestoreCollections.APP_SETTINGS)
+                .document(uid)
+                .set(mapOf("readReceiptsEnabled" to enabled), SetOptions.merge())
+                .await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -136,6 +160,13 @@ class FirestoreRepository(
         db.collection(FirestoreCollections.USERS)
             .document(uid)
             .set(mapOf("photoUrl" to photoUrl), SetOptions.merge())
+            .await()
+    }
+
+    suspend fun updateBannerUrl(uid: String, bannerUrl: String) {
+        db.collection(FirestoreCollections.USERS)
+            .document(uid)
+            .set(mapOf("bannerUrl" to bannerUrl), SetOptions.merge())
             .await()
     }
 

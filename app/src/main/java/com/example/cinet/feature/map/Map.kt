@@ -7,7 +7,7 @@ import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +21,8 @@ import androidx.core.content.ContextCompat
 import com.example.cinet.R
 import com.example.cinet.core.permissions.PermissionManager
 import com.example.cinet.data.model.CampusRegistry
+import com.example.cinet.data.model.Conversation
+import com.example.cinet.data.model.MeetupPin
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.data.remote.SocialRepository
 import com.example.cinet.feature.settings.AppSettings
@@ -35,6 +37,10 @@ import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.GeoPoint
+import com.google.firebase.auth.FirebaseAuth
 import com.google.maps.android.compose.*
 import com.google.maps.model.TravelMode
 import kotlinx.coroutines.CoroutineScope
@@ -47,13 +53,19 @@ fun CampusMapScreen(
     viewModel: CampusRegistry = androidx.lifecycle.viewmodel.compose.viewModel(),
     preSelectedLocation: CampusLocation? = null,
     autoRouteToPreSelectedLocation: Boolean = false,
-    onFinishedLoading: () -> Unit = {}
+    onFinishedLoading: () -> Unit = {},
+    extraLocations: List<CampusLocation> = emptyList(),
+    onRemoveExtraLocation: ((CampusLocation) -> Unit)? = null,
+    onTopBarStateChanged: (MapTopBarState?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val textFieldState = rememberTextFieldState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    val auth = remember { FirebaseAuth.getInstance() }
+    val currentUid = auth.currentUser?.uid.orEmpty()
 
     var hasPermission by remember { mutableStateOf(PermissionManager.hasAllPermissions(context)) }
     val mapStyle = rememberCampusMapStyle(context)
@@ -72,6 +84,67 @@ fun CampusMapScreen(
     var eta by remember { mutableStateOf("") }
     var userLatLng by remember { mutableStateOf<LatLng?>(null) }
     var showBusSheet by remember { mutableStateOf(false) }
+
+    var meetupPins by remember { mutableStateOf<List<MeetupPin>>(emptyList()) }
+    var pendingMeetupCoordinate by remember { mutableStateOf<LatLng?>(null) }
+    var selectedMeetupPin by remember { mutableStateOf<MeetupPin?>(null) }
+    var sharePinDialogPin by remember { mutableStateOf<MeetupPin?>(null) }
+    var conversations by remember { mutableStateOf<List<Conversation>>(emptyList()) }
+    var reportMessage by remember { mutableStateOf<String?>(null) }
+    var currentUserNickname by remember { mutableStateOf("") }
+    var currentUserPhotoUrl by remember { mutableStateOf("") }
+
+    DisposableEffect(Unit) {
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
+        var publicPins = emptyList<MeetupPin>()
+        var myPins = emptyList<MeetupPin>()
+
+        fun updatePins() {
+            meetupPins = (publicPins + myPins)
+                .distinctBy { it.id }
+                .filterNot { it.isExpired }
+        }
+
+        val publicListener = firestore.collection("meetupPins")
+            .whereEqualTo("sharedToSocial", true)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("MeetupPins", "Failed to load public meetup pins", error)
+                    return@addSnapshotListener
+                }
+
+                publicPins = snapshot?.documents?.mapNotNull { document ->
+                    document.toObject(MeetupPin::class.java)?.copy(id = document.id)
+                } ?: emptyList()
+
+                updatePins()
+            }
+
+        val myPinsListener = firestore.collection("meetupPins")
+            .whereEqualTo("creatorUid", currentUid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("MeetupPins", "Failed to load my meetup pins", error)
+                    return@addSnapshotListener
+                }
+
+                myPins = snapshot?.documents?.mapNotNull { document ->
+                    document.toObject(MeetupPin::class.java)?.copy(id = document.id)
+                } ?: emptyList()
+
+                updatePins()
+            }
+
+        onDispose {
+            publicListener.remove()
+            myPinsListener.remove()
+        }
+    }
+
+    val visibleMeetupPins = remember(meetupPins) {
+        meetupPins.filterNot { it.isExpired }
+    }
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(34.162, -119.043), 16f)
@@ -116,6 +189,35 @@ fun CampusMapScreen(
         )
     }
 
+    val requestRouteToMeetupPin: (MeetupPin, TravelMode) -> Unit = { pin, mode ->
+        val meetupLocation = CampusLocation(
+            name = pin.title,
+            description = pin.description,
+            coordinates = GeoPoint(pin.latitude, pin.longitude),
+            category = "SHARED"
+        )
+
+        selectedLocation = meetupLocation
+        routeLocation = meetupLocation
+        activeTravelMode = mode
+
+        requestRouteToDestination(
+            destination = pin.latLng,
+            hasPermission = hasPermission,
+            fusedLocationClient = fusedLocationClient,
+            context = context,
+            mode = mode,
+            cameraPositionState = cameraPositionState,
+            coroutineScope = coroutineScope,
+            onUserLatLng = { userLatLng = it },
+            onEta = { eta = it },
+            onPolylinePoints = { polylinePoints = it }
+        )
+
+        showRemoveRoute = true
+        selectedMeetupPin = null
+    }
+
     val searchState = SearchState(
         textFieldState = textFieldState,
         results = filteredNames,
@@ -136,12 +238,46 @@ fun CampusMapScreen(
         }
     )
 
+    val mapTopBarState = MapTopBarState(
+        searchState = searchState,
+        categories = campusRegistry.keys.map { it.uppercase() }.toSet() + "TRANSIT" + "SHARED",
+        activeFilters = activeFilters,
+        onFiltersChanged = { activeFilters = it }
+    )
+
+    SideEffect {
+        onTopBarStateChanged(mapTopBarState)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            onTopBarStateChanged(null)
+        }
+    }
+
     val repository = remember { SocialRepository() }
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         repository.getFriends().onSuccess {
             friends = it
+        }
+
+        repository.getConversations().onSuccess {
+            conversations = it
+        }
+
+        if (currentUid.isNotBlank()) {
+            firestore.collection("users")
+                .document(currentUid)
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    currentUserNickname = snapshot.getString("nickname") ?: ""
+                    currentUserPhotoUrl = snapshot.getString("photoUrl") ?: ""
+                }
+                .addOnFailureListener { error ->
+                    Log.e("MapShare", "Failed to load current user profile", error)
+                }
         }
     }
 
@@ -192,10 +328,13 @@ fun CampusMapScreen(
             mapProperties = mapProperties,
             cameraPositionState = cameraPositionState,
             focusManager = focusManager,
-            markers = markersToDraw,
+            markers = markersToDraw + extraLocations,
+            meetupPins = visibleMeetupPins,
             polylinePoints = polylinePoints,
             coroutineScope = coroutineScope,
             onMarkerSelected = { selectedLocation = it },
+            onMeetupPinSelected = { selectedMeetupPin = it },
+            onMapLongClick = { pendingMeetupCoordinate = it },
             onRouteVisible = { showRemoveRoute = true },
             mode = activeTravelMode
         )
@@ -210,6 +349,7 @@ fun CampusMapScreen(
                     onDismiss = {
                         polylinePoints = emptyList()
                         showRemoveRoute = false
+                        routeLocation = null
                     },
                     routeDurations = durations,
                     location = routeLocation,
@@ -230,7 +370,9 @@ fun CampusMapScreen(
             onModeSelected = requestRoute,
             routeDurations = durations,
             onShowBusSchedule = { showBusSheet = true },
-            friends = friends
+            friends = friends,
+            onRemoveLocation = onRemoveExtraLocation,
+            photoUrl = selectedLocation?.description ?: ""
         )
 
         userLatLng?.let { user ->
@@ -246,6 +388,159 @@ fun CampusMapScreen(
 
         if (showBusSheet) {
             BusScheduleSheet(onDismiss = { showBusSheet = false })
+        }
+
+        pendingMeetupCoordinate?.let { coordinate ->
+            CreateMeetupPinDialog(
+                coordinate = coordinate,
+                onDismiss = { pendingMeetupCoordinate = null },
+                onCreatePin = { pin ->
+                    firestore.collection("meetupPins")
+                        .add(pin)
+                        .addOnSuccessListener { documentReference ->
+                            Log.d("MeetupPins", "Meetup pin saved successfully: ${documentReference.id}")
+                            pendingMeetupCoordinate = null
+                        }
+                        .addOnFailureListener { error ->
+                            Log.e("MeetupPins", "Failed to save meetup pin", error)
+                            reportMessage = "Failed to save meetup pin: ${error.message}"
+                        }
+                }
+            )
+        }
+
+        selectedMeetupPin?.let { pin ->
+            MeetupPinDetailsDialog(
+                pin = pin,
+                onDismiss = {
+                    selectedMeetupPin = null
+                },
+                onDelete = {
+                    if (pin.id.isBlank()) {
+                        selectedMeetupPin = null
+                        reportMessage = "This pin cannot be deleted yet."
+                        return@MeetupPinDetailsDialog
+                    }
+
+                    firestore.collection("meetupPins")
+                        .document(pin.id)
+                        .delete()
+                        .addOnSuccessListener {
+                            Log.d("MeetupPins", "Meetup pin deleted successfully")
+                            selectedMeetupPin = null
+                        }
+                        .addOnFailureListener { error ->
+                            Log.e("MeetupPins", "Failed to delete meetup pin", error)
+                            reportMessage = "Failed to delete meetup pin: ${error.message}"
+                        }
+                },
+                onShare = {
+                    coroutineScope.launch {
+                        repository.getConversations()
+                            .onSuccess { loadedConversations ->
+                                conversations = loadedConversations
+                                sharePinDialogPin = pin
+                                selectedMeetupPin = null
+                            }
+                            .onFailure { error ->
+                                reportMessage = "Failed to load conversations: ${error.message}"
+                            }
+                    }
+                },
+
+                onDirections = {
+                    requestRouteToMeetupPin(pin, TravelMode.WALKING)
+                }
+            )
+        }
+
+        sharePinDialogPin?.let { pin ->
+            AlertDialog(
+                onDismissRequest = {
+                    sharePinDialogPin = null
+                },
+                title = {
+                    Text("Share Pin")
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Choose a conversation")
+
+                        if (conversations.isEmpty()) {
+                            Text("No conversations found. Try opening Messages once, then come back.")
+                        } else {
+                            conversations.forEach { conversation ->
+                                val title =
+                                    if (conversation.isGroup) {
+                                        conversation.groupName.ifBlank { "Group Chat" }
+                                    } else {
+                                        conversation.participantNicknames.entries
+                                            .firstOrNull { it.key != currentUid }
+                                            ?.value
+                                            ?: conversation.participantNicknames.values.firstOrNull()
+                                            ?: "Conversation"
+                                    }
+
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            val result = repository.sendMessage(
+                                                conversationId = conversation.id,
+                                                content = "Shared a meetup pin: ${pin.title}",
+                                                type = "location_share",
+                                                metadata = mapOf(
+                                                    "lat" to pin.latitude.toString(),
+                                                    "lng" to pin.longitude.toString(),
+                                                    "locationName" to pin.title,
+                                                    "senderNickname" to currentUserNickname.ifBlank { "Friend" },
+                                                    "senderPhotoUrl" to currentUserPhotoUrl
+                                                )
+                                            )
+
+                                            result
+                                                .onSuccess {
+                                                    sharePinDialogPin = null
+                                                    reportMessage = "Pin shared successfully."
+                                                }
+                                                .onFailure { error ->
+                                                    Log.e("MapShare", "Failed to share pin to chat", error)
+                                                    reportMessage = "Failed to share pin: ${error.message}"
+                                                }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(title)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    OutlinedButton(
+                        onClick = {
+                            sharePinDialogPin = null
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        reportMessage?.let { message ->
+            AlertDialog(
+                onDismissRequest = { reportMessage = null },
+                title = { Text("Notice") },
+                text = { Text(message) },
+                confirmButton = {
+                    Button(onClick = { reportMessage = null }) {
+                        Text("OK")
+                    }
+                }
+            )
         }
     }
 }
@@ -268,7 +563,8 @@ private fun rememberCampusMapProperties(
     remember(hasPermission, mapStyle) {
         MapProperties(
             isMyLocationEnabled = hasPermission,
-            mapStyleOptions = mapStyle
+            mapStyleOptions = mapStyle,
+            isBuildingEnabled = true
         )
     }
 
@@ -516,9 +812,12 @@ private fun CampusMapLayer(
     cameraPositionState: CameraPositionState,
     focusManager: FocusManager,
     markers: List<CampusLocation>,
+    meetupPins: List<MeetupPin>,
     polylinePoints: List<LatLng>,
     coroutineScope: CoroutineScope,
     onMarkerSelected: (CampusLocation) -> Unit,
+    onMeetupPinSelected: (MeetupPin) -> Unit,
+    onMapLongClick: (LatLng) -> Unit,
     onRouteVisible: () -> Unit,
     mode: TravelMode
 ) {
@@ -527,9 +826,14 @@ private fun CampusMapLayer(
         properties = mapProperties,
         cameraPositionState = cameraPositionState,
         onMapClick = { focusManager.clearFocus() },
+        onMapLongClick = {
+            focusManager.clearFocus()
+            onMapLongClick(it)
+        },
         uiSettings = MapUiSettings(
             myLocationButtonEnabled = false,
-            zoomControlsEnabled = true
+            zoomControlsEnabled = true,
+            tiltGesturesEnabled = true
         )
     ) {
         markers.forEach { location ->
@@ -538,6 +842,15 @@ private fun CampusMapLayer(
                 cameraPositionState = cameraPositionState,
                 coroutineScope = coroutineScope,
                 onSelected = onMarkerSelected
+            )
+        }
+
+        meetupPins.forEach { pin ->
+            MeetupPinMarker(
+                pin = pin,
+                cameraPositionState = cameraPositionState,
+                coroutineScope = coroutineScope,
+                onSelected = onMeetupPinSelected
             )
         }
 
@@ -583,6 +896,7 @@ private fun CampusMarker(
                     "TRANSIT" -> R.drawable.bus_stop
                     "COMMUTER_PARKING" -> R.drawable.parking
                     "DINING" -> R.drawable.dining
+                    "SHARED" -> R.drawable.person
                     else -> R.drawable.unlisted
                 },
                 backgroundColor = primaryColor
@@ -614,6 +928,224 @@ private fun CampusMarker(
     )
 }
 
+@Composable
+private fun CreateMeetupPinDialog(
+    coordinate: LatLng,
+    onDismiss: () -> Unit,
+    onCreatePin: (MeetupPin) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var isTemporary by remember { mutableStateOf(true) }
+    var durationHoursText by remember { mutableStateOf("2") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create Meetup Pin") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    singleLine = true
+                )
+
+                TextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    minLines = 2
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Switch(
+                        checked = isTemporary,
+                        onCheckedChange = { isTemporary = it }
+                    )
+                    Text(if (isTemporary) "Temporary pin" else "Permanent pin")
+                }
+
+                if (isTemporary) {
+                    TextField(
+                        value = durationHoursText,
+                        onValueChange = { durationHoursText = it.filter { char -> char.isDigit() } },
+                        label = { Text("Expires in hours") },
+                        singleLine = true
+                    )
+                }
+
+                Text(
+                    text = "Location: %.5f, %.5f".format(coordinate.latitude, coordinate.longitude),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = title.isNotBlank(),
+                onClick = {
+                    val durationHours = durationHoursText.toLongOrNull()?.coerceAtLeast(1L) ?: 2L
+                    val now = System.currentTimeMillis()
+
+                    onCreatePin(
+                        MeetupPin(
+                            title = title.trim(),
+                            description = description.trim(),
+                            latitude = coordinate.latitude,
+                            longitude = coordinate.longitude,
+                            isTemporary = isTemporary,
+                            sharedToSocial = false,
+                            creatorUid = FirebaseAuth.getInstance().currentUser?.uid ?: "",
+                            creatorName = "Bryan",
+                            createdAt = Timestamp.now(),
+                            expiresAt = if (isTemporary) {
+                                Timestamp(
+                                    java.util.Date(
+                                        now + durationHours * 60L * 60L * 1000L
+                                    )
+                                )
+                            } else {
+                                null
+                            }
+                        )
+                    )
+                }
+            ) {
+                Text("Create")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun MeetupPinDetailsDialog(
+    pin: MeetupPin,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+    onShare: () -> Unit,
+    onDirections: () -> Unit
+) {
+    val expirationText = pin.expiresAt?.let {
+        val minutesLeft =
+            ((it.toDate().time - System.currentTimeMillis()) / 60000L)
+                .coerceAtLeast(0L)
+
+        "Expires in about $minutesLeft minutes"
+    } ?: "Permanent pin"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(pin.title) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (pin.description.isNotBlank()) {
+                    Text(pin.description)
+                }
+
+                Text(
+                    expirationText,
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Text(
+                    text = if (pin.sharedToSocial) {
+                        "Shared to Social"
+                    } else {
+                        "Not shared to Social"
+                    },
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Text(
+                    text = "Location: %.5f, %.5f".format(pin.latitude, pin.longitude),
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onDirections,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Get Directions")
+                }
+
+                OutlinedButton(
+                    onClick = onShare,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Share to Chat")
+                }
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Delete Pin")
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+private fun MeetupPinMarker(
+    pin: MeetupPin,
+    cameraPositionState: CameraPositionState,
+    coroutineScope: CoroutineScope,
+    onSelected: (MeetupPin) -> Unit
+) {
+    val context = LocalContext.current
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val customIcon = remember(primaryColor) {
+        try {
+            customMarker(
+                context = context,
+                iconResId = R.drawable.person,
+                backgroundColor = primaryColor
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    val markerState = remember(pin.id) {
+        MarkerState(position = pin.latLng)
+    }
+
+    Marker(
+        state = markerState,
+        title = pin.title,
+        snippet = if (pin.isTemporary) "Temporary meetup pin" else "Permanent meetup pin",
+        icon = customIcon ?: BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_VIOLET),
+        onClick = {
+            onSelected(pin)
+            coroutineScope.launch {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(pin.latLng, 18f),
+                    durationMs = 1000
+                )
+            }
+            true
+        }
+    )
+}
+
 fun customMarker(
     context: Context,
     iconResId: Int,
@@ -625,10 +1157,18 @@ fun customMarker(
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    pinDrawable?.let {
-        it.setTint(backgroundColor.toArgb())
-        it.setBounds(0, 0, size, size)
-        it.draw(canvas)
+    pinDrawable?.let { drawable ->
+        val wrapped = androidx.core.graphics.drawable.DrawableCompat
+            .wrap(drawable)
+            .mutate()
+
+        androidx.core.graphics.drawable.DrawableCompat.setTint(
+            wrapped,
+            backgroundColor.toArgb()
+        )
+
+        wrapped.setBounds(0, 0, size, size)
+        wrapped.draw(canvas)
     }
 
     iconDrawable?.let {

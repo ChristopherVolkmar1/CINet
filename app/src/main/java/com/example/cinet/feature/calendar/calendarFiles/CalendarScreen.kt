@@ -34,13 +34,27 @@ fun CalendarScreen(
     onBack: () -> Unit,
     initialShowClassDialog: Boolean = false,
     onProfileClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    showHeader: Boolean = true,
+    onTopBarStateChanged: (CalendarTopBarState?) -> Unit = {}
 ) {
     val viewModel: CalendarViewModel = viewModel()
     val context = LocalContext.current
     val today = remember { LocalDate.now() }
+    LaunchedEffect(Unit) {
+        viewModel.refreshClasses()
+        viewModel.refreshAssignments()
+        viewModel.refreshEvents()
+    }
 
     val classItems = viewModel.classItems
+
+    val visibleClassItems = viewModel.getVisibleClasses()
+
+    val syncedCanvasClassNames = viewModel.getUnscheduledCanvasClasses()
+        .map { it.name }
+        .sorted()
+
     val currentMonth = viewModel.currentMonth
     val selectedDate = viewModel.selectedDate
     val activeDate = selectedDate ?: today
@@ -48,6 +62,7 @@ fun CalendarScreen(
     var reminderRefreshKey by remember { mutableStateOf(0) }
     val agendaCountByDate = remember(
         classItems,
+        viewModel.scheduleItems,
         viewModel.studySessions,
         viewModel.userEventItems,
         viewModel.campusEventItems,
@@ -58,6 +73,7 @@ fun CalendarScreen(
             context = context,
             currentMonth = currentMonth,
             classes = classItems,
+            assignments = viewModel.scheduleItems,
             studySessions = viewModel.studySessions,
             customEvents = viewModel.userEventItems,
             campusEvents = viewModel.campusEventItems
@@ -66,6 +82,7 @@ fun CalendarScreen(
 
     val classesForSelectedDate = viewModel.getClassesForSelectedDate()
     val studySessionsForSelectedDate = viewModel.getStudySessionsForSelectedDate()
+    val assignmentsForSelectedDate = viewModel.getItemsForSelectedDate()
     val eventsForSelectedDate = viewModel.getEventsForSelectedDate()
     val customEventsForSelectedDate = viewModel.getCustomEventsForSelectedDate()
     val reminderEventsForSelectedDate = remember(eventsForSelectedDate, reminderRefreshKey) {
@@ -125,6 +142,26 @@ fun CalendarScreen(
         selectedMeetingDays = emptySet()
     }
 
+    // Checks whether the class meeting being saved already exists.
+    fun hasDuplicateClassMeeting(
+        classToEdit: ClassItem?,
+        name: String,
+        meetingDays: List<String>,
+        startTime: String,
+        endTime: String
+    ): Boolean {
+        val normalizedName = name.trim()
+
+        return classItems.any { existingClass ->
+            val isSameSavedClass = classToEdit?.id == existingClass.id
+            val hasSameName = existingClass.name.equals(normalizedName, ignoreCase = true)
+            val hasSameTime = existingClass.startTime == startTime && existingClass.endTime == endTime
+            val hasOverlappingDay = existingClass.meetingDays.any { it in meetingDays }
+
+            !isSameSavedClass && hasSameName && hasSameTime && hasOverlappingDay
+        }
+    }
+
     fun resetStudySessionForm() {
         editingSession = null
         sessionClassName = ""
@@ -155,6 +192,22 @@ fun CalendarScreen(
         classStartTime = classItem.startTime
         classEndTime = classItem.endTime
         selectedMeetingDays = classItem.meetingDays.toSet()
+        showClassDialog = true
+    }
+
+    // Opens the normal class creation dialog with a Canvas class name prefilled.
+    fun openCanvasClassMeetingCreator(canvasClassName: String) {
+        resetClassForm()
+        val existing = classItems.firstOrNull { it.name == canvasClassName && it.canvasId != null }
+        if (existing != null) {
+            editingClass = existing
+            className = existing.name
+            classStartTime = existing.startTime
+            classEndTime = existing.endTime
+            selectedMeetingDays = existing.meetingDays.toSet()
+        } else {
+            className = canvasClassName
+        }
         showClassDialog = true
     }
 
@@ -191,6 +244,17 @@ fun CalendarScreen(
             viewModel.onDateSelected(date)
         }
     }
+    DisposableEffect(Unit) {
+        onTopBarStateChanged(
+            CalendarTopBarState(
+                onClassesClick = { selectedQuickAccessType = CalendarQuickAccessType.CLASSES },
+                onStudyClick = { selectedQuickAccessType = CalendarQuickAccessType.STUDY },
+                onEventsClick = { selectedQuickAccessType = CalendarQuickAccessType.EVENTS }
+            )
+        )
+
+        onDispose { onTopBarStateChanged(null) }
+    }
 
     Column(
         modifier = Modifier
@@ -200,9 +264,10 @@ fun CalendarScreen(
             .padding(horizontal = 24.dp)
             .padding(top = 18.dp, bottom = 110.dp)
     ) {
-        CalendarHeader()
-
-        Spacer(modifier = Modifier.height(10.dp))
+        if(showHeader){
+            CalendarHeader()
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
         CalendarModeSection(
             selectedMode = calendarMode,
@@ -225,32 +290,14 @@ fun CalendarScreen(
             selectedDate = activeDate,
             classes = classesForSelectedDate,
             studySessions = studySessionsForSelectedDate,
+            assignments = assignmentsForSelectedDate,
             events = customEventsForSelectedDate,
             reminderCampusEvents = reminderEventsForSelectedDate,
             onTodayClick = { viewModel.onDateSelected(today) },
             onClassClick = ::openClassEditor,
             onStudySessionClick = ::openStudySessionEditor,
+            onAssignmentClick = ::openAssignmentEditor,
             onEventClick = ::openEventEditor
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        androidx.compose.material3.HorizontalDivider(
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        CalendarQuickAccessCards(
-            onClassesClick = {
-                selectedQuickAccessType = CalendarQuickAccessType.CLASSES
-            },
-            onStudyClick = {
-                selectedQuickAccessType = CalendarQuickAccessType.STUDY
-            },
-            onEventsClick = {
-                selectedQuickAccessType = CalendarQuickAccessType.EVENTS
-            }
         )
     }
 
@@ -258,7 +305,8 @@ fun CalendarScreen(
         CalendarQuickAccessPopup(
             type = quickAccessType,
             selectedDate = activeDate,
-            classes = classesForSelectedDate,
+            classes = visibleClassItems,
+            syncedCanvasClassNames = syncedCanvasClassNames,
             studySessions = studySessionsForSelectedDate,
             events = eventsForSelectedDate,
             onDismiss = { selectedQuickAccessType = null },
@@ -284,6 +332,10 @@ fun CalendarScreen(
             onClassClick = { classItem ->
                 selectedQuickAccessType = null
                 openClassEditor(classItem)
+            },
+            onCanvasClassClick = { canvasClassName ->
+                selectedQuickAccessType = null
+                openCanvasClassMeetingCreator(canvasClassName)
             },
             onStudySessionClick = { session ->
                 selectedQuickAccessType = null
@@ -379,9 +431,15 @@ fun CalendarScreen(
             onClassNameChange = { className = it },
             classStartTime = classStartTime,
             classEndTime = classEndTime,
+            classItems = visibleClassItems,
             selectedMeetingDays = selectedMeetingDays,
             onMeetingDaysChange = { selectedMeetingDays = it },
-            weekdayOptions = weekdayOptions,
+            onExistingClassSelected = { existing ->
+                editingClass = existing
+                classStartTime = existing.startTime
+                classEndTime = existing.endTime
+                selectedMeetingDays = existing.meetingDays.toSet()
+            },
             onPickStartTime = {
                 openTimePicker(context) { picked -> classStartTime = picked }
             },
@@ -408,6 +466,23 @@ fun CalendarScreen(
                     }
 
                     if (classToEdit == null) {
+                        val hasDuplicateMeeting = hasDuplicateClassMeeting(
+                            classToEdit = classToEdit,
+                            name = className,
+                            meetingDays = meetingDaysList,
+                            startTime = classStartTime,
+                            endTime = classEndTime
+                        )
+
+                        if (hasDuplicateMeeting) {
+                            Toast.makeText(
+                                context,
+                                "This class meeting already exists.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            return@ClassDialog
+                        }
+
                         viewModel.addClass(
                             name = className,
                             meetingDays = meetingDaysList,
@@ -477,13 +552,12 @@ fun CalendarScreen(
         StudySessionDialog(
             editingSession = editingSession,
             date = dateStr,
-            className = sessionClassName,
-            onClassNameChange = { sessionClassName = it },
             topic = sessionTopic,
             onTopicChange = { sessionTopic = it },
             startTime = sessionStartTime,
-            location = sessionLocation,
-            onLocationChange = { sessionLocation = it },
+            className = sessionClassName,
+            classItems = visibleClassItems,
+            onClassNameChange = { sessionClassName = it },
             onPickStartTime = { openTimePicker(context) { picked -> sessionStartTime = picked } },
             onDismiss = { showStudySessionDialog = false; resetStudySessionForm() },
             onConfirm = {
@@ -555,12 +629,14 @@ private fun buildAgendaActivityCountByDate(
     context: android.content.Context,
     currentMonth: YearMonth,
     classes: List<ClassItem>,
+    assignments: List<ScheduleItem>,
     studySessions: List<StudySession>,
     customEvents: List<EventItem>,
     campusEvents: List<EventItem>
 ): Map<LocalDate, Int> {
     val counts = mutableMapOf<LocalDate, Int>()
 
+    addDatesToAgendaCountMap(counts, assignments.map { it.date })
     addDatesToAgendaCountMap(counts, studySessions.map { it.date })
     addDatesToAgendaCountMap(counts, customEvents.map { it.date })
     addDatesToAgendaCountMap(

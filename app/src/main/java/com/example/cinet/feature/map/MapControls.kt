@@ -20,21 +20,12 @@ import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.School
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,40 +62,22 @@ fun MapControls(
     onModeSelected: (TravelMode) -> Unit,
     routeDurations: RouteDurations,
     onShowBusSchedule: () -> Unit = {},
-    friends: List<UserProfile>
+    friends: List<UserProfile>,
+    onRemoveLocation: ((CampusLocation) -> Unit)? = null,
+    photoUrl: String = ""
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        FilterMenu(
-            categories = campusRegistry.keys.map { it.uppercase() }.toSet() + "TRANSIT",
-            activeFilters = activeFilters,
-            onFiltersChanged = onFiltersChanged
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Box(Modifier.weight(1f)) {
-            SearchLocationBar(
-                textFieldState = searchState.textFieldState,
-                searchResults = searchState.results,
-                onSearch = searchState.onSearch
-            )
-        }
-
         DirectionsPopup(
             location = selectedLocation,
             onDismiss = onDismissPopup,
             onModeSelected = onModeSelected,
             routeDurations = routeDurations,
             onShowBusSchedule = onShowBusSchedule,
-            friends = friends
+            friends = friends,
+            onRemoveLocation = onRemoveLocation,
+            photoUrl = photoUrl
         )
     }
-}
+
 
 // -------------------- Filter menu --------------------
 
@@ -122,7 +95,7 @@ fun FilterMenu(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
-        modifier = Modifier.size(56.dp)
+        modifier = Modifier.size(44.dp)
     ) {
         IconButton(onClick = { showDialog = true }) {
             Icon(
@@ -139,7 +112,7 @@ fun FilterMenu(
         ) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.secondary,
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp,
             ) {
                 Column(
@@ -157,7 +130,7 @@ fun FilterMenu(
                             modifier = Modifier
                                 .padding(16.dp),
                             style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSecondary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         ElevatedButton(
                             onClick = { onFiltersChanged(emptySet()) },
@@ -173,14 +146,14 @@ fun FilterMenu(
                         ) {
                             Text(
                                 text = "Clear",
-                                color = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.8f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                                 style = MaterialTheme.typography.labelLarge,
                                 maxLines = 1,
                                 softWrap = false
                             )
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surface)
+
                     Spacer(modifier = Modifier.padding(start = 2.dp))
                     categories.forEach { category ->
                         val isSelected = activeFilters.contains(category)
@@ -191,7 +164,8 @@ fun FilterMenu(
                             Icon(
                                 imageVector = categoryIcons[category.uppercase().trim()] ?: Icons.Default.Place,
                                 contentDescription = null,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(28.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.padding(start = 6.dp))
                             Text(
@@ -201,7 +175,7 @@ fun FilterMenu(
                                         word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                                     },
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSecondary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.weight(1f))
                             Switch(
@@ -213,12 +187,12 @@ fun FilterMenu(
                                         activeFilters - category
                                     }
                                     onFiltersChanged(newFilters)
-                                },
-                                colors = SwitchDefaults.colors(
+                                }
+                                /*colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
                                     checkedTrackColor = MaterialTheme.colorScheme.secondary,
                                     uncheckedTrackColor = Color.White
-                                )
+                                )*/
                             )
                         }
                     }
@@ -235,7 +209,8 @@ private fun categoryIconMap(): Map<String, ImageVector> = mapOf(
     "ACADEMIC" to Icons.Default.School,
     "COMMUTER_PARKING" to Icons.Default.LocalParking,
     "DINING" to Icons.Default.Restaurant,
-    "TRANSIT" to Icons.Default.DirectionsBus
+    "TRANSIT" to Icons.Default.DirectionsBus,
+    "SHARED" to Icons.Default.PersonPin
 )
 
 // -------------------- Overlay: center-self button --------------------
@@ -274,7 +249,7 @@ fun CenterCamera(
 @Composable
 fun PreviewFilter() {
     CINetTheme(darkTheme = true) {
-        val sampleCategories = setOf("ACADEMIC", "DINING", "TRANSIT", "COMMUTER_PARKING")
+        val sampleCategories = setOf("ACADEMIC", "DINING", "TRANSIT", "COMMUTER_PARKING", "SHARED")
         var activeFilters by remember { mutableStateOf(setOf("ACADEMIC")) }
 
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -23,14 +23,16 @@ private val pronounOptions = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileSetupScreen(
-    onSaveProfile: (nickname: String, major: String, pronouns: String) -> Unit
+    onSaveProfile: (nickname: String, major: String, minor: String, pronouns: String) -> Unit
 ) {
     var nickname by remember { mutableStateOf("") }
     var major by remember { mutableStateOf("") }
+    var minor by remember { mutableStateOf("")}
     var selectedPronouns by remember { mutableStateOf(pronounOptions.first()) }
     var pronounsExpanded by remember { mutableStateOf(false) }
     var nicknameError by remember { mutableStateOf(false) }
     var majorError by remember { mutableStateOf(false) }
+    var minorError by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -87,6 +89,22 @@ fun ProfileSetupScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
+            OutlinedTextField(
+                value = minor,
+                onValueChange = {
+                    minor = it
+                    minorError = false
+                },
+                label = { Text("Minor") },
+                singleLine = true,
+                isError = minorError,
+                supportingText = if (minorError) {
+                    { Text("Minor is required") }
+                } else null,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
             ExposedDropdownMenuBox(
                 expanded = pronounsExpanded,
                 onExpandedChange = { pronounsExpanded = it },
@@ -126,7 +144,7 @@ fun ProfileSetupScreen(
                     nicknameError = nickname.isBlank()
                     majorError = major.isBlank()
                     if (!nicknameError && !majorError) {
-                        onSaveProfile(nickname.trim(), major.trim(), selectedPronouns)
+                        onSaveProfile(nickname.trim(), major.trim(), minor.trim(),selectedPronouns)
                     }
                 },
                 modifier = Modifier.fillMaxWidth()

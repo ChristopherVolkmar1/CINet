@@ -37,6 +37,7 @@ import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.Locale
+import androidx.compose.ui.graphics.lerp
 
 /** Shows the Day, Week, and Month selector as a pill control. */
 @Composable
@@ -125,7 +126,7 @@ private fun CalendarModeButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent
+    val containerColor = if (isSelected) Color.White else Color.Transparent
     val textColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary
 
     Box(
@@ -140,7 +141,7 @@ private fun CalendarModeButton(
             text = mode.displayName(),
             color = textColor,
             style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
     }
@@ -279,14 +280,14 @@ private fun DayCalendarBody(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface),
+                    .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = selectedDate.dayOfMonth.toString(),
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -417,7 +418,7 @@ private fun MonthCalendarBody(
     )
 }
 
-/** Wraps calendar view pieces in a filled purple rounded card. */
+/** Wraps calendar view pieces in a filled rounded card. */
 @Composable
 private fun PurpleSectionCard(
     modifier: Modifier = Modifier,
@@ -427,7 +428,13 @@ private fun PurpleSectionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        colors = CardDefaults.cardColors(
+            containerColor = lerp(
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.primary,
+                0.80f
+            )
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -458,7 +465,7 @@ private fun HeaderWithArrows(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimary
         )
 
@@ -483,7 +490,7 @@ private fun NavigationButton(
             text = symbol,
             color = MaterialTheme.colorScheme.onPrimary,
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -506,7 +513,7 @@ private fun WeekdayHeader(firstDayOfWeek: DayOfWeek) {
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -532,7 +539,7 @@ private fun WeekStripDate(
             text = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
 
@@ -542,14 +549,14 @@ private fun WeekStripDate(
             modifier = Modifier
                 .size(if (isSelected) 38.dp else 34.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent),
+                .background(if (isSelected) Color.White else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = date.dayOfMonth.toString(),
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
         }
@@ -619,14 +626,14 @@ private fun MonthDateCell(
             modifier = Modifier
                 .size(if (isSelected) 26.dp else 22.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent),
+                .background(if (isSelected) Color.White else Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.Bold
             )
         }
 

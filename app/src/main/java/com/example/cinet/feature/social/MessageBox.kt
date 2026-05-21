@@ -16,8 +16,11 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Poll
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -46,6 +49,9 @@ fun MessageBox(
     onSendMessage: () -> Unit,
     studySelected: () -> Unit,
     eventSelected: () -> Unit,
+    onAttachmentClick: () -> Unit,
+    sendUserLocation: () -> Unit,
+    pollCreation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -56,7 +62,7 @@ fun MessageBox(
         verticalAlignment = Alignment.Bottom
     ) {
         // Study/Event invite pop up buttons
-        Box() {
+        Box {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary,
@@ -75,7 +81,10 @@ fun MessageBox(
                 expanded = showMenu,
                 onDismiss = { showMenu = false },
                 onStudyClick = studySelected,
-                onEventClick = eventSelected
+                onEventClick = eventSelected,
+                onAttachmentClick = onAttachmentClick,
+                sendUserLocation = sendUserLocation,
+                pollCreation = pollCreation,
             )
         }
         // Message bar section
@@ -124,6 +133,7 @@ fun MessageBox(
                 )
             }
         }
+        Spacer(modifier = Modifier.padding(bottom = 8.dp))
     }
 }
 @Composable
@@ -131,30 +141,57 @@ fun AddAttachment(
     expanded: Boolean,
     onStudyClick: () -> Unit,
     onEventClick: () -> Unit,
+    onAttachmentClick: () -> Unit,
+    sendUserLocation: () -> Unit,
+    pollCreation: () -> Unit,
     onDismiss: () -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        offset = DpOffset(x = 0.dp, y = (-8).dp)
     ) {
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss,
-            offset = DpOffset(x = 0.dp, y = -8.dp)
-        ) {
-            DropdownMenuItem(
-                text = { Text("Study Invite")},
-                leadingIcon = { Icon(Icons.Default.School, "Study Invite") },
-                onClick = {
-                    onStudyClick()
-                    onDismiss()
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Event Invite")},
-                leadingIcon = { Icon(Icons.Default.Event, "Event Invite") },
-                onClick = {
-                    onEventClick()
-                    onDismiss()
-                }
-            )
-        }
+        DropdownMenuItem(
+            text = { Text("Study Invite")},
+            leadingIcon = { Icon(Icons.Default.School, "Study Invite") },
+            onClick = {
+                onStudyClick()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Event Invite")},
+            leadingIcon = { Icon(Icons.Default.Event, "Event Invite") },
+            onClick = {
+                onEventClick()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Create a Poll") },
+            leadingIcon = { Icon(Icons.Default.Poll, contentDescription = "Create a Poll") },
+            onClick = {
+                pollCreation()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Share your location") },
+            leadingIcon = { Icon(Icons.Default.ShareLocation, contentDescription = "Share your location") },
+            onClick = {
+                sendUserLocation()
+                onDismiss()
+            }
+        )
+        DropdownMenuItem(
+            text = { Text("Attach File") },
+            leadingIcon = { Icon(Icons.Default.AttachFile, contentDescription = "Attach File") },
+            onClick = {
+                onAttachmentClick()
+                onDismiss()
+            }
+        )
+    }
 }
 
 @Preview(showBackground = true, showSystemUi = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -170,7 +207,10 @@ fun PreviewMessageBox() {
                 state = textFieldState,
                 onSendMessage = { },
                 studySelected = { },
-                eventSelected = { }
+                eventSelected = { },
+                onAttachmentClick = { },
+                sendUserLocation = { },
+                pollCreation = {}
             )
         }
     }

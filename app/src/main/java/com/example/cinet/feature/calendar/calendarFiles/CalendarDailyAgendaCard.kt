@@ -2,17 +2,7 @@ package com.example.cinet.feature.calendar.calendarFiles
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
@@ -35,6 +25,9 @@ import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.study.StudySession
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.example.cinet.feature.calendar.schedule.ScheduleItem
+import com.example.cinet.feature.calendar.event.EventSource
+import androidx.compose.ui.graphics.lerp
 
 /** Shows the selected day's classes, study sessions, custom events, and toggled campus events. */
 @Composable
@@ -42,11 +35,13 @@ fun CalendarDailyAgendaCard(
     selectedDate: LocalDate,
     classes: List<ClassItem>,
     studySessions: List<StudySession>,
+    assignments: List<ScheduleItem>,
     events: List<EventItem>,
     reminderCampusEvents: List<EventItem>,
     onTodayClick: () -> Unit,
     onClassClick: (ClassItem) -> Unit,
     onStudySessionClick: (StudySession) -> Unit,
+    onAssignmentClick: (ScheduleItem) -> Unit,
     onEventClick: (EventItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -54,19 +49,23 @@ fun CalendarDailyAgendaCard(
         selectedDate,
         classes,
         studySessions,
+        assignments,
         events,
         reminderCampusEvents,
         onClassClick,
         onStudySessionClick,
+        onAssignmentClick,
         onEventClick
     ) {
         buildAgendaItems(
             classes = classes,
             studySessions = studySessions,
+            assignments = assignments,
             events = events,
             reminderCampusEvents = reminderCampusEvents,
             onClassClick = onClassClick,
             onStudySessionClick = onStudySessionClick,
+            onAssignmentClick = onAssignmentClick,
             onEventClick = onEventClick
         )
     }
@@ -114,7 +113,7 @@ private fun AgendaDateHeader(
             text = title,
             modifier = Modifier.weight(1f),
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 22.sp,
             lineHeight = 26.sp,
             maxLines = 1,
@@ -124,7 +123,7 @@ private fun AgendaDateHeader(
         Text(
             text = buildEventCountLabel(itemCount),
             color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             fontSize = 15.sp,
             modifier = Modifier.clickable(onClick = onTodayClick),
             maxLines = 1
@@ -140,7 +139,11 @@ private fun EmptyAgendaMessage(selectedDate: LocalDate) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Column(
@@ -152,7 +155,7 @@ private fun EmptyAgendaMessage(selectedDate: LocalDate) {
             Text(
                 text = if (isToday) "No saved calendar items for today yet" else "No saved calendar items for this day yet",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimary
             )
 
@@ -176,7 +179,11 @@ private fun AgendaEventCard(item: AgendaItem) {
             .height(62.dp)
             .clickable { item.onClick() },
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.primary,
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        ),
         shadowElevation = 4.dp
     ) {
         Row(
@@ -200,7 +207,7 @@ private fun AgendaEventCard(item: AgendaItem) {
                     text = item.title,
                     fontSize = 15.sp,
                     lineHeight = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -257,10 +264,12 @@ private fun AgendaEventCard(item: AgendaItem) {
 private fun buildAgendaItems(
     classes: List<ClassItem>,
     studySessions: List<StudySession>,
+    assignments: List<ScheduleItem>,
     events: List<EventItem>,
     reminderCampusEvents: List<EventItem>,
     onClassClick: (ClassItem) -> Unit,
     onStudySessionClick: (StudySession) -> Unit,
+    onAssignmentClick: (ScheduleItem) -> Unit,
     onEventClick: (EventItem) -> Unit
 ): List<AgendaItem> {
     val classItems = classes.map { classItem ->
@@ -286,11 +295,32 @@ private fun buildAgendaItems(
         )
     }
 
+    val assignmentItems = assignments.map { assignment ->
+        val subtitle = if (assignment.canvasId != null) {
+            "Assignment • ${assignment.className} • Canvas"
+        } else {
+            "Assignment • ${assignment.className}"
+        }
+        AgendaItem(
+            timeText = "Due ${assignment.dueTime}",
+            title = assignment.assignmentName,
+            subtitle = subtitle,
+            location = "",
+            sortValue = parseTimeToMinutes(assignment.dueTime),
+            onClick = { onAssignmentClick(assignment) }
+        )
+    }
+
     val customEventItems = events.map { event ->
+        val typeLabel = when (event.source) {
+            EventSource.CANVAS -> "Canvas Event"
+            EventSource.CAMPUS -> "Campus Event"
+            else -> "Custom Event"
+        }
         AgendaItem(
             timeText = if (event.allDay) "All day" else event.time.ifBlank { "Event" },
             title = event.name,
-            subtitle = "Custom Event",
+            subtitle = typeLabel,
             location = event.location,
             sortValue = if (event.allDay) Int.MIN_VALUE else parseTimeToMinutes(event.time),
             onClick = { onEventClick(event) }
@@ -308,7 +338,7 @@ private fun buildAgendaItems(
         )
     }
 
-    return (classItems + studyItems + customEventItems + campusReminderItems)
+    return (classItems + studyItems + assignmentItems + customEventItems + campusReminderItems)
         .sortedWith(compareBy<AgendaItem> { it.sortValue }.thenBy { it.title.lowercase() })
 }
 

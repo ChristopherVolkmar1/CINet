@@ -2,6 +2,7 @@ package com.example.cinet.feature.map
 
 import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,10 +30,12 @@ import androidx.compose.material.icons.filled.Dining
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.DirectionsTransit
 import androidx.compose.material.icons.filled.LocalParking
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,18 +51,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.cinet.data.model.UserProfile
 import com.example.cinet.ui.theme.CINetTheme
 import com.google.maps.model.TravelMode
@@ -87,7 +96,9 @@ fun DirectionsPopup(
     onModeSelected: (TravelMode) -> Unit,
     routeDurations: RouteDurations,
     onShowBusSchedule: () -> Unit = {},
-    friends: List<UserProfile>
+    friends: List<UserProfile>,
+    onRemoveLocation: ((CampusLocation) -> Unit)? = null,
+    photoUrl: String = "",
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     if (location == null) return
@@ -106,7 +117,15 @@ fun DirectionsPopup(
                 .padding(start = 24.dp, end = 24.dp, bottom = 30.dp)
         ) {
             Spacer(modifier = Modifier.width(2.dp))
-            LocationHeader(location, onShowBusSchedule)
+            LocationHeader(
+                location,
+                onShowBusSchedule,
+                onRemoveLocation = { loc ->
+                    onRemoveLocation?.invoke(loc)
+                    onDismiss()
+                },
+                photoUrl = photoUrl
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surface)
@@ -143,13 +162,15 @@ fun DirectionsPopup(
 
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surface)
-            if (location.category != "COMMUTER_PARKING") {
+            if (location.category != "COMMUTER_PARKING" && location.category != "SHARED") {
                 Spacer(modifier = Modifier.height(16.dp))
                 QuickInfo(location)
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            ShareLocation(friends = friends, location = location)
-            Spacer(modifier = Modifier.height(4.dp))
+            if (location.category != "SHARED") {
+                Spacer(modifier = Modifier.height(16.dp))
+                ShareLocation(friends = friends, location = location)
+                Spacer(modifier = Modifier.height(4.dp))
+            }
         }
     }
 }
@@ -160,6 +181,7 @@ private fun categoryIcon(category: String): ImageVector = when (category) {
     "COMMUTER_PARKING" -> Icons.Default.LocalParking
     "DINING" -> Icons.Default.Dining
     "TRANSIT" -> Icons.Default.DirectionsTransit
+    "SHARED" -> Icons.Default.LocationOn
     else -> Icons.Default.School
 }
 
@@ -214,7 +236,7 @@ private fun StatusBox(status: String, modifier: Modifier = Modifier) {
             Text(
                 text = status.uppercase(),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSecondary,
                 letterSpacing = 1.sp,
                 maxLines = 1
@@ -223,7 +245,12 @@ private fun StatusBox(status: String, modifier: Modifier = Modifier) {
     }
 }
 @Composable
-private fun LocationHeader(location: CampusLocation, onShowBusSchedule: () -> Unit = {}) {
+private fun LocationHeader(
+    location: CampusLocation,
+    onShowBusSchedule: () -> Unit = {},
+    onRemoveLocation: ((CampusLocation) -> Unit)? = null,
+    photoUrl: String = ""
+) {
     val status = getStatusForLocation(location.hours)
     Box(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -232,11 +259,26 @@ private fun LocationHeader(location: CampusLocation, onShowBusSchedule: () -> Un
                 .fillMaxWidth()
                 .padding(top = 12.dp)
         ) {
-            Icon(
-                categoryIcon(location.category),
-                contentDescription = null,
-                modifier = Modifier.size(50.dp)
-            )
+            if (location.category == "SHARED" && photoUrl.isNotBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(photoUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.onSecondary, CircleShape)
+                )
+            } else {
+                Icon(
+                    categoryIcon(location.category),
+                    contentDescription = null,
+                    modifier = Modifier.size(50.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(24.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -261,13 +303,27 @@ private fun LocationHeader(location: CampusLocation, onShowBusSchedule: () -> Un
                 }
             }
         }
-        if (location.category != "COMMUTER_PARKING") {
+        if (location.category != "COMMUTER_PARKING" && location.category != "SHARED") {
             StatusBox(
                 status,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(y = -24.dp)
+                    .offset(y = (-24).dp)
             )
+        } else if (location.category == "SHARED") {
+            ElevatedButton(
+                onClick = { onRemoveLocation?.invoke(location) },
+                modifier = Modifier
+                    .width(120.dp)
+                    .align(Alignment.TopEnd)
+                    .offset(y = (-30).dp),
+                colors = ButtonDefaults.elevatedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer, // Background
+                    contentColor = MaterialTheme.colorScheme.onSecondary    // Text/Icon
+                )
+            ) {
+                Text("Delete", color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
         }
     }
 }
