@@ -29,6 +29,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState
+import com.example.cinet.feature.map.MapTopBarControls
 import com.example.cinet.feature.social.ConversationTopBarState
 
 
@@ -58,16 +60,25 @@ internal fun AppTopBar(
         ) {
             val newConversationTopBarState = state.newConversationTopBarState
             val conversationTopBarState = state.conversationTopBarState
-            if (state.showBackButton) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
-                    )
+            val mapTopBarState = state.mapTopBarState
+            val calendarTopBarState = state.calendarTopBarState
+
+            // Map screen: MapTopBarControls is a RowScope extension that owns
+            // the entire remaining width (search bar + filter button). No title
+            // or separate action slot needed when it is active.
+            if (mapTopBarState != null) {
+                MapTopBarControls(state = mapTopBarState)
+            } else {
+                if (state.showBackButton) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-            }
 
             when {
                 conversationTopBarState != null -> {
@@ -111,19 +122,28 @@ internal fun AppTopBar(
                 }
             }
 
-            if (conversationTopBarState != null) {
-                ConversationTopBarActions(state = conversationTopBarState)
-            } else if (newConversationTopBarState != null) {
-                NewConversationTopBarAction(state = newConversationTopBarState)
-            } else if (state.showSocialActions) {
-                SocialTopBarActions(
-                    pendingRequestCount = state.pendingRequestCount,
-                    showCanvasMessages = state.showCanvasMessagesAction,
-                    onFriendsClick = onFriendsClick,
-                    onNewMessageClick = onNewMessageClick,
-                    onCanvasMessagesClick = onCanvasMessagesClick
-                )
+            // Right-side actions — one branch wins, in priority order.
+            when {
+                conversationTopBarState != null ->
+                    ConversationTopBarActions(state = conversationTopBarState)
+
+                newConversationTopBarState != null ->
+                    NewConversationTopBarAction(state = newConversationTopBarState)
+
+                state.showSocialActions ->
+                    SocialTopBarActions(
+                        pendingRequestCount = state.pendingRequestCount,
+                        showCanvasMessages = state.showCanvasMessagesAction,
+                        onFriendsClick = onFriendsClick,
+                        onNewMessageClick = onNewMessageClick,
+                        onCanvasMessagesClick = onCanvasMessagesClick
+                    )
+
+                // Restored: Calendar quick-access buttons (Classes / Study / Events).
+                calendarTopBarState != null ->
+                    CalendarTopBarActions(state = calendarTopBarState)
             }
+            } // end else (non-map screens)
         }
     }
 }
@@ -254,6 +274,20 @@ private fun ConversationTopBarActions(state: ConversationTopBarState) {
                 }
             }
         }
+    }
+}
+
+// Restored: Shows the Classes / Study / Events quick-access buttons on the Calendar screen.
+@Composable
+private fun CalendarTopBarActions(state: CalendarTopBarState) {
+    IconButton(onClick = state.onClassesClick) {
+        Icon(Icons.Default.School, contentDescription = "Classes", tint = Color.White)
+    }
+    IconButton(onClick = state.onStudyClick) {
+        Icon(Icons.Default.MenuBook, contentDescription = "Study", tint = Color.White)
+    }
+    IconButton(onClick = state.onEventsClick) {
+        Icon(Icons.Default.CalendarMonth, contentDescription = "Events", tint = Color.White)
     }
 }
 

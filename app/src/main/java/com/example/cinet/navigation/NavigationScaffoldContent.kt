@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.example.cinet.data.remote.canvas.CanvasConversation
 import com.example.cinet.feature.clubs.ClubItem
 import com.example.cinet.feature.home.news.NewsArticle
+import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.MapTopBarState
 
@@ -36,6 +37,8 @@ internal fun NavigationScaffoldContent(
     onClubsBack: () -> Unit,
     onCanvasConversationClick: (CanvasConversation) -> Unit,
     onMapTopBarStateChanged: (MapTopBarState?) -> Unit,
+    // Restored: forwards CalendarScreen's top-bar state up to AppTopBar.
+    onCalendarTopBarStateChanged: (CalendarTopBarState?) -> Unit,
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -107,7 +110,8 @@ internal fun NavigationScaffoldContent(
 
                     else -> NavigationScreenRoute(
                         uiState = uiState,
-                        callbacks = routeCallbacks
+                        callbacks = routeCallbacks,
+                        onCalendarTopBarStateChanged = onCalendarTopBarStateChanged
                     )
                 }
             }
