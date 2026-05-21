@@ -7,8 +7,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,22 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.TextButton
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState
-import com.example.cinet.feature.map.MapTopBarControls
 import com.example.cinet.feature.social.ConversationTopBarState
-
 
 // Draws the persistent page title bar used across the app.
 @Composable
@@ -40,10 +38,15 @@ internal fun AppTopBar(
     state: NavigationTopBarState,
     isHomeScreen: Boolean = false,
     nickname: String = "",
+    mapTopBarContent: (@Composable RowScope.() -> Unit)? = null,
+    calendarTopBarContent: (@Composable RowScope.() -> Unit)? = null,
+    settingsTopBarActions: (@Composable RowScope.() -> Unit)? = null,
     onBack: () -> Unit,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
     onCanvasMessagesClick: () -> Unit,
+    onSettingsCanvasClick: () -> Unit = {},
+    onSettingsSignOutClick: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -60,25 +63,18 @@ internal fun AppTopBar(
         ) {
             val newConversationTopBarState = state.newConversationTopBarState
             val conversationTopBarState = state.conversationTopBarState
-            val mapTopBarState = state.mapTopBarState
-            val calendarTopBarState = state.calendarTopBarState
 
-            // Map screen: MapTopBarControls is a RowScope extension that owns
-            // the entire remaining width (search bar + filter button). No title
-            // or separate action slot needed when it is active.
-            if (mapTopBarState != null) {
-                MapTopBarControls(state = mapTopBarState)
-            } else {
-                if (state.showBackButton) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
+            if (state.showBackButton) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
+                    )
                 }
+
+                Spacer(modifier = Modifier.width(4.dp))
+            }
 
             when {
                 conversationTopBarState != null -> {
@@ -99,6 +95,25 @@ internal fun AppTopBar(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
+                }
+
+                calendarTopBarContent != null -> {
+                    Text(
+                        text = state.title,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        lineHeight = 50.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    calendarTopBarContent()
+                }
+
+                mapTopBarContent != null -> {
+                    mapTopBarContent()
                 }
 
                 isHomeScreen -> {
@@ -122,7 +137,6 @@ internal fun AppTopBar(
                 }
             }
 
-            // Right-side actions — one branch wins, in priority order.
             when {
                 conversationTopBarState != null ->
                     ConversationTopBarActions(state = conversationTopBarState)
@@ -139,11 +153,15 @@ internal fun AppTopBar(
                         onCanvasMessagesClick = onCanvasMessagesClick
                     )
 
-                // Restored: Calendar quick-access buttons (Classes / Study / Events).
-                calendarTopBarState != null ->
-                    CalendarTopBarActions(state = calendarTopBarState)
+                state.showSettingsActions ->
+                    SettingsTopBarActions(
+                        onCanvasSyncClick = onSettingsCanvasClick,
+                        onSignOutClick = onSettingsSignOutClick
+                    )
+
+                settingsTopBarActions != null ->
+                    settingsTopBarActions()
             }
-            } // end else (non-map screens)
         }
     }
 }
@@ -186,8 +204,13 @@ private fun ConversationTopBarContent(
     val initial = state.title.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
 
     Row(
-        modifier = modifier
-            .then(if (state.onTitleClick != null) Modifier.clickable { state.onTitleClick.invoke() } else Modifier),
+        modifier = modifier.then(
+            if (state.onTitleClick != null) {
+                Modifier.clickable { state.onTitleClick.invoke() }
+            } else {
+                Modifier
+            }
+        ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (!state.isGroup && photoUrl != null) {
@@ -212,10 +235,17 @@ private fun ConversationTopBarContent(
                     .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = initial, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = initial,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
+
         Spacer(modifier = Modifier.width(10.dp))
+
         Text(
             text = state.title,
             color = Color.White,
@@ -227,67 +257,100 @@ private fun ConversationTopBarContent(
     }
 }
 
-// Shows the action buttons for an open conversation (search, info, or more-options menu).
+// Shows the action buttons for an open conversation.
 @Composable
 private fun ConversationTopBarActions(state: ConversationTopBarState) {
     if (state.isGroup) {
-        // Group: PushPin (if pinned) + Search + Info
         if (state.onPinnedClick != null) {
             IconButton(onClick = state.onPinnedClick) {
-                Icon(Icons.Default.PushPin, contentDescription = "Pinned messages", tint = Color.White)
+                Icon(
+                    imageVector = Icons.Default.PushPin,
+                    contentDescription = "Pinned messages",
+                    tint = Color.White
+                )
             }
         }
+
         IconButton(onClick = state.onSearchClick) {
-            Icon(Icons.Default.Search, contentDescription = "Search messages", tint = Color.White)
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search messages",
+                tint = Color.White
+            )
         }
+
         if (state.onInfoClick != null) {
             IconButton(onClick = state.onInfoClick) {
-                Icon(Icons.Default.Info, contentDescription = "Group info", tint = Color.White)
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Group info",
+                    tint = Color.White
+                )
             }
         }
     } else {
-        // DM: MoreVert dropdown — Pinned Messages, Search Messages, Remove Friend
         var expanded by remember { mutableStateOf(false) }
+
         Box {
             IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More options",
+                    tint = Color.White
+                )
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
                 if (state.onPinnedClick != null) {
                     DropdownMenuItem(
                         text = { Text("Pinned Messages") },
-                        leadingIcon = { Icon(Icons.Default.PushPin, null) },
-                        onClick = { expanded = false; state.onPinnedClick.invoke() }
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.PushPin,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            state.onPinnedClick.invoke()
+                        }
                     )
                 }
+
                 DropdownMenuItem(
                     text = { Text("Search Messages") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    onClick = { expanded = false; state.onSearchClick() }
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        state.onSearchClick()
+                    }
                 )
+
                 if (state.onRemoveFriendClick != null) {
                     DropdownMenuItem(
                         text = { Text("Remove Friend") },
-                        leadingIcon = { Icon(Icons.Default.PersonRemove, null) },
-                        onClick = { expanded = false; state.onRemoveFriendClick.invoke() }
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.PersonRemove,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            state.onRemoveFriendClick.invoke()
+                        }
                     )
                 }
             }
         }
-    }
-}
-
-// Restored: Shows the Classes / Study / Events quick-access buttons on the Calendar screen.
-@Composable
-private fun CalendarTopBarActions(state: CalendarTopBarState) {
-    IconButton(onClick = state.onClassesClick) {
-        Icon(Icons.Default.School, contentDescription = "Classes", tint = Color.White)
-    }
-    IconButton(onClick = state.onStudyClick) {
-        Icon(Icons.Default.MenuBook, contentDescription = "Study", tint = Color.White)
-    }
-    IconButton(onClick = state.onEventsClick) {
-        Icon(Icons.Default.CalendarMonth, contentDescription = "Events", tint = Color.White)
     }
 }
 
@@ -341,6 +404,7 @@ private fun SocialTopBarActions(
 
         Spacer(modifier = Modifier.width(12.dp))
     }
+
     BadgedBox(
         badge = {
             if (pendingRequestCount > 0) {
@@ -369,5 +433,32 @@ private fun SocialTopBarActions(
                 modifier = Modifier.size(32.dp)
             )
         }
+    }
+}
+
+// Shows the Canvas Sync and Sign Out actions used by the Settings page.
+@Composable
+private fun SettingsTopBarActions(
+    onCanvasSyncClick: () -> Unit,
+    onSignOutClick: () -> Unit,
+) {
+    IconButton(onClick = onCanvasSyncClick) {
+        Icon(
+            imageVector = Icons.Default.Sync,
+            contentDescription = "Canvas Sync",
+            tint = Color.White,
+            modifier = Modifier.size(32.dp)
+        )
+    }
+
+    Spacer(modifier = Modifier.width(12.dp))
+
+    IconButton(onClick = onSignOutClick) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.Logout,
+            contentDescription = "Sign out",
+            tint = Color.White,
+            modifier = Modifier.size(32.dp)
+        )
     }
 }

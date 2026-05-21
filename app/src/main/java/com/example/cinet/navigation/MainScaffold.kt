@@ -405,6 +405,10 @@ internal fun MainScaffold(
                     !showNewConversation &&
                     !showSocialScreen,
             showCanvasMessagesAction = showCanvasMessagesAction,
+            showSettingsActions = currentScreen == Screen.Settings &&
+                    !showCanvasScreen &&
+                    !showProfileEdit &&
+                    selectedProfile == null,
             pendingRequestCount = pendingRequestCount,
             isHomeScreen = currentScreen == Screen.Home &&
                     selectedNewsArticle == null &&
@@ -651,7 +655,7 @@ internal fun MainScaffold(
             if (selectedClub != null) selectedClub = null else showClubs = false
         },
         onCanvasConversationClick = { selectedCanvasConversation = it },
-        onMapTopBarStateChanged = { mapTopBarState = it },
-        onCalendarTopBarStateChanged = { calendarTopBarState = it },
+        onSettingsCanvasClick = routeCallbacks.onOpenCanvas,
+        onSettingsSignOutClick = routeCallbacks.onSignOut,
     )
 }

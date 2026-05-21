@@ -20,6 +20,9 @@ import com.example.cinet.feature.map.MapTopBarState
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.zIndex
+import androidx.compose.runtime.*
+import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarActions
+import com.example.cinet.feature.map.MapTopBarControls
 
 // Draws the scaffold, persistent top bar, bottom bar, map layer, and active page route.
 @Composable
@@ -39,10 +42,11 @@ internal fun NavigationScaffoldContent(
     onClubClick: (ClubItem) -> Unit,
     onClubsBack: () -> Unit,
     onCanvasConversationClick: (CanvasConversation) -> Unit,
-    onMapTopBarStateChanged: (MapTopBarState?) -> Unit,
-    // Restored: forwards CalendarScreen's top-bar state up to AppTopBar.
-    onCalendarTopBarStateChanged: (CalendarTopBarState?) -> Unit,
+    onSettingsCanvasClick: () -> Unit,
+    onSettingsSignOutClick: () -> Unit,
 ) {
+    var mapTopBarState by remember { mutableStateOf<MapTopBarState?>(null) }
+    var calendarTopBarState by remember { mutableStateOf<CalendarTopBarState?>(null) }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -54,9 +58,25 @@ internal fun NavigationScaffoldContent(
                         !uiState.isShowingClubs &&
                         !uiState.isShowingCanvasInbox,
                 nickname = uiState.userProfile.nickname,
+                mapTopBarContent = if (uiState.currentScreen == Screen.Map && mapTopBarState != null) {
+                    {
+                        MapTopBarControls(state = mapTopBarState!!)
+                    }
+                } else {
+                    null
+                },
+                calendarTopBarContent = if (uiState.currentScreen == Screen.Calendar && calendarTopBarState != null) {
+                    {
+                        CalendarTopBarActions(state = calendarTopBarState!!)
+                    }
+                } else {
+                    null
+                },
                 onFriendsClick = onTopBarFriendsClick,
                 onNewMessageClick = onTopBarNewMessageClick,
-                onCanvasMessagesClick = onTopBarCanvasMessagesClick
+                onCanvasMessagesClick = onTopBarCanvasMessagesClick,
+                onSettingsCanvasClick = onSettingsCanvasClick,
+                onSettingsSignOutClick = onSettingsSignOutClick
             )
         },
         bottomBar = {
@@ -89,7 +109,7 @@ internal fun NavigationScaffoldContent(
                 onBack = onMapBack,
                 onFinishedLoading = onMapFinishedLoading,
                 onRemoveExtraLocation = onRemoveExtraLocation,
-                onTopBarStateChanged = onMapTopBarStateChanged,
+                onTopBarStateChanged = { mapTopBarState = it }
             )
 
             if (uiState.currentScreen != Screen.Map) {
@@ -120,7 +140,7 @@ internal fun NavigationScaffoldContent(
                         else -> NavigationScreenRoute(
                             uiState = uiState,
                             callbacks = routeCallbacks,
-                            onCalendarTopBarStateChanged = onCalendarTopBarStateChanged
+                            onCalendarTopBarStateChanged = { calendarTopBarState = it }
                         )
                     }
                 }
