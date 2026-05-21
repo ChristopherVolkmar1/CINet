@@ -169,7 +169,7 @@ internal fun AppTopBar(
             }
         }
     }
-}
+
 
 // Shows the right-side action used by the New Message page.
 @Composable
