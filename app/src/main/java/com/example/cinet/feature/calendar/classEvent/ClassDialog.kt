@@ -15,11 +15,9 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.feature.calendar.calendarFiles.CalendarFirestoreRepository
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.SearchBar
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +29,7 @@ fun ClassDialog(
     classStartTime: String,
     classEndTime: String,
     onExistingClassSelected: (ClassItem) -> Unit = {},
+    classItems: List<ClassItem>,
     selectedMeetingDays: Set<String>,
     onMeetingDaysChange: (Set<String>) -> Unit,
     onPickStartTime: () -> Unit,
@@ -64,17 +63,6 @@ fun ClassDialog(
         "F" to "Fri"
     )
     var expanded by remember { mutableStateOf(false) }
-    var classList by remember { mutableStateOf<List<ClassItem>>(emptyList()) }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-        scope.launch {
-            try {
-                classList = CalendarFirestoreRepository().loadClasses()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
     AlertDialog(
         modifier = Modifier.width(850.dp),
         onDismissRequest = onDismiss,
@@ -82,143 +70,146 @@ fun ClassDialog(
             Text(if (editingClass == null) "Create Class" else "Edit Class")
         },
         text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState()).imePadding()){
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = it },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        OutlinedTextField(
-                            value = className,
-                            onValueChange = {onClassNameChange(it)},
-                            readOnly = false,
-                            label = { Text("Class Name") },
-                            placeholder = { Text("Select your class") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(MenuAnchorType.PrimaryEditable)
-                        )
-                        val filtering = classList.filter { it.name.contains(className, ignoreCase = true) }
-                        if (filtering.isNotEmpty()) {
-                            ExposedDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                filtering.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option.name) },
-                                        onClick = { onClassNameChange(option.name); onExistingClassSelected(option); expanded = false }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        days.forEach { day ->
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = day,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Checkbox(
-                                    checked = selectedMeetingDays.contains(dayDisplayToStored[day]),
-                                    onCheckedChange = { checked ->
-                                        val stored = dayDisplayToStored[day] ?: day
-                                        onMeetingDaysChange(
-                                            if (checked) selectedMeetingDays + stored
-                                            else selectedMeetingDays - stored
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = classStartTime,
-                            onValueChange = {},
-                            label = { Text("Start Time") },
-                            readOnly = true,
-                            singleLine = true,
-                            maxLines = 1,
-                            trailingIcon = {
-                                IconButton(onClick = onPickStartTime) {
-                                    Icon(Icons.Default.Schedule, contentDescription = "Pick time")
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        OutlinedTextField(
-                            value = classEndTime,
-                            onValueChange = {},
-                            label = { Text("End Time") },
-                            readOnly = true,
-                            singleLine = true,
-                            maxLines = 1,
-                            trailingIcon = {
-                                IconButton(onClick = onPickEndTime) {
-                                    Icon(Icons.Default.Schedule, contentDescription = "Pick time")
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    SearchBar(
-                        placeholderText = "Search Location",
-                        textFieldState = textFieldState,
-                        searchResults = academicNames,
-                        onSearch = { query ->
-                            locationField = academic.find {
-                                it.name.equals(query, ignoreCase = true)
-                            }
-                            textFieldState.edit { replace(0, length, query) }
-                        }
+            Column(modifier = Modifier.verticalScroll(rememberScrollState()).imePadding()){
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = className,
+                        onValueChange = {onClassNameChange(it)},
+                        readOnly = false,
+                        label = { Text("Class Name") },
+                        placeholder = { Text("Select your class") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(MenuAnchorType.PrimaryEditable)
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    HorizontalDivider()
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Reminders",
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1
-                            )
-
-                            Text(
-                                text = "Notify before class",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2
-                            )
+                    val filtering = classItems
+                        .filter { it.name.contains(className, ignoreCase = true) }
+                        .distinctBy { it.name }
+                        .sortedBy { it.name.lowercase() }
+                    if (filtering.isNotEmpty()) {
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            filtering.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.name) },
+                                    onClick = { onClassNameChange(option.name); onExistingClassSelected(option); expanded = false }
+                                )
+                            }
                         }
-
-                        Switch(
-                            checked = remindersEnabled,
-                            onCheckedChange = { remindersEnabled = it }
-                        )
                     }
                 }
-              },
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    days.forEach { day ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = day,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Checkbox(
+                                checked = selectedMeetingDays.contains(dayDisplayToStored[day]),
+                                onCheckedChange = { checked ->
+                                    val stored = dayDisplayToStored[day] ?: day
+                                    onMeetingDaysChange(
+                                        if (checked) selectedMeetingDays + stored
+                                        else selectedMeetingDays - stored
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = classStartTime,
+                        onValueChange = {},
+                        label = { Text("Start Time") },
+                        readOnly = true,
+                        singleLine = true,
+                        maxLines = 1,
+                        trailingIcon = {
+                            IconButton(onClick = onPickStartTime) {
+                                Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    OutlinedTextField(
+                        value = classEndTime,
+                        onValueChange = {},
+                        label = { Text("End Time") },
+                        readOnly = true,
+                        singleLine = true,
+                        maxLines = 1,
+                        trailingIcon = {
+                            IconButton(onClick = onPickEndTime) {
+                                Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SearchBar(
+                    placeholderText = "Search Location",
+                    textFieldState = textFieldState,
+                    searchResults = academicNames,
+                    onSearch = { query ->
+                        locationField = academic.find {
+                            it.name.equals(query, ignoreCase = true)
+                        }
+                        textFieldState.edit { replace(0, length, query) }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                HorizontalDivider()
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Reminders",
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1
+                        )
+
+                        Text(
+                            text = "Notify before class",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2
+                        )
+                    }
+
+                    Switch(
+                        checked = remindersEnabled,
+                        onCheckedChange = { remindersEnabled = it }
+                    )
+                }
+            }
+        },
         confirmButton = {},
 
         dismissButton = {
@@ -272,6 +263,7 @@ fun ClassDialogCreatePreview() {
         onClassNameChange = {},
         classStartTime = "9:00 AM",
         classEndTime = "10:15 AM",
+        classItems = emptyList(),
         selectedMeetingDays = setOf("M", "W"),
         onMeetingDaysChange = {},
         onPickStartTime = {},
@@ -299,6 +291,7 @@ fun ClassDialogEditPreview() {
         onClassNameChange = {},
         classStartTime = "11:00 AM",
         classEndTime = "12:15 PM",
+        classItems = emptyList(),
         selectedMeetingDays = setOf("T", "TH"),
         onMeetingDaysChange = {},
         onPickStartTime = {},

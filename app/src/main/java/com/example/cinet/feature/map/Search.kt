@@ -23,14 +23,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.example.cinet.ui.theme.CINetTheme
 import kotlin.String
 import androidx.compose.foundation.text.BasicTextField
@@ -109,18 +114,27 @@ fun SearchBar(
     val uniqueResults = remember(searchResults) { dedupeSearchResults(searchResults) }
     val showDropdown = isFocused && textFieldState.text.isNotEmpty() && uniqueResults.isNotEmpty()
 
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 4.dp,
+    // Track the rendered size of the input pill so the popup can match its width
+    // and sit just below it. Without this, the popup would be a default size and
+    // not aligned to the search bar.
+    var anchorSize by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 8.dp)
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { focusManager.clearFocus() })
-            }
+            .onGloballyPositioned { coords -> anchorSize = coords.size }
     ) {
-        Column {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                }
+        ) {
             SearchInputField(
                 placeholderText = placeholderText,
                 textFieldState = textFieldState,
@@ -131,18 +145,37 @@ fun SearchBar(
                     focusManager.clearFocus()
                 }
             )
+        }
 
-            if (showDropdown) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                uniqueResults.take(5).forEach { result ->
-                    SearchSuggestionItem(
-                        label = result,
-                        onClick = {
-                            onSearch(result)
-                            isFocused = false
-                            focusManager.clearFocus()
+        // The dropdown is hosted in a Popup rather than in the same Surface/Column
+        // as the input. Because the search bar now lives inside the AppTopBar's
+        // fixed-height 50.dp Row, an inline dropdown would be clipped to that
+        // height. A Popup renders in its own window, ignoring the parent's
+        // height constraints, and floats above whatever screen is below.
+        if (showDropdown) {
+            Popup(
+                alignment = Alignment.TopStart,
+                offset = IntOffset(0, anchorSize.height),
+                properties = PopupProperties(focusable = false)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.width(with(density) { anchorSize.width.toDp() })
+                ) {
+                    Column {
+                        uniqueResults.take(5).forEach { result ->
+                            SearchSuggestionItem(
+                                label = result,
+                                onClick = {
+                                    onSearch(result)
+                                    isFocused = false
+                                    focusManager.clearFocus()
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }
