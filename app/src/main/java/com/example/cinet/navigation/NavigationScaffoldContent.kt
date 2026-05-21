@@ -17,6 +17,9 @@ import com.example.cinet.feature.home.news.NewsArticle
 import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.MapTopBarState
+import androidx.compose.foundation.background
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.zIndex
 
 // Draws the scaffold, persistent top bar, bottom bar, map layer, and active page route.
 @Composable
@@ -90,29 +93,36 @@ internal fun NavigationScaffoldContent(
             )
 
             if (uiState.currentScreen != Screen.Map) {
-                when {
-                    uiState.isShowingCanvasInbox -> NavigationCanvasMessagesRoute(
-                        selectedConversation = uiState.selectedCanvasConversation,
-                        onOpenConversation = onCanvasConversationClick
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .zIndex(2f)
+                ) {
+                    when {
+                        uiState.isShowingCanvasInbox -> NavigationCanvasMessagesRoute(
+                            selectedConversation = uiState.selectedCanvasConversation,
+                            onOpenConversation = onCanvasConversationClick
+                        )
 
-                    uiState.isShowingNews -> NavigationNewsRoute(
-                        selectedNewsArticle = uiState.selectedNewsArticle,
-                        onArticleClick = onArticleClick,
-                        onBack = onNewsBack
-                    )
+                        uiState.isShowingNews -> NavigationNewsRoute(
+                            selectedNewsArticle = uiState.selectedNewsArticle,
+                            onArticleClick = onArticleClick,
+                            onBack = onNewsBack
+                        )
 
-                    uiState.isShowingClubs -> NavigationClubsRoute(
-                        selectedClub = uiState.selectedClub,
-                        onClubClick = onClubClick,
-                        onBack = onClubsBack
-                    )
+                        uiState.isShowingClubs -> NavigationClubsRoute(
+                            selectedClub = uiState.selectedClub,
+                            onClubClick = onClubClick,
+                            onBack = onClubsBack
+                        )
 
-                    else -> NavigationScreenRoute(
-                        uiState = uiState,
-                        callbacks = routeCallbacks,
-                        onCalendarTopBarStateChanged = onCalendarTopBarStateChanged
-                    )
+                        else -> NavigationScreenRoute(
+                            uiState = uiState,
+                            callbacks = routeCallbacks,
+                            onCalendarTopBarStateChanged = onCalendarTopBarStateChanged
+                        )
+                    }
                 }
             }
         }

@@ -5,14 +5,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.CampusMapScreen
 import com.example.cinet.feature.map.MapTopBarState
 
-// Keeps the map alive in the composition and hides it when another page is active.
-// currentScreen controls visibility via alpha so the map composable is never destroyed
-// (avoids reload cost). Pointer input is blocked when hidden so touches don't leak through.
+// Keeps the map alive, but moves it behind other pages when Map is not active.
 @Composable
 internal fun NavigationMapLayer(
     currentScreen: Screen,
@@ -24,21 +22,15 @@ internal fun NavigationMapLayer(
     onRemoveExtraLocation: (CampusLocation) -> Unit,
     onTopBarStateChanged: (MapTopBarState?) -> Unit,
 ) {
+    val isMapVisible = currentScreen == Screen.Map
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { alpha = if (currentScreen == Screen.Map) 1f else 0f }
-            .then(
-                if (currentScreen != Screen.Map) {
-                    Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) { awaitPointerEvent() }
-                        }
-                    }
-                } else {
-                    Modifier
-                }
-            )
+            .zIndex(if (isMapVisible) 1f else 0f)
+            .graphicsLayer {
+                alpha = if (isMapVisible) 1f else 0f
+            }
     ) {
         CampusMapScreen(
             onBack = onBack,

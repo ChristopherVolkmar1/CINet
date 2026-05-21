@@ -240,9 +240,7 @@ fun ConversationScreen(
                 onRemoveFriendClick = if (!conversation.isGroup && otherUid.isNotBlank()) {
                     { showRemoveFriendDialog = true }
                 } else null,
-                onPinnedClick = if (pinnedMessageIds.isNotEmpty()) {
-                    { showPinnedSheet = true }
-                } else null,
+                onPinnedClick = { showPinnedSheet = true },
             )
         )
     }

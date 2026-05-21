@@ -236,6 +236,9 @@ internal fun MainScaffold(
             selectedClub != null -> selectedClub = null
             showClubs -> showClubs = false
             currentScreen == Screen.Social && selectedProfile != null -> selectedProfile = null
+            currentScreen == Screen.Social && showSocialScreen -> {
+                showSocialScreen = false
+            }
             currentScreen == Screen.Social && activeConversation != null -> {
                 activeConversation = null
                 conversationTopBarState = null
