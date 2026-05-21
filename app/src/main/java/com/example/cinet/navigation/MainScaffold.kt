@@ -657,7 +657,5 @@ internal fun MainScaffold(
             if (selectedClub != null) selectedClub = null else showClubs = false
         },
         onCanvasConversationClick = { selectedCanvasConversation = it },
-        onSettingsCanvasClick = routeCallbacks.onOpenCanvas,
-        onSettingsSignOutClick = routeCallbacks.onSignOut,
     )
 }
