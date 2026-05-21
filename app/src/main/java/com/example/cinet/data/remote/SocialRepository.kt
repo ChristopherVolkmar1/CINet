@@ -830,15 +830,34 @@ class SocialRepository(
     /**
      * Hard-deletes a single message. Admins can delete any message;
      * callers are responsible for the permission check before calling.
+     *
+     * After deletion, re-queries the most recent remaining message and
+     * updates conversations/{id}.lastMessage so the list preview stays accurate.
      */
     suspend fun deleteMessage(conversationId: String, messageId: String): Result<Unit> {
         return try {
-            db.collection("conversations")
-                .document(conversationId)
-                .collection("messages")
-                .document(messageId)
-                .delete()
+            val conversationRef = db.collection("conversations").document(conversationId)
+            val messagesRef = conversationRef.collection("messages")
+
+            messagesRef.document(messageId).delete().await()
+
+            // Refresh lastMessage to the newest remaining message, or clear it if
+            // the conversation is now empty.
+            val remaining = messagesRef
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(1)
+                .get()
                 .await()
+
+            val newLastMessage = remaining.documents.firstOrNull()?.getString("content") ?: ""
+            val newLastSenderId = remaining.documents.firstOrNull()?.getString("senderId") ?: ""
+            conversationRef.update(
+                mapOf(
+                    "lastMessage" to newLastMessage,
+                    "lastSenderId" to newLastSenderId,
+                )
+            ).await()
+
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("SocialRepository", "deleteMessage failed: ${e.message}")
@@ -1034,6 +1053,32 @@ class SocialRepository(
     }
 
 
+    /** Pins a message. Only the most recent 3 pins are shown in the UI. */
+    suspend fun pinMessage(conversationId: String, messageId: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update("pinnedMessageIds", FieldValue.arrayUnion(messageId))
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "pinMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /** Removes a pin from a message. */
+    suspend fun unpinMessage(conversationId: String, messageId: String): Result<Unit> {
+        return try {
+            db.collection("conversations").document(conversationId)
+                .update("pinnedMessageIds", FieldValue.arrayRemove(messageId))
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("SocialRepository", "unpinMessage failed: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
     /** Vote casting for polls */
     suspend fun castVote(conversationId: String, messageId: String, selectedIndex: Int, currentUid: String) {
         val messageDocRef = db.collection("conversations")
@@ -1058,9 +1103,17 @@ class SocialRepository(
             }
             votedUids.add(currentUid)
 
+            // userVotes tracks which option each uid voted for: "uid1:0||uid2:2"
+            // This is separate from votedUids (which is just a presence set) so
+            // we can correctly restore the selected highlight after a recompose.
+            val userVotesString = metadata["userVotes"] as? String ?: ""
+            val userVoteEntries = userVotesString.split("||").filter { it.isNotBlank() }.toMutableList()
+            userVoteEntries.add("$currentUid:$selectedIndex")
+
             val updatedMetadata = metadata.toMutableMap().apply {
                 put("votes", voteCounts.joinToString("||"))
                 put("votedUids", votedUids.joinToString("||"))
+                put("userVotes", userVoteEntries.joinToString("||"))
             }
 
             transaction.update(messageDocRef, "metadata", updatedMetadata)

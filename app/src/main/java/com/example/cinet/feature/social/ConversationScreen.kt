@@ -74,6 +74,8 @@ import kotlinx.coroutines.tasks.await
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PushPin
 
 /**
  * A file the user has selected but not yet sent.
@@ -85,6 +87,7 @@ private data class PendingAttachment(
     val mimeType: String,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationScreen(
     conversation: Conversation,
@@ -212,12 +215,15 @@ fun ConversationScreen(
     }
 
     var showPollDialog by remember { mutableStateOf(false) }
+    var showPinnedSheet by remember { mutableStateOf(false) }
+    // Declared here (before the LaunchedEffect that keys on it) to avoid a forward reference.
+    var pinnedMessageIds by remember { mutableStateOf(conversation.pinnedMessageIds) }
 
     // Push the current conversation header into the persistent top bar.
     // Re-runs whenever title, photo, or interactive state changes so the bar stays in sync.
     LaunchedEffect(
         conversationTitle, otherUserPhotoUrl, otherUserProfile,
-        conversation.isGroup, showSearchBar, showGroupInfo
+        conversation.isGroup, showSearchBar, showGroupInfo, pinnedMessageIds
     ) {
         onTopBarStateChange(
             ConversationTopBarState(
@@ -234,6 +240,7 @@ fun ConversationScreen(
                 onRemoveFriendClick = if (!conversation.isGroup && otherUid.isNotBlank()) {
                     { showRemoveFriendDialog = true }
                 } else null,
+                onPinnedClick = { showPinnedSheet = true },
             )
         )
     }
@@ -287,6 +294,20 @@ fun ConversationScreen(
                         val lastUpdated = doc.getTimestamp("lastUpdated")?.toDate()?.time ?: 0L
                         docId != conversation.id && lastUpdated > entryTime
                     }
+                }
+            }
+        onDispose { listener.remove() }
+    }
+
+    // Live pinned message IDs — re-read whenever an admin pins/unpins.
+    DisposableEffect(conversation.id) {
+        val listener = FirebaseFirestore.getInstance()
+            .collection("conversations")
+            .document(conversation.id)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    @Suppress("UNCHECKED_CAST")
+                    pinnedMessageIds = (snapshot.get("pinnedMessageIds") as? List<String>) ?: emptyList()
                 }
             }
         onDispose { listener.remove() }
@@ -494,6 +515,188 @@ fun ConversationScreen(
                     }
                 }
 
+                // ── Pinned messages sheet ──────────────────────────────────────
+                if (showPinnedSheet) {
+                    val canUnpin = !conversation.isGroup || conversation.roles[currentUid] == "admin"
+                    // Resolve pinned IDs → Messages, newest pin first (like Discord).
+                    // IDs not found in the loaded message list are skipped gracefully.
+                    val resolvedPins: List<Message> = pinnedMessageIds
+                        .reversed()
+                        .mapNotNull { pid -> messages.firstOrNull { msg -> msg.id == pid } }
+
+                    ModalBottomSheet(
+                        onDismissRequest = { showPinnedSheet = false },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            // Header
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PushPin,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    text = "Pinned Messages",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                            HorizontalDivider()
+
+                            if (resolvedPins.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(48.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No pinned messages",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 24.dp),
+                                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                                ) {
+                                    items(resolvedPins) { pinned ->
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    showPinnedSheet = false
+                                                    val idx = messages.indexOfFirst { msg -> msg.id == pinned.id }
+                                                    if (idx >= 0) scope.launch { listState.animateScrollToItem(idx) }
+                                                }
+                                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                        ) {
+                                            // Sender row
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                val photoUrl = pinned.senderPhotoUrl.takeIf { it.isNotBlank() }
+                                                if (photoUrl != null) {
+                                                    AsyncImage(
+                                                        model = ImageRequest.Builder(LocalContext.current)
+                                                            .data(photoUrl).crossfade(true).build(),
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier
+                                                            .size(28.dp)
+                                                            .clip(CircleShape)
+                                                            .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                                    )
+                                                } else {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(28.dp)
+                                                            .clip(CircleShape)
+                                                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                                                            .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = pinned.senderNickname.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    text = pinned.senderNickname,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                )
+                                                Spacer(Modifier.width(6.dp))
+                                                pinned.createdAt?.let { date ->
+                                                    Text(
+                                                        text = SimpleDateFormat("M/d/yy h:mm a", Locale.getDefault()).format(date),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                                if (canUnpin) {
+                                                    Spacer(Modifier.weight(1f))
+                                                    IconButton(
+                                                        onClick = {
+                                                            scope.launch {
+                                                                repository.unpinMessage(conversation.id, pinned.id)
+                                                            }
+                                                        },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Close,
+                                                            contentDescription = "Unpin",
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                            Spacer(Modifier.height(6.dp))
+                                            // Message preview — images render inline, everything else as text
+                                            val isImage = pinned.type == "attachment" &&
+                                                    (pinned.metadata["mimeType"] as? String)?.startsWith("image/") == true
+                                            val imageUrl = pinned.metadata["url"] as? String
+
+                                            if (isImage && imageUrl != null) {
+                                                AsyncImage(
+                                                    model = ImageRequest.Builder(LocalContext.current)
+                                                        .data(imageUrl)
+                                                        .crossfade(true)
+                                                        .build(),
+                                                    contentDescription = pinned.metadata["fileName"] as? String ?: "Image",
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .heightIn(max = 180.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                )
+                                            } else {
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text(
+                                                        text = when (pinned.type) {
+                                                            "poll"           -> "📊 Poll: ${pinned.content}"
+                                                            "attachment"     -> "📎 ${pinned.metadata["fileName"] as? String ?: "Attachment"}"
+                                                            "location_share" -> "📍 ${pinned.metadata["locationName"] as? String ?: "Location"}"
+                                                            "study_invite"   -> "📚 Study invite"
+                                                            "event_invite"   -> "📅 Event invite"
+                                                            else             -> pinned.content
+                                                        },
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.padding(10.dp),
+                                                        maxLines = 3,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -501,7 +704,7 @@ fun ConversationScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(displayedMessages) { message ->
+                    items(displayedMessages, key = { it.id }) { message ->
                         // Per-user check: has THIS user already accepted or declined?
                         // acceptedBy/declinedBy are comma-separated UIDs stored in metadata.
                         val acceptedBy = (message.metadata["acceptedBy"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
@@ -530,6 +733,13 @@ fun ConversationScreen(
                                 message.senderId == currentUid
                             ) {
                                 { scope.launch { repository.deleteMessage(conversation.id, message.id) } }
+                            } else null,
+                            onPinMessage = if (message.id !in pinnedMessageIds) {
+                                { scope.launch { repository.pinMessage(conversation.id, message.id) } }
+                            } else null,
+                            onUnpinMessage = if (message.id in pinnedMessageIds &&
+                                (!conversation.isGroup || conversation.roles[currentUid] == "admin")) {
+                                { scope.launch { repository.unpinMessage(conversation.id, message.id) } }
                             } else null,
                             readBy = message.readBy,
                             memberProfiles = memberProfiles,
@@ -859,7 +1069,7 @@ fun ConversationScreen(
 }
 
 // Frontend team: restyle this bubble however you want
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun MessageBubble(
     message: Message,
@@ -873,6 +1083,8 @@ fun MessageBubble(
     onAccept: (() -> Unit)? = null,
     onDecline: (() -> Unit)? = null,
     onDeleteMessage: (() -> Unit)? = null,
+    onPinMessage: (() -> Unit)? = null,
+    onUnpinMessage: (() -> Unit)? = null,
     onOpenSenderProfile: (() -> Unit)? = null,
     readBy: Map<String, Any> = emptyMap(),
     memberProfiles: Map<String, UserProfile> = emptyMap(),
@@ -880,8 +1092,11 @@ fun MessageBubble(
     isGroup: Boolean = false,
     onVoteSubmitted: ((messageId: String, selectedIndex: Int) -> Unit)? = null
 ) {
+    val hasContextActions = onDeleteMessage != null || onPinMessage != null || onUnpinMessage != null
+    var showContextSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    // Delete confirmation dialog — opened from the context sheet
     if (showDeleteDialog && onDeleteMessage != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -901,14 +1116,68 @@ fun MessageBubble(
         )
     }
 
+    // Context sheet — long-press opens this; shows contextual actions for this bubble
+    if (showContextSheet) {
+        ModalBottomSheet(onDismissRequest = { showContextSheet = false }) {
+            Column(modifier = Modifier.padding(bottom = 24.dp)) {
+                Text(
+                    text = "Message options",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+                HorizontalDivider()
+                if (onPinMessage != null) {
+                    ListItem(
+                        headlineContent = { Text("Pin message") },
+                        leadingContent = {
+                            Icon(Icons.Default.PushPin, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary)
+                        },
+                        modifier = Modifier.clickable {
+                            showContextSheet = false
+                            onPinMessage()
+                        }
+                    )
+                }
+                if (onUnpinMessage != null) {
+                    ListItem(
+                        headlineContent = { Text("Unpin message") },
+                        leadingContent = {
+                            Icon(Icons.Default.PushPin, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        },
+                        modifier = Modifier.clickable {
+                            showContextSheet = false
+                            onUnpinMessage()
+                        }
+                    )
+                }
+                if (onDeleteMessage != null) {
+                    ListItem(
+                        headlineContent = { Text("Delete message", color = MaterialTheme.colorScheme.error) },
+                        leadingContent = {
+                            Icon(Icons.Default.Delete, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error)
+                        },
+                        modifier = Modifier.clickable {
+                            showContextSheet = false
+                            showDeleteDialog = true
+                        }
+                    )
+                }
+            }
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (onDeleteMessage != null)
+                if (hasContextActions)
                     Modifier.combinedClickable(
                         onClick = {},
-                        onLongClick = { showDeleteDialog = true }
+                        onLongClick = { showContextSheet = true }
                     )
                 else Modifier
             ),
@@ -986,6 +1255,7 @@ fun MessageBubble(
                     message = message,
                     isCurrentUser = isCurrentUser,
                     onPreviewImage = onPreviewImage,
+                    onLongClick = if (hasContextActions) ({ showContextSheet = true }) else null,
                 )
             } else if (message.type == "poll") {
                 PollsBubble(
@@ -1425,11 +1695,13 @@ fun LocationShareBubble(
  *
  * Shape, alignment, and sizing are consistent with the rest of the bubble family.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AttachmentBubble(
     message: Message,
     isCurrentUser: Boolean,
     onPreviewImage: ((Message) -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val url      = message.metadata["url"]      as? String ?: ""
@@ -1462,9 +1734,10 @@ fun AttachmentBubble(
                 MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier
                 .widthIn(min = 120.dp, max = 260.dp)
-                .clickable {
-                    if (onPreviewImage != null) onPreviewImage(message) else openUrl()
-                },
+                .combinedClickable(
+                    onClick = { if (onPreviewImage != null) onPreviewImage(message) else openUrl() },
+                    onLongClick = onLongClick,
+                ),
         ) {
             Column {
                 // Round bottom corners only when there's no caption below the image

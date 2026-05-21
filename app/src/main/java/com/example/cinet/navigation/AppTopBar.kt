@@ -10,6 +10,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,21 +21,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.TextButton
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.feature.social.ConversationTopBarState
 import androidx.compose.foundation.layout.RowScope
-
 
 
 // Draws the persistent page title bar used across the app.
@@ -140,29 +139,37 @@ internal fun AppTopBar(
                 }
             }
 
-            if (conversationTopBarState != null) {
-                ConversationTopBarActions(state = conversationTopBarState)
-            } else if (newConversationTopBarState != null) {
-                NewConversationTopBarAction(state = newConversationTopBarState)
-            } else if (state.showSocialActions) {
-                SocialTopBarActions(
-                    pendingRequestCount = state.pendingRequestCount,
-                    showCanvasMessages = state.showCanvasMessagesAction,
-                    onFriendsClick = onFriendsClick,
-                    onNewMessageClick = onNewMessageClick,
-                    onCanvasMessagesClick = onCanvasMessagesClick
-                )
-            } else if (state.showSettingsActions) {
-                SettingsTopBarActions(
-                    onCanvasSyncClick = onSettingsCanvasClick,
-                    onSignOutClick = onSettingsSignOutClick
-                )
-            } else if (settingsTopBarActions != null) {
-                settingsTopBarActions()
+
+                        when {
+                conversationTopBarState != null ->
+                    ConversationTopBarActions(state = conversationTopBarState)
+
+                newConversationTopBarState != null ->
+                    NewConversationTopBarAction(state = newConversationTopBarState)
+
+                state.showSocialActions ->
+                    SocialTopBarActions(
+                        pendingRequestCount = state.pendingRequestCount,
+                        showCanvasMessages = state.showCanvasMessagesAction,
+                        onFriendsClick = onFriendsClick,
+                        onNewMessageClick = onNewMessageClick,
+                        onCanvasMessagesClick = onCanvasMessagesClick
+                    )
+
+                state.showSettingsActions ->
+                    SettingsTopBarActions(
+                        onCanvasSyncClick = onSettingsCanvasClick,
+                        onSignOutClick = onSettingsSignOutClick
+                    )
+
+                settingsTopBarActions != null ->
+                    settingsTopBarActions()
+            }
+
             }
         }
     }
-}
+
 
 // Shows the right-side action used by the New Message page.
 @Composable
@@ -202,8 +209,13 @@ private fun ConversationTopBarContent(
     val initial = state.title.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
 
     Row(
-        modifier = modifier
-            .then(if (state.onTitleClick != null) Modifier.clickable { state.onTitleClick.invoke() } else Modifier),
+        modifier = modifier.then(
+            if (state.onTitleClick != null) {
+                Modifier.clickable { state.onTitleClick.invoke() }
+            } else {
+                Modifier
+            }
+        ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (!state.isGroup && photoUrl != null) {
@@ -228,10 +240,17 @@ private fun ConversationTopBarContent(
                     .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = initial, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = initial,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
+
         Spacer(modifier = Modifier.width(10.dp))
+
         Text(
             text = state.title,
             color = Color.White,
@@ -243,37 +262,96 @@ private fun ConversationTopBarContent(
     }
 }
 
-// Shows the action buttons for an open conversation (search, info, or more-options menu).
+// Shows the action buttons for an open conversation.
 @Composable
 private fun ConversationTopBarActions(state: ConversationTopBarState) {
     if (state.isGroup) {
-        // Group: Search + Info
-        IconButton(onClick = state.onSearchClick) {
-            Icon(Icons.Default.Search, contentDescription = "Search messages", tint = Color.White)
+        if (state.onPinnedClick != null) {
+            IconButton(onClick = state.onPinnedClick) {
+                Icon(
+                    imageVector = Icons.Default.PushPin,
+                    contentDescription = "Pinned messages",
+                    tint = Color.White
+                )
+            }
         }
+
+        IconButton(onClick = state.onSearchClick) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search messages",
+                tint = Color.White
+            )
+        }
+
         if (state.onInfoClick != null) {
             IconButton(onClick = state.onInfoClick) {
-                Icon(Icons.Default.Info, contentDescription = "Group info", tint = Color.White)
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Group info",
+                    tint = Color.White
+                )
             }
         }
     } else {
-        // DM: MoreVert dropdown — Search Messages, Remove Friend
         var expanded by remember { mutableStateOf(false) }
+
         Box {
             IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More options",
+                    tint = Color.White
+                )
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                if (state.onPinnedClick != null) {
+                    DropdownMenuItem(
+                        text = { Text("Pinned Messages") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.PushPin,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            state.onPinnedClick.invoke()
+                        }
+                    )
+                }
+
                 DropdownMenuItem(
                     text = { Text("Search Messages") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    onClick = { expanded = false; state.onSearchClick() }
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        state.onSearchClick()
+                    }
                 )
+
                 if (state.onRemoveFriendClick != null) {
                     DropdownMenuItem(
                         text = { Text("Remove Friend") },
-                        leadingIcon = { Icon(Icons.Default.PersonRemove, null) },
-                        onClick = { expanded = false; state.onRemoveFriendClick.invoke() }
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.PersonRemove,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            state.onRemoveFriendClick.invoke()
+                        }
                     )
                 }
             }
@@ -331,6 +409,7 @@ private fun SocialTopBarActions(
 
         Spacer(modifier = Modifier.width(12.dp))
     }
+
     BadgedBox(
         badge = {
             if (pendingRequestCount > 0) {

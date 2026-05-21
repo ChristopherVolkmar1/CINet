@@ -9,13 +9,11 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -23,11 +21,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.feature.calendar.calendarFiles.CalendarFirestoreRepository
 import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.map.SearchBar
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +35,7 @@ fun StudySessionDialog(
     onTopicChange: (String) -> Unit,
     startTime: String,
     className: String,
+    classItems: List<ClassItem>,
     onClassNameChange: (String) -> Unit,
     onPickStartTime: () -> Unit,
     onDismiss: () -> Unit,
@@ -51,18 +49,7 @@ fun StudySessionDialog(
     val textFieldState = rememberTextFieldState()
 
     var expanded by remember { mutableStateOf(false) }
-    var classList by remember { mutableStateOf<List<ClassItem>>(emptyList()) }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-        scope.launch {
-            try {
-                classList = CalendarFirestoreRepository().loadClasses()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-    val validClass = classList.any { it.name == className }
+    val validClass = classItems.any { it.name == className }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editingSession == null) "Add Study Session" else "Edit Study Session") },
@@ -93,7 +80,10 @@ fun StudySessionDialog(
                             .fillMaxWidth()
                             .menuAnchor(MenuAnchorType.PrimaryEditable)
                     )
-                    val filtering = classList.filter { it.name.contains(className, ignoreCase = true) }
+                    val filtering = classItems
+                        .filter { it.name.contains(className, ignoreCase = true) }
+                        .distinctBy { it.name }
+                        .sortedBy { it.name.lowercase() }
                     if (filtering.isNotEmpty()) {
                         ExposedDropdownMenu(
                             expanded = expanded,
@@ -183,6 +173,7 @@ fun StudySessionDialogCreatePreview() {
         onTopicChange = {},
         startTime = "",
         className = "",
+        classItems = emptyList(),
         onClassNameChange = {},
         onPickStartTime = {},
         onDismiss = {},
@@ -208,6 +199,7 @@ fun StudySessionDialogEditPreview() {
         onTopicChange = {},
         startTime = "3:00 PM",
         className = "",
+        classItems = emptyList(),
         onClassNameChange = {},
         onPickStartTime = {},
         onDismiss = {},

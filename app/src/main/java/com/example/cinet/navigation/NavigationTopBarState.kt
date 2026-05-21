@@ -1,4 +1,7 @@
 package com.example.cinet.navigation
+
+import com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState
+import com.example.cinet.feature.map.MapTopBarState
 import com.example.cinet.feature.social.ConversationTopBarState
 import com.example.cinet.feature.social.NewConversationTopBarState
 
@@ -14,4 +17,6 @@ internal data class NavigationTopBarState(
     val nickname: String = "",
     val newConversationTopBarState: NewConversationTopBarState? = null,
     val conversationTopBarState: ConversationTopBarState? = null,
+    val mapTopBarState: MapTopBarState? = null,
+    val calendarTopBarState: CalendarTopBarState? = null,
 )

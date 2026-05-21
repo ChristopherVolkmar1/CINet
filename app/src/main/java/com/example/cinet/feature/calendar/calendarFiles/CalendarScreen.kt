@@ -555,6 +555,7 @@ fun CalendarScreen(
             onTopicChange = { sessionTopic = it },
             startTime = sessionStartTime,
             className = sessionClassName,
+            classItems = visibleClassItems,
             onClassNameChange = { sessionClassName = it },
             onPickStartTime = { openTimePicker(context) { picked -> sessionStartTime = picked } },
             onDismiss = { showStudySessionDialog = false; resetStudySessionForm() },

@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
+import com.example.cinet.data.remote.canvas.CanvasMessagingSettings
 
 /**
  * Orchestrates the Canvas connection UI:
@@ -48,6 +50,24 @@ class CanvasSyncViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.update { it.copy(tokenInput = newValue, statusMessage = null) }
     }
 
+    /** Re-checks the saved token whenever the Canvas screen opens. */
+    fun refreshConnectionState() {
+        if (tokenStore.hasToken()) {
+            _uiState.update {
+                it.copy(hasToken = true)
+            }
+        } else {
+            hideCanvasFeatures()
+
+            _uiState.update {
+                CanvasUiState(
+                    hasToken = false,
+                    statusMessage = DISCONNECTED_PROMPT
+                )
+            }
+        }
+    }
+
     /**
      * Saves the entered token, then probes /users/self to confirm it works.
      * Clears the input field afterwards so the secret isn't sitting in
@@ -55,27 +75,44 @@ class CanvasSyncViewModel(application: Application) : AndroidViewModel(applicati
      */
     fun onSaveAndTest() {
         val raw = _uiState.value.tokenInput.trim()
+
         if (raw.isEmpty()) {
             _uiState.update { it.copy(statusMessage = "Paste your Canvas token first.") }
             return
         }
-        _uiState.update { it.copy(isBusy = true, statusMessage = "Testing connection…") }
+
+        _uiState.update {
+            it.copy(
+                isBusy = true,
+                statusMessage = "Testing connection…"
+            )
+        }
+
         viewModelScope.launch {
             tokenStore.saveToken(raw)
-            // Probing is a network call — run off the main thread.
-            val result = withContext(Dispatchers.IO) { apiClient.probeAuth() }
+
+            // Probing is a network call, so run it off the main thread.
+            val result = withContext(Dispatchers.IO) {
+                apiClient.probeAuth()
+            }
+
             when (result) {
-                is CanvasAuthResult.Success -> _uiState.update {
-                    it.copy(
-                        isBusy = false,
-                        hasToken = true,
-                        tokenInput = "",
-                        statusMessage = "Connected as ${result.userName}."
-                    )
+                is CanvasAuthResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isBusy = false,
+                            hasToken = true,
+                            tokenInput = "",
+                            statusMessage = "Connected as ${result.userName}."
+                        )
+                    }
                 }
+
                 is CanvasAuthResult.Failure -> {
-                    // Token is bad — wipe it so subsequent runs don't hit Canvas with a dud.
+                    // Token is bad, so wipe it and hide Canvas-only features.
                     tokenStore.clear()
+                    hideCanvasFeatures()
+
                     _uiState.update {
                         it.copy(
                             isBusy = false,
@@ -117,15 +154,23 @@ class CanvasSyncViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    /** Removes the stored token and resets the UI to disconnected. */
+    /** Removes the stored token, hides Canvas data, and resets the UI to disconnected. */
     fun onDisconnect() {
         tokenStore.clear()
+        hideCanvasFeatures()
+
         _uiState.update {
             CanvasUiState(
                 hasToken = false,
-                statusMessage = "Canvas disconnected."
+                statusMessage = DISCONNECTED_PROMPT
             )
         }
+    }
+
+    // Hides Canvas-only app surfaces after the token is removed.
+    private fun hideCanvasFeatures() {
+        CanvasDisplaySettings.showCanvasInCalendar = false
+        CanvasMessagingSettings.showCanvasMessaging = false
     }
 
     private fun formatSummary(r: CanvasSyncResult): String {
@@ -139,6 +184,12 @@ class CanvasSyncViewModel(application: Application) : AndroidViewModel(applicati
         val skipNote = if (r.skipped.isNotEmpty()) " ${r.skipped.size} skipped." else ""
         return main + skipNote
     }
+
+    companion object {
+        private const val DISCONNECTED_PROMPT =
+            "Canvas is disconnected. Enter a valid Canvas access token to sync again."
+    }
+
 }
 
 /** UI state for the Canvas connection screen. */

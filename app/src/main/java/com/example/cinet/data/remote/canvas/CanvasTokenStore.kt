@@ -40,9 +40,9 @@ class CanvasTokenStore(context: Context) {
         prefs.edit().putString(KEY_TOKEN, rawToken.trim()).apply()
     }
 
-    /** Wipes the saved token (used by "Disconnect Canvas"). */
+    /** Wipes the saved token immediately so sign-out cannot reuse a stale Canvas session. */
     fun clear() {
-        prefs.edit().remove(KEY_TOKEN).apply()
+        prefs.edit().remove(KEY_TOKEN).commit()
     }
 
     /** True when a token is currently saved — used to drive the "Connected" UI state. */
