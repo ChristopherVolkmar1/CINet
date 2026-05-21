@@ -265,9 +265,9 @@ fun CalendarScreen(
             .padding(top = 18.dp, bottom = 110.dp)
     ) {
         if(showHeader){
-        CalendarHeader()
-        Spacer(modifier = Modifier.height(10.dp))
-            }
+            CalendarHeader()
+            Spacer(modifier = Modifier.height(10.dp))
+        }
 
         CalendarModeSection(
             selectedMode = calendarMode,
@@ -431,6 +431,7 @@ fun CalendarScreen(
             onClassNameChange = { className = it },
             classStartTime = classStartTime,
             classEndTime = classEndTime,
+            classItems = visibleClassItems,
             selectedMeetingDays = selectedMeetingDays,
             onMeetingDaysChange = { selectedMeetingDays = it },
             onExistingClassSelected = { existing ->
