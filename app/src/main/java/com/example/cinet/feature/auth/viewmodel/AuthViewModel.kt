@@ -65,10 +65,10 @@ class AuthViewModel(
     }
 
     // Saves the user's profile details to Firestore and updates state
-    fun saveProfile(nickname: String, major: String, pronouns: String) {
+    fun saveProfile(nickname: String, major: String, minor: String, pronouns: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
-            repository.saveProfileDetails(nickname, major, pronouns)
+            repository.saveProfileDetails(nickname, major, minor, pronouns)
                 .onSuccess { _authState.value = AuthState.Authenticated(it) }
                 .onFailure { _authState.value = AuthState.Error(it.message ?: "Unknown error") }
         }
@@ -105,6 +105,25 @@ class AuthViewModel(
                 .onFailure { e ->
                     android.util.Log.e(TAG, "Failed to update settings in Firestore: ${e.message}")
                     // Rollback could be implemented here if necessary
+                }
+        }
+    }
+
+    fun updateReadReceiptsEnabled(enabled: Boolean) {
+        val currentState = _authState.value
+        if (currentState is AuthState.Authenticated) {
+            _authState.value = AuthState.Authenticated(
+                currentState.userProfile.copy(readReceiptsEnabled = enabled)
+            )
+        } else if (currentState is AuthState.ProfileSetup) {
+            _authState.value = AuthState.ProfileSetup(
+                currentState.userProfile.copy(readReceiptsEnabled = enabled)
+            )
+        }
+        viewModelScope.launch {
+            repository.updateReadReceiptsEnabled(enabled)
+                .onFailure { e ->
+                    android.util.Log.e(TAG, "Failed to update readReceiptsEnabled: ${e.message}")
                 }
         }
     }

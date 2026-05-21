@@ -33,6 +33,7 @@ object AppSettings {
     var classReminderMinutesBefore: Long = 10L
     var assignmentReminderMinutesBefore: Long = 60L
     var selectedTheme by mutableStateOf(AppThemeColor.Green)
+    var readReceiptsEnabled by mutableStateOf(true)
 }
 
 // settings stuff - Zack
@@ -42,13 +43,15 @@ object AppSettings {
 @Composable
 fun SettingScreen(
     onBack: () -> Unit,
-    onSignOut: () -> Unit,
     isDarkMode: Boolean,
     notificationsEnabled: Boolean,
     selectedTheme: AppThemeColor,
     onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
     userProfile: UserProfile? = null,
     onViewProfile: () -> Unit = {},
+    showHeader: Boolean = true,
+    readReceiptsEnabled: Boolean = true,
+    onReadReceiptsChange: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -130,23 +133,25 @@ fun SettingScreen(
         }
 
         // Header section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Return to previous screen"
+        if (showHeader) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Return to previous screen"
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.headlineMedium
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineMedium
-            )
         }
 
         ThemeSelector(
@@ -208,15 +213,29 @@ fun SettingScreen(
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        // sign out button
-        OutlinedButton(
-            onClick = onSignOut,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+        // Read receipts toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Sign out")
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Read Receipts", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "Show others when you've read their messages",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = readReceiptsEnabled,
+                onCheckedChange = onReadReceiptsChange
+            )
         }
+        Spacer(modifier = Modifier.weight(1f))
     }
 }

@@ -19,4 +19,8 @@ data class Conversation(
     // false = hidden (e.g. after unfriend). Defaults to true so legacy docs
     // without this field are treated as active.
     val active: Boolean = true,
+    // uid → "admin" | "member". Creator gets "admin". Empty for legacy DMs.
+    val roles: Map<String, String> = emptyMap(),
+    // IDs of messages pinned by an admin. Max 3 shown; older pins fall off the banner.
+    val pinnedMessageIds: List<String> = emptyList(),
 )

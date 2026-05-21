@@ -2,11 +2,13 @@ package com.example.cinet.feature.clubs
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Groups
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.cinet.feature.map.SearchBar
 
 // clubs stuff - Zack
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,35 +29,50 @@ fun ClubsScreen(
     selectedClubUrl: String? = null,
     selectedClubTitle: String? = null,
     onClubClick: (ClubItem) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showTopBar: Boolean = true
 ) {
     val clubsRepository = remember { ClubsRepository() }
     var clubs by remember { mutableStateOf<List<ClubItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
 
+    val textFieldState = rememberTextFieldState() // Search text field
     LaunchedEffect(Unit) {
         clubs = clubsRepository.fetchClubs()
         isLoading = false
     }
 
     if (selectedClubUrl != null) {
+        BackHandler {
+            if (webView?.canGoBack() == true) {
+                webView?.goBack()
+            } else {
+                onBack()
+            }
+        }
         // club details - Zack
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { 
-                        Text(
-                            text = selectedClubTitle ?: "Club Details",
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        ) 
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                if (showTopBar) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = selectedClubTitle ?: "Club Details",
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { padding ->
             AndroidView(
@@ -64,11 +82,12 @@ fun ClubsScreen(
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true // Required for some modern sites
                         loadUrl(selectedClubUrl)
+                        webView = this
                     }
                 },
-                update = { webView ->
-                    if (webView.url != selectedClubUrl) {
-                        webView.loadUrl(selectedClubUrl)
+                update = { view ->
+                    if (view.url != selectedClubUrl) {
+                        view.loadUrl(selectedClubUrl)
                     }
                 },
                 modifier = Modifier
@@ -80,14 +99,19 @@ fun ClubsScreen(
         // main clubs list - Zack
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Campus Clubs") },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                if (showTopBar) {
+                    TopAppBar(
+                        title = { Text("Campus Clubs") },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         ) { padding ->
             if (isLoading) {
@@ -127,16 +151,35 @@ fun ClubsScreen(
                     }
                 }
             } else {
-                LazyColumn(
+                val query = textFieldState.text.toString()
+                val filteredList = if (query.isBlank()) clubs else clubs.filter {
+                    it.title.contains(query, ignoreCase = true)
+                }
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(padding)
                 ) {
-                    items(clubs) { club ->
-                        ClubListItem(club = club) {
-                            onClubClick(club)
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        SearchBar(
+                            placeholderText = "Search clubs...",
+                            textFieldState = textFieldState,
+                            searchResults = emptyList(),
+                            onSearch = { query ->
+                                textFieldState.edit { replace(0, length, query) }
+                            }
+                        )
+                    }
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(filteredList) { club ->
+                            ClubListItem(club = club) {
+                                onClubClick(club)
+                            }
                         }
                     }
                 }

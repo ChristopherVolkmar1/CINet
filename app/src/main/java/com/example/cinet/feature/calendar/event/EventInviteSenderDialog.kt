@@ -1,5 +1,6 @@
 package com.example.cinet.feature.calendar.event
 
+import android.text.TextUtils.replace
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -8,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.core.time.openTimePicker
 import com.example.cinet.data.model.CampusRegistry
-import com.example.cinet.feature.map.SearchLocationBar
+import com.example.cinet.feature.map.SearchBar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,18 +54,7 @@ fun EventInviteSenderDialog(
 
     // Location state — shared ViewModel instead of a private Firestore fetch
     val campusRegistry by campusRegistryViewModel.campusRegistry.collectAsState()
-    var locationCategory by remember { mutableStateOf("academic") }
     val locationTextFieldState = rememberTextFieldState()
-
-    // Names in the selected category, filtered by whatever is typed
-    val filteredLocationNames = remember(
-        locationTextFieldState.text, locationCategory, campusRegistry
-    ) {
-        val categoryLocations = campusRegistry[locationCategory] ?: emptyList()
-        categoryLocations
-            .filter { it.name.contains(locationTextFieldState.text.toString(), ignoreCase = true) }
-            .map { it.name }
-    }
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -107,66 +99,46 @@ fun EventInviteSenderDialog(
                             readOnly = true,
                             label = { Text("Date") },
                             placeholder = { Text("Tap to pick a date") },
+                            trailingIcon = {
+                                IconButton(onClick = { showDatePicker = true }) {
+                                    Icon(Icons.Default.Schedule, contentDescription = "Pick date")
+                                }
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { showDatePicker = true }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        Button(
-                            onClick = { showDatePicker = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Pick Date") }
-                        Spacer(modifier = Modifier.height(8.dp))
-
                         OutlinedTextField(
                             value = eventTime,
                             onValueChange = {},
-                            readOnly = true,
                             label = { Text("Time") },
+                            readOnly = true,
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(onClick = { openTimePicker(context) { eventTime = it } }) {
+                                    Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Button(
-                            onClick = { openTimePicker(context) { eventTime = it } },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Pick Time") }
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // ── Location: category chips + search bar ─────────────
-                        Text(
-                            text = "Location (optional)",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            locationCategories.forEach { (key, label) ->
-                                FilterChip(
-                                    selected = locationCategory == key,
-                                    onClick = { locationCategory = key },
-                                    label = {
-                                        Text(label, style = MaterialTheme.typography.labelSmall)
-                                    },
-                                )
-                            }
+                        Box(modifier = Modifier.imePadding()) {
+                            SearchBar(
+                                placeholderText = "Add a location...",
+                                textFieldState = locationTextFieldState,
+                                searchResults = campusRegistry.values.flatten()
+                                    .filter { it.name.contains(locationTextFieldState.text.toString(), ignoreCase = true) }
+                                    .map { it.name }
+                                    .distinct(),
+                                onSearch = { query ->
+                                    locationTextFieldState.edit { replace(0, length, query) }
+                                }
+                            )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        SearchLocationBar(
-                            textFieldState = locationTextFieldState,
-                            searchResults = filteredLocationNames,
-                            onSearch = { query ->
-                                locationTextFieldState.edit { replace(0, length, query) }
-                            }
-                        )
                     }
-
                 } else {
                     // ── Pick from existing events ─────────────────────────────
                     Row(

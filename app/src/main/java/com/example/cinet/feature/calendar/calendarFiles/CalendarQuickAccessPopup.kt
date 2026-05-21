@@ -2,36 +2,14 @@ package com.example.cinet.feature.calendar.calendarFiles
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,12 +17,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.example.cinet.feature.calendar.classEvent.ClassItem
 import com.example.cinet.feature.calendar.event.EventItem
 import com.example.cinet.feature.calendar.study.StudySession
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.graphics.lerp
 
 /** Identifies which quick-access popup is currently open. */
 enum class CalendarQuickAccessType {
@@ -59,39 +38,54 @@ fun CalendarQuickAccessPopup(
     type: CalendarQuickAccessType,
     selectedDate: LocalDate,
     classes: List<ClassItem>,
+    syncedCanvasClassNames: List<String> = emptyList(),
     studySessions: List<StudySession>,
     events: List<EventItem>,
     onDismiss: () -> Unit,
     onAddClick: () -> Unit,
     onClassClick: (ClassItem) -> Unit,
+    onCanvasClassClick: (String) -> Unit = {},
     onStudySessionClick: (StudySession) -> Unit,
     onEventClick: (EventItem) -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.16f))
-        ) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = popupTitle(type),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineSmall
+                )
+
+                IconButton(onClick = onAddClick) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add"
+                    )
+                }
+
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close"
+                    )
+                }
+            }
+        },
+        text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp)
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                PopupHeader(
-                    type = type,
-                    onAddClick = onAddClick,
-                    onDismiss = onDismiss
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
                 Text(
                     text = popupDescription(type),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondary
+                    style = MaterialTheme.typography.bodyMedium
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -99,41 +93,34 @@ fun CalendarQuickAccessPopup(
                 Text(
                     text = selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondary,
                     fontWeight = FontWeight.SemiBold
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 380.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    when (type) {
-                        CalendarQuickAccessType.CLASSES -> ClassPopupList(
-                            classes = classes,
-                            onClassClick = onClassClick
-                        )
+                when (type) {
+                    CalendarQuickAccessType.CLASSES -> ClassPopupList(
+                        classes = classes,
+                        syncedCanvasClassNames = syncedCanvasClassNames,
+                        onClassClick = onClassClick,
+                        onCanvasClassClick = onCanvasClassClick
+                    )
 
-                        CalendarQuickAccessType.STUDY -> StudyPopupList(
-                            studySessions = studySessions,
-                            onStudySessionClick = onStudySessionClick
-                        )
+                    CalendarQuickAccessType.STUDY -> StudyPopupList(
+                        studySessions = studySessions,
+                        onStudySessionClick = onStudySessionClick
+                    )
 
-                        CalendarQuickAccessType.EVENTS -> EventPopupList(
-                            events = events,
-                            onEventClick = onEventClick
-                        )
-                    }
+                    CalendarQuickAccessType.EVENTS -> EventPopupList(
+                        events = events,
+                        onEventClick = onEventClick
+                    )
                 }
             }
-        }
-    }
+        },
+        confirmButton = {},
+        dismissButton = {}
+    )
 }
 
 /** Shows the popup title row with the moved + action button. */
@@ -180,44 +167,95 @@ private fun PopupHeader(
 /** Shows the icon bubble for the selected popup type. */
 @Composable
 private fun PopupIcon(type: CalendarQuickAccessType) {
-    val green = MaterialTheme.colorScheme.onSecondary
+    //val green = MaterialTheme.colorScheme.onSecondary
 
     Surface(
         modifier = Modifier.size(44.dp),
         shape = CircleShape,
-        color = green.copy(alpha = 0.12f)
+        color = lerp(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primary,
+            0.80f
+        )
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = popupIcon(type),
                 contentDescription = null,
-                tint = green,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(24.dp)
             )
         }
     }
 }
 
-/** Shows class rows in the quick-access popup. */
+/** Shows saved class meetings and Canvas-synced classes in the quick-access popup. */
 @Composable
 private fun ClassPopupList(
     classes: List<ClassItem>,
-    onClassClick: (ClassItem) -> Unit
+    syncedCanvasClassNames: List<String>,
+    onClassClick: (ClassItem) -> Unit,
+    onCanvasClassClick: (String) -> Unit
 ) {
-    if (classes.isEmpty()) {
-        EmptyPopupMessage(text = "No classes scheduled for this day yet.")
+    val savedClasses = classes.filter { it.meetingDays.isNotEmpty() }
+    val hasSavedClasses = savedClasses.isNotEmpty()
+    val hasCanvasClasses = syncedCanvasClassNames.isNotEmpty()
+
+    if (!hasSavedClasses && !hasCanvasClasses) {
+        EmptyPopupMessage(text = "No classes scheduled or synced yet.")
         return
     }
 
-    classes.forEach { classItem ->
-        PopupItemCard(
-            title = classItem.name,
-            primaryDetail = buildTimeRange(classItem.startTime, classItem.endTime),
-            secondaryDetail = classItem.meetingDays.joinToString(", "),
-            location = classItem.location,
-            onClick = { onClassClick(classItem) }
-        )
+    if (hasSavedClasses) {
+        PopupSectionLabel(text = "Saved class meetings")
+
+        classes.forEach { classItem ->
+            if (classItem.meetingDays.isNotEmpty()) {
+                PopupItemCard(
+                    title = classItem.name,
+                    primaryDetail = buildTimeRange(classItem.startTime, classItem.endTime),
+                    secondaryDetail = classItem.meetingDays.joinToString(", "),
+                    location = classItem.location,
+                    onClick = { onClassClick(classItem) }
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
     }
+
+    if (hasSavedClasses && hasCanvasClasses) {
+        Spacer(modifier = Modifier.height(8.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+
+    if (hasCanvasClasses) {
+        PopupSectionLabel(text = "Canvas synced classes")
+
+        syncedCanvasClassNames.forEach { canvasClassName ->
+            PopupItemCard(
+                title = canvasClassName,
+                primaryDetail = "Tap to add meeting time",
+                secondaryDetail = "Synced from Canvas",
+                location = "",
+                onClick = { onCanvasClassClick(canvasClassName) }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+    }
+}
+
+/** Shows a small label above a group of popup rows. */
+@Composable
+private fun PopupSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        fontWeight = FontWeight.SemiBold
+    )
+
+    Spacer(modifier = Modifier.height(6.dp))
 }
 
 /** Shows study-session rows in the quick-access popup. */
@@ -273,7 +311,7 @@ private fun buildEventPopupDescription(event: EventItem): String {
         "$typeLabel • ${event.description}"
     }
 }
-/** Shows one rounded item inside a quick-access popup. */
+/** Shows one standard Material-style item inside a quick-access popup. */
 @Composable
 private fun PopupItemCard(
     title: String,
@@ -286,24 +324,25 @@ private fun PopupItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.06f)
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.12f))
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondary,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
 
             if (primaryDetail.isNotBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
+
                 DetailRow(
                     icon = Icons.Default.CalendarMonth,
                     text = primaryDetail
@@ -312,10 +351,10 @@ private fun PopupItemCard(
 
             if (secondaryDetail.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
                     text = secondaryDetail,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -323,6 +362,7 @@ private fun PopupItemCard(
 
             if (location.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
+
                 DetailRow(
                     icon = Icons.Default.LocationOn,
                     text = location
@@ -345,14 +385,14 @@ private fun DetailRow(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.82f),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp)
         )
 
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -370,8 +410,7 @@ private fun EmptyPopupMessage(text: String) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSecondary
+            style = MaterialTheme.typography.bodyMedium
         )
     }
 }

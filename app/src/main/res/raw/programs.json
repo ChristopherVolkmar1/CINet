@@ -1,0 +1,145 @@
+[
+  { "name": "Africana Studies", "type": "Minor", "department": "Africana Studies", "units": "19" },
+
+  { "name": "Anthropology", "type": "Major", "department": "Anthropology", "units": "120" },
+  { "name": "Anthropology", "type": "Minor", "department": "Anthropology", "units": "22" },
+
+  { "name": "Applied Physics", "type": "Major", "department": "Applied Physics", "units": "120" },
+  { "name": "Applied Physics", "type": "Minor", "department": "Applied Physics", "units": "36" },
+  { "name": "Astronomy", "type": "Minor", "department": "Applied Physics", "units": "27-39" },
+
+  { "name": "Art", "type": "Major", "department": "Art", "units": "120" },
+  { "name": "Art History", "type": "Major", "department": "Art", "units": "120" },
+  { "name": "Art Studio", "type": "Major", "department": "Art", "units": "120" },
+  { "name": "Art", "type": "Minor", "department": "Art", "units": "24" },
+  { "name": "Art History", "type": "Minor", "department": "Art", "units": "21" },
+  { "name": "Arts Management", "type": "Minor", "department": "Art", "units": "18" },
+  { "name": "Digital Media Art", "type": "Certificate", "department": "Art", "units": "18" },
+
+  { "name": "Asian-Pacific Studies", "type": "Minor", "department": "Asian-Pacific Studies", "units": "18" },
+
+  { "name": "Biology", "type": "Major", "department": "Biology", "units": "120" },
+  { "name": "Biology", "type": "Minor", "department": "Biology", "units": "24-28" },
+  { "name": "Biotechnology", "type": "Graduate Program", "department": "Biology", "units": "33" },
+  { "name": "Biotechnology (Stem Cell Technology)", "type": "Graduate Program", "department": "Biology", "units": "35" },
+  { "name": "Biotechnology + MBA Dual Degree", "type": "Graduate Program", "department": "Biology", "units": "72" },
+
+  { "name": "Chemistry", "type": "Major", "department": "Chemistry", "units": "120" },
+  { "name": "Biochemistry", "type": "Major", "department": "Chemistry", "units": "120" },
+  { "name": "Chemistry", "type": "Minor", "department": "Chemistry", "units": "23" },
+
+  { "name": "Chicana/o Studies", "type": "Major", "department": "Chicana/o Studies", "units": "120" },
+  { "name": "Chicana/o Studies", "type": "Minor", "department": "Chicana/o Studies", "units": "18-19" },
+
+  { "name": "Environmental Communication", "type": "Major", "department": "Communication", "units": "120" },
+  { "name": "Health Communication", "type": "Major", "department": "Communication", "units": "120" },
+  { "name": "Organizational Communication", "type": "Major", "department": "Communication", "units": "120" },
+  { "name": "Communication", "type": "Minor", "department": "Communication", "units": "18" },
+  { "name": "Visual Media Communication", "type": "Minor", "department": "Communication", "units": "24" },
+
+  { "name": "Computer Game Design & Development", "type": "Minor", "department": "Computer Game Design & Development", "units": "24-25" },
+
+  { "name": "Computer Science", "type": "Major", "department": "Computer Science", "units": "120" },
+  { "name": "Computer Science", "type": "Graduate Program", "department": "Computer Science", "units": "32" },
+  { "name": "Computer Science", "type": "Minor", "department": "Computer Science", "units": "20-23" },
+  { "name": "Cybersecurity", "type": "Minor", "department": "Computer Science", "units": "25-37" },
+  { "name": "Robotics Engineering", "type": "Minor", "department": "Computer Science", "units": "24" },
+
+  { "name": "Dance Studies", "type": "Major", "department": "Dance Studies", "units": "120" },
+
+  { "name": "English", "type": "Major", "department": "English", "units": "120" },
+  { "name": "English (Creative Writing)", "type": "Major", "department": "English", "units": "120" },
+  { "name": "English (Education)", "type": "Major", "department": "English", "units": "120" },
+  { "name": "English (Multicultural Literatures)", "type": "Major", "department": "English", "units": "120" },
+  { "name": "English", "type": "Minor", "department": "English", "units": "21" },
+  { "name": "Creative Writing", "type": "Minor", "department": "English", "units": "15" },
+  { "name": "Professional Writing", "type": "Certificate", "department": "English", "units": "18" },
+
+  { "name": "Environmental Science (Earth Systems)", "type": "Major", "department": "Environmental Science & Resource Management", "units": "120" },
+  { "name": "Environmental Science (Marine and Coastal)", "type": "Major", "department": "Environmental Science & Resource Management", "units": "120" },
+  { "name": "Environmental Science & Resource Management", "type": "Minor", "department": "Environmental Science & Resource Management", "units": "23-25" },
+  { "name": "Environmental Technologies", "type": "Certificate", "department": "Environmental Science & Resource Management", "units": "18" },
+
+  { "name": "Freedom and Justice Studies", "type": "Minor", "department": "Freedom and Justice Studies", "units": "18" },
+
+  { "name": "Global Studies", "type": "Major", "department": "Global Studies", "units": "120" },
+  { "name": "Global Studies", "type": "Minor", "department": "Global Studies", "units": "19-35" },
+
+  { "name": "Global Premodern Studies", "type": "Minor", "department": "Global Premodern Studies", "units": "18" },
+
+  { "name": "Health Science", "type": "Major", "department": "Health Science", "units": "120" },
+
+  { "name": "History", "type": "Major", "department": "History", "units": "120" },
+  { "name": "History", "type": "Minor", "department": "History", "units": "18" },
+
+  { "name": "Information Technology", "type": "Major", "department": "Information Technology", "units": "120" },
+  { "name": "Information Technology", "type": "Minor", "department": "Information Technology", "units": "21" },
+
+  { "name": "Mathematics (Applied)", "type": "Major", "department": "Mathematics", "units": "120" },
+  { "name": "Mathematics (Education)", "type": "Major", "department": "Mathematics", "units": "120" },
+  { "name": "Mathematics (Pure)", "type": "Major", "department": "Mathematics", "units": "120" },
+  { "name": "Mathematics (Statistics)", "type": "Major", "department": "Mathematics", "units": "120" },
+  { "name": "Mathematics", "type": "Minor", "department": "Mathematics", "units": "20" },
+  { "name": "Foundational Mathematics", "type": "Minor", "department": "Mathematics", "units": "34-36" },
+  { "name": "Statistics and Data Analytics", "type": "Minor", "department": "Mathematics", "units": "24" },
+  { "name": "Mathematics", "type": "Graduate Program", "department": "Mathematics", "units": "N/A" },
+
+  { "name": "Mechatronics Engineering", "type": "Major", "department": "Mechatronics Engineering", "units": "125" },
+
+  { "name": "Music", "type": "Major", "department": "Music", "units": "120" },
+
+  { "name": "Nursing", "type": "Major", "department": "Nursing", "units": "120" },
+  { "name": "Nursing (RN to BSN)", "type": "Major", "department": "Nursing", "units": "120" },
+  { "name": "Nursing (Family Nurse Practitioner)", "type": "Graduate Program", "department": "Nursing", "units": "46" },
+  { "name": "Nursing (Nurse Educator)", "type": "Graduate Program", "department": "Nursing", "units": "39" },
+
+  { "name": "Performing Arts", "type": "Minor", "department": "Performing Arts", "units": "21" },
+  { "name": "Guitar", "type": "Certificate", "department": "Performing Arts", "units": "22" },
+
+  { "name": "Philosophy", "type": "Minor", "department": "Philosophy", "units": "18" },
+
+  { "name": "Political Science", "type": "Major", "department": "Political Science", "units": "120" },
+  { "name": "Political Science", "type": "Minor", "department": "Political Science", "units": "18" },
+
+  { "name": "Psychology", "type": "Major", "department": "Psychology", "units": "120" },
+  { "name": "Psychology", "type": "Minor", "department": "Psychology", "units": "18-20" },
+  { "name": "Developmental Psychology", "type": "Minor", "department": "Psychology", "units": "18" },
+
+  { "name": "Sociology", "type": "Major", "department": "Sociology", "units": "120" },
+  { "name": "Sociology", "type": "Minor", "department": "Sociology", "units": "21" },
+
+  { "name": "Spanish", "type": "Major", "department": "Spanish", "units": "120" },
+  { "name": "Spanish", "type": "Minor", "department": "Spanish", "units": "18-26" },
+  { "name": "Healthcare Interpreting", "type": "Certificate", "department": "Spanish", "units": "15" },
+  { "name": "Spanish Translation", "type": "Certificate", "department": "Spanish", "units": "15" },
+
+  { "name": "Theatre and Performance Studies", "type": "Major", "department": "Theatre and Performance Studies", "units": "120" },
+
+  { "name": "Business", "type": "Major", "department": "Business", "units": "120" },
+  { "name": "Business (Finance)", "type": "Major", "department": "Business", "units": "120" },
+  { "name": "Business (Management)", "type": "Major", "department": "Business", "units": "120" },
+  { "name": "Business (Marketing)", "type": "Major", "department": "Business", "units": "120" },
+  { "name": "Business", "type": "Minor", "department": "Business", "units": "21" },
+  { "name": "Business Administration", "type": "Certificate", "department": "Business", "units": "15" },
+  { "name": "Business Administration (MBA)", "type": "Graduate Program", "department": "Business", "units": "33-48" },
+
+  { "name": "Economics", "type": "Major", "department": "Economics", "units": "120" },
+  { "name": "Economics", "type": "Minor", "department": "Economics", "units": "21-22" },
+
+  { "name": "Early Childhood Studies", "type": "Major", "department": "Early Childhood Studies", "units": "120" },
+
+  { "name": "Liberal Studies (Concentrated)", "type": "Major", "department": "Liberal Studies", "units": "120" },
+  { "name": "Liberal Studies (Teaching Credential)", "type": "Major", "department": "Liberal Studies", "units": "133" },
+  { "name": "Liberal Studies (Teaching and Learning)", "type": "Major", "department": "Liberal Studies", "units": "120" },
+
+  { "name": "Education Specialist (Mild to Moderate)", "type": "Credential", "department": "Education", "units": "34-40" },
+  { "name": "Multiple Subject Teaching", "type": "Credential", "department": "Education", "units": "36-42" },
+  { "name": "Administrative Services", "type": "Credential", "department": "Education", "units": "26" },
+  { "name": "Single Subject Teaching", "type": "Credential", "department": "Education", "units": "31-37" },
+  { "name": "Education (Curriculum and Instruction)", "type": "Graduate Program", "department": "Education", "units": "31" },
+  { "name": "Education (Disability Studies)", "type": "Graduate Program", "department": "Education", "units": "31" },
+  { "name": "Education (Higher Education Leadership)", "type": "Graduate Program", "department": "Education", "units": "31" },
+  { "name": "Education (P-12 Leadership)", "type": "Graduate Program", "department": "Education", "units": "31" },
+
+  { "name": "University Experience Program", "type": "Non-Degree Program", "department": "University", "units": "N/A" }
+]

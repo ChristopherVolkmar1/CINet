@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -94,7 +95,8 @@ fun getDynamicColorScheme(selectedTheme: AppThemeColor, isDark: Boolean): ColorS
             onSecondary = Color.White,
             onTertiary = Color.White,
             onBackground = Color.White,
-            onSurface = Color.White
+            onSurface = Color.White,
+            error = selectedTheme.darkButton
         )
     } else {
         lightColorScheme(
@@ -108,7 +110,8 @@ fun getDynamicColorScheme(selectedTheme: AppThemeColor, isDark: Boolean): ColorS
             onSecondary = Color.White,
             onTertiary = Color.White,
             onBackground = Color.Black,
-            onSurface = Color.Black
+            onSurface = Color.Black,
+            error = Color.Red
         )
     }
 }
@@ -131,14 +134,11 @@ fun ThemeSelector(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Color",
-                    style = MaterialTheme.typography.titleMedium
+                    "Theme Color",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    selectedTheme.displayName,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Spacer(modifier = Modifier.width(5.dp))
             }
 
             Row(
@@ -168,7 +168,8 @@ fun ThemeSelector(
                                 Icons.Default.Check,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(20.dp),
+                                //verticalAlignment = Alignment.CenterVertically
                             )
                         }
                     }

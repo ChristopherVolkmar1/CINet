@@ -1,6 +1,8 @@
 package com.example.cinet.feature.calendar.assignment
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.runtime.Composable
@@ -103,21 +105,20 @@ fun AssignmentDialog(
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
-
                 OutlinedTextField(
                     value = dueTime,
-                    // Prevents manual editing; time must come from picker.
                     onValueChange = {},
                     label = { Text("Due Time") },
-                    modifier = Modifier.fillMaxWidth(),
-                    readOnly = true
+                    readOnly = true,
+                    singleLine = true,
+                    maxLines = 1,
+                    trailingIcon = {
+                        IconButton(onClick = onPickTime) {
+                            Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                        }
+                    }
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(onClick = onPickTime) {
-                    Text("Pick Time")
-                }
             }
         },
         confirmButton = {

@@ -93,21 +93,29 @@ object ClassReminderScheduler {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
 
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerMillis,
                     pendingIntent
                 )
-            }
-            else -> {
-                alarmManager.setExact(
+            } else {
+                // Falls back to an inexact alarm — no SCHEDULE_EXACT_ALARM
+                // permission required. Class reminders are fine drifting by
+                // a few minutes; better than crashing.
+                alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerMillis,
                     pendingIntent
                 )
             }
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerMillis,
+                pendingIntent
+            )
         }
 
 

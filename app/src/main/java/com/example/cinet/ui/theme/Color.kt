@@ -21,24 +21,24 @@ val CINetTertiaryDark = Color.White
 // -------------------- Green --------------------
 val GreenLight = Color(0xFF0D8654)
 val GreenDark = Color(0xFF006140)
-val CINetButtonGreenLight = Color(0xFF0D8654)
+val CINetButtonGreenLight = Color(0xFF0B6E45)
 val CINetButtonGreenDark = Color(0xFF0D8654)
 // -------------------- Orange --------------------
 val OrangeLight = Color(0xFFCA6830)
 val OrangeDark = Color(0xFF8F4420)
-val ButtonOrangeLight = Color(0xFFCA6830)
+val ButtonOrangeLight = Color(0xFFB05B2B)
 val ButtonOrangeDark = Color(0xFFCA6830)
 
 // -------------------- Purple --------------------
 val PurpleLight = Color(0xFF7B4AAF)
 val PurpleDark = Color(0xFF4A2470)
-val ButtonPurpleLight = Color(0xFF7B4AAF)
+val ButtonPurpleLight = Color(0xFF6A4096)
 val ButtonPurpleDark = Color(0xFF7B4AAF)
 
 // -------------------- Yellow --------------------
 val YellowLight = Color(0xFFB89A1A)
 val YellowDark = Color(0xFF7A6310)
-val ButtonYellowLight = Color(0xFFB89A1A)
+val ButtonYellowLight = Color(0xFF967E13)
 val ButtonYellowDark = Color(0xFFB89A1A)
 
 // -------------------- Blue --------------------

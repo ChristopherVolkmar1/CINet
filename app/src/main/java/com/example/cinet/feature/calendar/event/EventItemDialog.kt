@@ -1,32 +1,27 @@
 package com.example.cinet.feature.calendar.event
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.model.CampusRegistry
 import com.example.cinet.feature.map.CampusLocation
-import com.example.cinet.feature.map.SearchLocationBar
+import com.example.cinet.feature.map.SearchBar
+import kotlinx.coroutines.flow.MutableStateFlow
 
-// Category key → display label pairs shown as filter chips above the search bar.
-private val locationCategories = listOf(
-    "academic"         to "Academic",
-    "dining"           to "Dining",
-    "commuter_parking" to "Parking",
-)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventItemDialog(
     editingEvent: EventItem?,
@@ -39,24 +34,13 @@ fun EventItemDialog(
     onPickTime: () -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    onDelete: (() -> Unit)?,
-    viewModel: CampusRegistry = viewModel<CampusRegistry>()
+    onDelete: (() -> Unit)?
 ) {
-    // Full registry — contains academic, dining, commuter_parking, transit
-    val campusRegistry by viewModel.campusRegistry.collectAsState()
+    val isPreview = LocalInspectionMode.current
+    val vm: CampusRegistry? = if (isPreview) null else viewModel<CampusRegistry>()
+    val campusRegistry by (vm?.campusRegistry ?: MutableStateFlow(emptyMap())).collectAsState(initial = emptyMap())
 
     val textFieldState = rememberTextFieldState()
-
-    // Which category the user has selected (default: Academic)
-    var locationCategory by remember { mutableStateOf("academic") }
-
-    // Locations in the selected category, filtered by whatever is typed
-    val filteredNames = remember(textFieldState.text, locationCategory, campusRegistry) {
-        val categoryLocations = campusRegistry[locationCategory] ?: emptyList()
-        categoryLocations
-            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
-            .map { it.name }
-    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -78,62 +62,65 @@ fun EventItemDialog(
                     value = eventTime,
                     onValueChange = {},
                     label = { Text("Time") },
-                    modifier = Modifier.fillMaxWidth(),
-                    readOnly = true
+                    readOnly = true,
+                    singleLine = true,
+                    maxLines = 1,
+                    trailingIcon = {
+                        IconButton(onClick = onPickTime) {
+                            Icon(Icons.Default.Schedule, contentDescription = "Pick time")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(onClick = onPickTime) { Text("Pick Time") }
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Category filter chips — Academic / Dining / Parking
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    locationCategories.forEach { (key, label) ->
-                        FilterChip(
-                            selected = locationCategory == key,
-                            onClick = {
-                                locationCategory = key
-                                // Clear selection when switching category
-                                onLocationChange(null)
-                            },
-                            label = { Text(label) },
-                        )
-                    }
+                Box(modifier = Modifier.imePadding()) {
+                    SearchBar(
+                        placeholderText = "Add a location...",
+                        textFieldState = textFieldState,
+                        searchResults = campusRegistry.values.flatten()
+                            .filter { it.name.contains(textFieldState.text.toString(), ignoreCase = true) }
+                            .map { it.name }
+                            .distinct(),
+                        onSearch = { query ->
+                            val found = (campusRegistry["academic"] ?: emptyList())
+                                .find { it.name.equals(query, ignoreCase = true) }
+                            onLocationChange(found)
+                            textFieldState.edit { replace(0, length, query) }
+                        }
+                    )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Search bar — results come from the selected category only
-                SearchLocationBar(
-                    textFieldState = textFieldState,
-                    searchResults = filteredNames,
-                    onSearch = { query ->
-                        val categoryLocations = campusRegistry[locationCategory] ?: emptyList()
-                        val found = categoryLocations.find { it.name.equals(query, ignoreCase = true) }
-                        onLocationChange(found)
-                        textFieldState.edit { replace(0, length, query) }
-                    }
-                )
             }
         },
-        confirmButton = {
-            Button(onClick = onConfirm) {
-                Text(if (editingEvent == null) "Save" else "Update")
-            }
-        },
+        confirmButton = {},
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 if (onDelete != null) {
                     Button(
                         onClick = onDelete,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error
-                        )
+                        ),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) { Text("Delete") }
                 }
-                OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) { Text("Cancel") }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    Text(if (editingEvent == null) "Save" else "Update")
+                }
             }
         }
     )

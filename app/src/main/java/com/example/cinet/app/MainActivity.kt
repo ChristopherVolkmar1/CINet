@@ -22,6 +22,9 @@ import com.example.cinet.ui.theme.CINetTheme
 import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
+import com.example.cinet.data.remote.canvas.CanvasTokenStore
+import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
+import com.example.cinet.data.remote.canvas.CanvasMessagingSettings
 
 class MainActivity : ComponentActivity() {
 
@@ -52,6 +55,9 @@ class MainActivity : ComponentActivity() {
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
 
+        CanvasDisplaySettings.init(this)
+        CanvasMessagingSettings.init(this)
+
         setContent {
             val authState by authViewModel.authState.collectAsState()
 
@@ -78,10 +84,10 @@ class MainActivity : ComponentActivity() {
             ) {
                 NavigationHandler(
                     authState = authState,
-                    onSignOut = { authViewModel.signOut() },
+                    onSignOut = { signOutAndClearCanvasSession() },
                     onRetry = { authViewModel.retryProfileLoad() },
-                    onSaveProfile = { nickname, major, pronouns ->
-                        authViewModel.saveProfile(nickname, major, pronouns)
+                    onSaveProfile = { nickname, major, minor, pronouns ->
+                        authViewModel.saveProfile(nickname, major, minor, pronouns)
                     },
                     initialConversationId = pendingConversationId,
                     onConversationOpened = { pendingConversationId = null },
@@ -99,6 +105,14 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
         pendingMapLocationName = intent.getStringExtra(EXTRA_OPEN_MAP_FOR_LOCATION)
+    }
+
+    // Clears Canvas access before signing out so the next user must reconnect Canvas.
+    private fun signOutAndClearCanvasSession() {
+        CanvasTokenStore(this).clear()
+        CanvasDisplaySettings.showCanvasInCalendar = false
+        CanvasMessagingSettings.showCanvasMessaging = false
+        authViewModel.signOut()
     }
 
     companion object {

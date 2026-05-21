@@ -12,6 +12,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.example.cinet.feature.calendar.schedule.ScheduleItem
 
 /** Builds the combined Home screen upcoming-event list from manual items, user events, and campus events. */
 fun buildHomeUpcomingEventItems(
@@ -20,18 +21,44 @@ fun buildHomeUpcomingEventItems(
     campusEvents: List<EventItem>,
     userEvents: List<EventItem> = emptyList(),
     classItems: List<ClassItem> = emptyList(),
+    scheduleItems: List<ScheduleItem> = emptyList(),
+    showCanvasItems: Boolean = true,
     currentTimeMillis: Long = System.currentTimeMillis()
 ): List<HomeUpcomingEventItem> {
+    val visibleUserEvents = if (showCanvasItems) {
+        userEvents
+    } else {
+        userEvents.filterNot { it.isCanvasEvent }
+    }
+
+    val visibleClasses = classItems.filter {
+        it.canvasId == null || (showCanvasItems && it.isFavorite)
+    }
+
     val campusUpcoming = buildCampusUpcomingEventItems(context, campusEvents, currentTimeMillis)
-    val userUpcoming = buildUserUpcomingEventItems(userEvents, currentTimeMillis)
-    val classUpcoming = buildClassUpcomingEventItems(classItems, currentTimeMillis)
+    val userUpcoming = buildUserUpcomingEventItems(visibleUserEvents, currentTimeMillis)
+    val classUpcoming = buildClassUpcomingEventItems(visibleClasses, currentTimeMillis)
+
+    val canvasAssignmentUpcoming = buildCanvasAssignmentUpcomingEventItems(
+        scheduleItems = scheduleItems,
+        classItems = classItems,
+        showCanvasItems = showCanvasItems,
+        currentTimeMillis = currentTimeMillis
+    )
+
     val manualUpcoming = buildManualUpcomingEventItems(manualItems)
-    
-    // Combine all and sort by time.
-    val sortedEvents = (campusUpcoming + userUpcoming + classUpcoming).sortedBy { it.sortKey }
-    
+
+// Combine all and sort by time.
+    val sortedEvents = (campusUpcoming + userUpcoming + classUpcoming + canvasAssignmentUpcoming)
+        .sortedBy { it.sortKey }
+
     val result = sortedEvents + manualUpcoming
-    Log.d("EventsBuilder", "Built ${result.size} items. Campus: ${campusUpcoming.size}, User: ${userUpcoming.size}, Class: ${classUpcoming.size}, Manual: ${manualUpcoming.size}")
+
+    Log.d(
+        "EventsBuilder",
+        "Built ${result.size} items. Campus: ${campusUpcoming.size}, User: ${userUpcoming.size}, Class: ${classUpcoming.size}, CanvasAssignments: ${canvasAssignmentUpcoming.size}, Manual: ${manualUpcoming.size}"
+    )
+
     return result
 }
 
@@ -55,11 +82,9 @@ private fun buildUserUpcomingEventItems(
     return userEvents
         .mapNotNull { event ->
             val startMillis = event.startEpochMillis ?: parseEventToMillis(event.date, event.time)
-            // For user events, we consider them "past" only if they've completely ended.
-            // Since we don't have a reliable end time for all, we use a 1-hour default duration for filtering.
-            val endMillis = event.endEpochMillis ?: (startMillis?.plus(3600000))
-            
-            if (startMillis == null || endMillis == null || endMillis < currentTimeMillis) return@mapNotNull null
+
+            // The home banner should show the next event, not an event that already started.
+            if (startMillis == null || startMillis <= currentTimeMillis) return@mapNotNull null
             
             HomeUpcomingEventItem(
                 title = event.name,
@@ -100,6 +125,42 @@ private fun buildClassUpcomingEventItems(
         }
 }
 
+/** Builds home-banner rows for Canvas assignment due dates shown on the calendar. */
+private fun buildCanvasAssignmentUpcomingEventItems(
+    scheduleItems: List<ScheduleItem>,
+    classItems: List<ClassItem>,
+    showCanvasItems: Boolean,
+    currentTimeMillis: Long
+): List<HomeUpcomingEventItem> {
+    if (!showCanvasItems) return emptyList()
+
+    return scheduleItems
+        .filter { it.canvasId != null }
+        .filter { shouldShowCanvasAssignmentOnHome(it, classItems) }
+        .mapNotNull { assignment ->
+            val dueMillis = parseEventToMillis(assignment.date, assignment.dueTime)
+                ?: return@mapNotNull null
+
+            if (dueMillis <= currentTimeMillis) return@mapNotNull null
+
+            HomeUpcomingEventItem(
+                title = assignment.assignmentName,
+                description = "${formatEventDate(dueMillis)} • Due ${assignment.dueTime} | ${assignment.className}",
+                isCampusEvent = false,
+                sortKey = dueMillis
+            )
+        }
+}
+
+/** Keeps Canvas assignments aligned with the same visibility rules used by the calendar. */
+private fun shouldShowCanvasAssignmentOnHome(
+    assignment: ScheduleItem,
+    classItems: List<ClassItem>
+): Boolean {
+    val parentClass = classItems.firstOrNull { it.id == assignment.classId } ?: return true
+    return parentClass.canvasId == null || parentClass.isFavorite
+}
+
 private fun shouldShowCampusEventOnHome(
     context: Context,
     event: EventItem,
@@ -108,10 +169,9 @@ private fun shouldShowCampusEventOnHome(
     if (!event.isCampusEvent) return false
     if (!CampusEventReminderPreferences.isReminderEnabled(context, event.id)) return false
 
-    val startMillis = event.startEpochMillis ?: parseEventToMillis(event.date, event.time)
-    val eventEndMillis = event.endEpochMillis ?: startMillis ?: return false
-    
-    return eventEndMillis >= currentTimeMillis
+    val startMillis = event.startEpochMillis ?: parseEventToMillis(event.date, event.time) ?: return false
+
+    return startMillis > currentTimeMillis
 }
 
 private fun toHomeUpcomingCampusEventItem(event: EventItem, startMillis: Long): HomeUpcomingEventItem {
@@ -186,9 +246,9 @@ private fun findNextClassOccurrence(classItem: ClassItem, currentTimeMillis: Lon
         if (meetingDays.contains(candidateDate.dayOfWeek)) {
             val candidateDateTime = candidateDate.atTime(startTime)
             val candidateMillis = candidateDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            
-            // Allow showing the class if it started within the last 45 minutes (it's "current")
-            if (candidateMillis >= currentTimeMillis - 2700000) {
+
+            // Only show class meetings that have not started yet.
+            if (candidateMillis > currentTimeMillis) {
                 return candidateMillis
             }
         }
