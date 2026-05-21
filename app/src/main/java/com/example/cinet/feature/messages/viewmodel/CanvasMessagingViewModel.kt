@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
 
 /**
  * Holds the state of the Canvas messaging surface.

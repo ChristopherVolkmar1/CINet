@@ -7,20 +7,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.cinet.data.remote.canvas.CanvasDisplaySettings
 import com.example.cinet.data.remote.canvas.CanvasMessagingSettings
 import com.example.cinet.feature.settings.canvas.viewmodel.CanvasSyncViewModel
+import androidx.compose.runtime.LaunchedEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +34,10 @@ fun CanvasConnectionScreen(
     val state by viewModel.uiState.collectAsState()
     val showCanvasInCalendar = CanvasDisplaySettings.showCanvasInCalendar
     val showCanvasMessaging = CanvasMessagingSettings.showCanvasMessaging
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshConnectionState()
+    }
 
     Scaffold(
         topBar = {
@@ -90,7 +82,7 @@ fun CanvasConnectionScreen(
                         text = if (state.hasToken)
                             "CINet pulls your starred Canvas courses, their assignments, calendar events, announcements, and to-dos."
                         else
-                            "Paste a Personal Access Token to let CINet pull your Canvas data into the calendar.",
+                            "Canvas is disconnected. Enter a valid Canvas access token to sync again.",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

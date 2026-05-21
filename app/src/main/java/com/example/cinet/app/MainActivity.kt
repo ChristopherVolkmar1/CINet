@@ -84,9 +84,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 NavigationHandler(
                     authState = authState,
-                    onSignOut = {
-                        CanvasTokenStore(this@MainActivity).clear()
-                        authViewModel.signOut() },
+                    onSignOut = { signOutAndClearCanvasSession() },
                     onRetry = { authViewModel.retryProfileLoad() },
                     onSaveProfile = { nickname, major, minor, pronouns ->
                         authViewModel.saveProfile(nickname, major, minor, pronouns)
@@ -107,6 +105,14 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         pendingConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
         pendingMapLocationName = intent.getStringExtra(EXTRA_OPEN_MAP_FOR_LOCATION)
+    }
+
+    // Clears Canvas access before signing out so the next user must reconnect Canvas.
+    private fun signOutAndClearCanvasSession() {
+        CanvasTokenStore(this).clear()
+        CanvasDisplaySettings.showCanvasInCalendar = false
+        CanvasMessagingSettings.showCanvasMessaging = false
+        authViewModel.signOut()
     }
 
     companion object {
