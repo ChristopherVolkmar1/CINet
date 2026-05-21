@@ -322,11 +322,13 @@ class SocialRepository(
         return try {
             val snapshot = db.collection("conversations")
                 .whereArrayContains("participantIds", currentUid)
-                .orderBy("lastUpdated", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
-            Result.success(snapshot.toObjects(Conversation::class.java))
+            val conversations = snapshot.toObjects(Conversation::class.java)
+                .sortedByDescending { it.lastUpdated?.time ?: 0L }
+
+            Result.success(conversations)
         } catch (e: Exception) {
             Result.failure(e)
         }
