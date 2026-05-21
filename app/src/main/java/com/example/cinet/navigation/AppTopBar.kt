@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -30,6 +31,8 @@ import androidx.compose.material3.TextButton
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.cinet.feature.social.ConversationTopBarState
+import androidx.compose.foundation.layout.RowScope
+
 
 
 // Draws the persistent page title bar used across the app.
@@ -40,19 +43,20 @@ internal fun AppTopBar(
     nickname: String = "",
     mapTopBarContent: (@Composable RowScope.() -> Unit)? = null,
     calendarTopBarContent: (@Composable RowScope.() -> Unit)? = null,
+    settingsTopBarActions: (@Composable RowScope.() -> Unit)? = null,
     onBack: () -> Unit,
     onFriendsClick: () -> Unit,
     onNewMessageClick: () -> Unit,
     onCanvasMessagesClick: () -> Unit,
-){
+    onSettingsCanvasClick: () -> Unit,
+    onSettingsSignOutClick: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.primary)
             .statusBarsPadding()
     ) {
-        val topBarHeight = if (mapTopBarContent != null) 70.dp else 60.dp
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -62,6 +66,7 @@ internal fun AppTopBar(
         ) {
             val newConversationTopBarState = state.newConversationTopBarState
             val conversationTopBarState = state.conversationTopBarState
+
             if (state.showBackButton) {
                 IconButton(onClick = onBack) {
                     Icon(
@@ -70,6 +75,7 @@ internal fun AppTopBar(
                         tint = Color.White
                     )
                 }
+
                 Spacer(modifier = Modifier.width(4.dp))
             }
 
@@ -146,6 +152,13 @@ internal fun AppTopBar(
                     onNewMessageClick = onNewMessageClick,
                     onCanvasMessagesClick = onCanvasMessagesClick
                 )
+            } else if (state.showSettingsActions) {
+                SettingsTopBarActions(
+                    onCanvasSyncClick = onSettingsCanvasClick,
+                    onSignOutClick = onSettingsSignOutClick
+                )
+            } else if (settingsTopBarActions != null) {
+                settingsTopBarActions()
             }
         }
     }
@@ -346,5 +359,32 @@ private fun SocialTopBarActions(
                 modifier = Modifier.size(32.dp)
             )
         }
+    }
+}
+
+// Shows the Canvas Sync and Sign Out actions used by the Settings page.
+@Composable
+private fun SettingsTopBarActions(
+    onCanvasSyncClick: () -> Unit,
+    onSignOutClick: () -> Unit,
+) {
+    IconButton(onClick = onCanvasSyncClick) {
+        Icon(
+            imageVector = Icons.Default.Sync,
+            contentDescription = "Canvas Sync",
+            tint = Color.White,
+            modifier = Modifier.size(32.dp)
+        )
+    }
+
+    Spacer(modifier = Modifier.width(12.dp))
+
+    IconButton(onClick = onSignOutClick) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.Logout,
+            contentDescription = "Sign out",
+            tint = Color.White,
+            modifier = Modifier.size(32.dp)
+        )
     }
 }

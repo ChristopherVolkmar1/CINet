@@ -84,11 +84,9 @@ internal fun NavigationScreenRoute(
             onSelectedProfileBack = callbacks.onSettingsSelectedProfileBack,
             onEditProfile = callbacks.onShowProfileEdit,
             onSettingsBack = { callbacks.onGoToScreen(Screen.Home) },
-            onSignOut = callbacks.onSignOut,
             onSettingsChange = callbacks.onSettingsChange,
             onReadReceiptsChange = callbacks.onReadReceiptsChange,
             onViewProfile = callbacks.onViewProfile,
-            onOpenCanvas = callbacks.onOpenCanvas,
         )
     }
 }

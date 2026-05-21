@@ -8,6 +8,7 @@ internal data class NavigationTopBarState(
     val showBackButton: Boolean,
     val showSocialActions: Boolean,
     val showCanvasMessagesAction: Boolean = false,
+    val showSettingsActions: Boolean = false,
     val pendingRequestCount: Int,
     val isHomeScreen: Boolean = false,
     val nickname: String = "",

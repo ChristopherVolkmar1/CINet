@@ -30,6 +30,8 @@ internal fun NavigationScaffoldContent(
     onTopBarFriendsClick: () -> Unit,
     onTopBarCanvasMessagesClick: () -> Unit,
     onTopBarNewMessageClick: () -> Unit,
+    onSettingsCanvasClick: () -> Unit,
+    onSettingsSignOutClick: () -> Unit,
     onMapBack: () -> Unit,
     onMapFinishedLoading: () -> Unit,
     onRemoveExtraLocation: (CampusLocation) -> Unit,
@@ -68,7 +70,9 @@ internal fun NavigationScaffoldContent(
                 },
                 onFriendsClick = onTopBarFriendsClick,
                 onNewMessageClick = onTopBarNewMessageClick,
-                onCanvasMessagesClick = onTopBarCanvasMessagesClick
+                onCanvasMessagesClick = onTopBarCanvasMessagesClick,
+                onSettingsCanvasClick = onSettingsCanvasClick,
+                onSettingsSignOutClick = onSettingsSignOutClick
             )
         },
         bottomBar = {

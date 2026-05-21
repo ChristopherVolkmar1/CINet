@@ -43,14 +43,12 @@ object AppSettings {
 @Composable
 fun SettingScreen(
     onBack: () -> Unit,
-    onSignOut: () -> Unit,
     isDarkMode: Boolean,
     notificationsEnabled: Boolean,
     selectedTheme: AppThemeColor,
     onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
     userProfile: UserProfile? = null,
     onViewProfile: () -> Unit = {},
-    onOpenCanvas: () -> Unit = {},
     showHeader: Boolean = true,
     readReceiptsEnabled: Boolean = true,
     onReadReceiptsChange: (Boolean) -> Unit = {},
@@ -238,27 +236,6 @@ fun SettingScreen(
                 onCheckedChange = onReadReceiptsChange
             )
         }
-
         Spacer(modifier = Modifier.weight(1f))
-
-        // Canvas LMS sync entry
-        OutlinedButton(
-            onClick = onOpenCanvas,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-        ) {
-            Text("Canvas Sync")
-        }
-
-        // sign out button
-        OutlinedButton(
-            onClick = onSignOut,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-        ) {
-            Text("Sign out")
-        }
     }
 }
