@@ -72,6 +72,9 @@ internal fun MainScaffold(
     var showSocialScreen by remember { mutableStateOf(false) }
     var newConversationTopBarState by remember { mutableStateOf<NewConversationTopBarState?>(null) }
     var conversationTopBarState by remember { mutableStateOf<ConversationTopBarState?>(null) }
+    // Restored: top-bar state pushed up from the Map and Calendar screens.
+    var mapTopBarState by remember { mutableStateOf<com.example.cinet.feature.map.MapTopBarState?>(null) }
+    var calendarTopBarState by remember { mutableStateOf<com.example.cinet.feature.calendar.calendarFiles.CalendarTopBarState?>(null) }
 
     var showCIView by remember { mutableStateOf(false) }
     var selectedNewsArticle by remember { mutableStateOf<NewsArticle?>(null) }
@@ -233,6 +236,9 @@ internal fun MainScaffold(
             selectedClub != null -> selectedClub = null
             showClubs -> showClubs = false
             currentScreen == Screen.Social && selectedProfile != null -> selectedProfile = null
+            currentScreen == Screen.Social && showSocialScreen -> {
+                showSocialScreen = false
+            }
             currentScreen == Screen.Social && activeConversation != null -> {
                 activeConversation = null
                 conversationTopBarState = null
@@ -242,9 +248,6 @@ internal fun MainScaffold(
                     showNewConversation = false
                     newConversationTopBarState = null
                 }
-            }
-            currentScreen == Screen.Social && showSocialScreen -> {
-                showSocialScreen = false
             }
             currentScreen == Screen.Settings && showCanvasScreen -> showCanvasScreen = false
             currentScreen == Screen.Settings && showProfileEdit -> showProfileEdit = false
@@ -422,7 +425,10 @@ internal fun MainScaffold(
                 conversationTopBarState
             } else {
                 null
-            }
+            },
+            // Restored: pass map and calendar top-bar states through to AppTopBar.
+            mapTopBarState = if (currentScreen == Screen.Map) mapTopBarState else null,
+            calendarTopBarState = if (currentScreen == Screen.Calendar) calendarTopBarState else null,
         ),
         currentScreen = currentScreen,
         userProfile = userProfile,
@@ -651,5 +657,7 @@ internal fun MainScaffold(
             if (selectedClub != null) selectedClub = null else showClubs = false
         },
         onCanvasConversationClick = { selectedCanvasConversation = it },
+        onSettingsCanvasClick = routeCallbacks.onOpenCanvas,
+        onSettingsSignOutClick = routeCallbacks.onSignOut,
     )
 }

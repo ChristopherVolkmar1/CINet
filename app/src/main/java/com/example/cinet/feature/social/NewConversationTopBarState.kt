@@ -8,4 +8,5 @@ data class NewConversationTopBarState(
     val isActionLoading: Boolean,
     val onBackClick: () -> Unit,
     val onActionClick: () -> Unit,
+    val onPinnedClick: (() -> Unit)? = null,
 )

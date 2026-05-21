@@ -5,16 +5,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import com.example.cinet.feature.map.CampusLocation
 import com.example.cinet.feature.map.CampusMapScreen
 import com.example.cinet.feature.map.MapTopBarState
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 
-// Displays the campus map only when the navigation layer asks for the map screen.
+// Keeps the map alive, but moves it behind other pages when Map is not active.
 @Composable
 internal fun NavigationMapLayer(
+    currentScreen: Screen,
     preSelectedLocation: CampusLocation?,
     autoRouteToPreSelectedLocation: Boolean,
     extraLocations: List<CampusLocation>,
@@ -23,8 +22,15 @@ internal fun NavigationMapLayer(
     onRemoveExtraLocation: (CampusLocation) -> Unit,
     onTopBarStateChanged: (MapTopBarState?) -> Unit,
 ) {
+    val isMapVisible = currentScreen == Screen.Map
+
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(if (isMapVisible) 1f else 0f)
+            .graphicsLayer {
+                alpha = if (isMapVisible) 1f else 0f
+            }
     ) {
         CampusMapScreen(
             onBack = onBack,
@@ -33,7 +39,7 @@ internal fun NavigationMapLayer(
             onFinishedLoading = onFinishedLoading,
             extraLocations = extraLocations,
             onRemoveExtraLocation = onRemoveExtraLocation,
-            onTopBarStateChanged = onTopBarStateChanged
+            onTopBarStateChanged = onTopBarStateChanged,
         )
     }
 }
