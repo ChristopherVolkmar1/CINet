@@ -632,6 +632,8 @@ internal fun MainScaffold(
             showNewConversation = true
         },
         onTopBarCanvasMessagesClick = routeCallbacks.onShowCanvasInbox,
+        onSettingsCanvasClick = routeCallbacks.onOpenCanvas,
+        onSettingsSignOutClick = routeCallbacks.onSignOut,
         onMapBack = ::popBackStack,
         onMapFinishedLoading = {
             preSelectedMapLocation = null

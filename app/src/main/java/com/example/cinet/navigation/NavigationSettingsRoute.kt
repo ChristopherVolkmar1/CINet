@@ -25,11 +25,9 @@ internal fun NavigationSettingsRoute(
     onSelectedProfileBack: () -> Unit,
     onEditProfile: () -> Unit,
     onSettingsBack: () -> Unit,
-    onSignOut: () -> Unit,
     onSettingsChange: (Boolean, Boolean, AppThemeColor) -> Unit,
     onReadReceiptsChange: (Boolean) -> Unit,
     onViewProfile: () -> Unit,
-    onOpenCanvas: () -> Unit,
 ) {
     when {
         showCanvasScreen -> CanvasConnectionScreen(
@@ -63,14 +61,12 @@ internal fun NavigationSettingsRoute(
 
         else -> SettingScreen(
             onBack = onSettingsBack,
-            onSignOut = onSignOut,
             isDarkMode = userProfile.isDarkMode,
             notificationsEnabled = userProfile.notificationsEnabled,
             selectedTheme = AppSettings.selectedTheme,
             onSettingsChange = onSettingsChange,
             userProfile = userProfile,
             onViewProfile = onViewProfile,
-            onOpenCanvas = onOpenCanvas,
             showHeader = false,
             readReceiptsEnabled = userProfile.readReceiptsEnabled,
             onReadReceiptsChange = onReadReceiptsChange,
